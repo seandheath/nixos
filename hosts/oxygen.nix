@@ -29,11 +29,8 @@
       enable = true;
     };
   };
-  virtualisation.libvirtd.allowedBridges = [ "br0" ];
 
-  #imports =
-    #[ (modulesPath + "/installer/scan/not-detected.nix")
-    #];
+  virtualisation.libvirtd.allowedBridges = [ "br0" ];
 
   boot.initrd.availableKernelModules = [ "xhci_pci" "ahci" "nvme" "usb_storage" "usbhid" "sd_mod" ];
   boot.initrd.kernelModules = [ ];
