@@ -40,11 +40,11 @@
 	go
 	joplin-desktop
 	bibletime
-	mullvad-vpn
 	teams
 	firefox
 	bitwarden
 	virt-manager
+	thefuck
   ];
   environment.sessionVariables.GTK_THEME = "Adwaita:dark";
   environment.etc = {
@@ -95,6 +95,6 @@
     alsa.support32Bit = true;
     pulse.enable = true;
   };
-
+  services.mullvad-vpn.enable = true;
 }
 
