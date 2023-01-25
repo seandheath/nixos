@@ -14,7 +14,7 @@
     initExtra = ''
 # ALIASES
 eval "$(thefuck --alias)"
-alias nr="sudo nixos-rebuild switch --impure --flake /etc/nixos"
+alias nr="sudo nixos-rebuild switch --impure --flake /home/user/nixos"
 alias ns="nix search nixpkgs"
 alias dmesg="dmesg --color=always"
 

@@ -2,14 +2,11 @@
 # your system.  Help is available in the configuration.nix(5) man page
 # and in the NixOS manual (accessible by running ‘nixos-help’).
 
-{ config, nixpkgs, ... }:
-
-{
+{ config, nixpkgs, system, ... }: {
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
   nixpkgs.config.allowUnfree = true;
   nix.settings = {
-    auto-optimise-store = true;
     experimental-features = [
       "nix-command"
       "flakes"
