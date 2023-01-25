@@ -5,11 +5,6 @@
 { config, pkgs, ... }:
 
 {
-  imports =
-    [ # Include the results of the hardware scan.
-      ../hardware-configuration.nix
-    ];
-
   networking.hostName = "uranium"; # Define your hostname.
 
   # This value determines the NixOS release from which the default

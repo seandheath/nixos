@@ -46,9 +46,10 @@
           inputs.nixos-hardware.nixosModules.common-cpu-intel
         ];
       };
-      
+
       oxygen = {
         system = "x86_64-linux";
+	home-manager = "workstation";
         modules = [
           ./users/user.nix
           ./modules/nvidia.nix
