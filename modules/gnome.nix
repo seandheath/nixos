@@ -45,6 +45,8 @@
 	bitwarden
 	virt-manager
 	thefuck
+	ripgrep
+	mullvad-vpn
   ];
   environment.sessionVariables.GTK_THEME = "Adwaita:dark";
   environment.etc = {
@@ -78,6 +80,7 @@
     gnome.iagno
     gnome.hitori
     gnome.atomix
+    gnome.epiphany
     gnome-tour
   ];
 
