@@ -13,10 +13,10 @@
     enable = true;
     startInBackground = true;
   };
-  services.syncthing = {
-    enable = true;
-    tray.enable = true;
-  };
+  #services.syncthing = {
+    #enable = true;
+    #tray.enable = true;
+  #};
 
   dconf.settings = {
     "org/gnome/mutter" = { workspaces-only-on-primary = "true"; };
