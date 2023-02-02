@@ -1,6 +1,5 @@
 { config, pkgs, ... }:
 {
-
   # Desktop Environment
   services.xserver = {
     enable = true;
@@ -15,6 +14,8 @@
   environment.systemPackages = with pkgs; [
 	gnomeExtensions.appindicator
 	gnomeExtensions.gtile
+	gnomeExtensions.mullvad-indicator
+	mullvad-vpn
 	gnome.gnome-tweaks
 	gnome.gnome-terminal
   	keepassxc
@@ -45,6 +46,7 @@
 	bitwarden
 	virt-manager
 	thefuck
+	devel.vmware-horizon-client
   ];
   environment.sessionVariables.GTK_THEME = "Adwaita:dark";
   environment.etc = {
