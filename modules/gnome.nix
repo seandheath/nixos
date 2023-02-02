@@ -9,6 +9,14 @@
   services.udev.packages = with pkgs; [
     gnome.gnome-settings-daemon 
   ];
+  services.printing.enable = true;
+  services.printing.drivers = with pkgs; [
+  	gutenprint
+	gutenprintBin
+	brlaser
+	brgenml1lpr
+  ];
+
 
   # GUI Packages
   environment.systemPackages = with pkgs; [
