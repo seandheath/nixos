@@ -13,10 +13,5 @@
       "flakes"
     ];
   };
-  nixpkgs.config = {
-    packageOverrides = pkgs: {
-      devel = import develTarball { config = config.nixpkgs.config; };
-    };
-  };
   time.timeZone = "America/New_York";
 }
