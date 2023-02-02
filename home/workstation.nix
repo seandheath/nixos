@@ -3,6 +3,7 @@
   imports = [
     ./core.nix
     ./go.nix
+    ./neovim.nix
     ./gnome.nix
   ];
 
