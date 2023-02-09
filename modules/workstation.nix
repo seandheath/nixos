@@ -1,6 +1,7 @@
 { config, pkgs, ... }:
 {
 
+  import = 
   # Desktop Environment
   services.xserver = {
     enable = true;
@@ -17,12 +18,10 @@
 	gnomeExtensions.gtile
 	gnome.gnome-tweaks
 	gnome.gnome-terminal
-	p7zip
   	keepassxc
 	vscodium
 	nmap
 	unzip
-	protonvpn-gui
 	vlc
 	helix
 	nextcloud-client
@@ -50,8 +49,6 @@
 	thefuck
 	ripgrep
 	mullvad-vpn
-	rustup
-	gcc
   ];
   environment.sessionVariables.GTK_THEME = "Adwaita:dark";
   environment.etc = {

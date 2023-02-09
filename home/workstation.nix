@@ -3,9 +3,9 @@
   imports = [
     ./core.nix
     ./go.nix
+    ./neovim.nix
     ./gnome.nix
   ];
-
 
   home.sessionPath = [ "/home/user/go/bin" ];
 
