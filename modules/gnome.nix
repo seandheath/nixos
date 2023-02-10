@@ -1,5 +1,6 @@
 { config, pkgs, ... }:
 {
+  virtualisation.podman.enable = true;
   # Desktop Environment
   services.xserver = {
     enable = true;
