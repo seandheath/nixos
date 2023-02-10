@@ -19,6 +19,7 @@
 	gnome.gnome-terminal
 	p7zip
   	keepassxc
+	pkg-config
 	vscodium
 	buildah
 	nmap
