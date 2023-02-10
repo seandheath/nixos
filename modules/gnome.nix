@@ -27,6 +27,7 @@
 	gnome.gnome-tweaks
 	gnome.gnome-terminal
 	p7zip
+	openssl
   	keepassxc
 	pkg-config
 	vscodium
