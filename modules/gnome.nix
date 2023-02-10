@@ -20,6 +20,7 @@
 	p7zip
   	keepassxc
 	vscodium
+	buildah
 	nmap
 	unzip
 	protonvpn-gui
