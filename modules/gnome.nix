@@ -1,6 +1,5 @@
 { config, pkgs, ... }:
 {
-
   # Desktop Environment
   services.xserver = {
     enable = true;
@@ -10,11 +9,21 @@
   services.udev.packages = with pkgs; [
     gnome.gnome-settings-daemon 
   ];
+  services.printing.enable = true;
+  services.printing.drivers = with pkgs; [
+  	gutenprint
+	gutenprintBin
+	brlaser
+	brgenml1lpr
+  ];
+
 
   # GUI Packages
   environment.systemPackages = with pkgs; [
 	gnomeExtensions.appindicator
 	gnomeExtensions.gtile
+	gnomeExtensions.mullvad-indicator
+	mullvad-vpn
 	gnome.gnome-tweaks
 	gnome.gnome-terminal
 	p7zip

@@ -1,10 +1,10 @@
 {
   inputs = {
-    devel.url = "github:seandheath/nixpkgs";
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     home-manager.url = "github:nix-community/home-manager";
     sops-nix.url = "github:Mic92/sops-nix";
     microvm.url = "github:astro/microvm.nix";
+    devel.url = "github:seandheath/nixpkgs";
   };
   outputs = { self, ... }@inputs:
   let
@@ -53,6 +53,7 @@
           ./users/user.nix
           ./modules/nvidia.nix
           ./modules/gnome.nix
+          ./modules/dod_certs.nix
         ];
       };
 
