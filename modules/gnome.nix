@@ -66,25 +66,25 @@
 	rustup
 	gcc
   ];
-  environment.sessionVariables.GTK_THEME = "Adwaita:dark";
-  environment.etc = {
-    "xdg/gtk-2.0/gtkrc".text = ''
-      gtk-theme-name = "Adwaita-dark"
-      gtk-icon-theme-name = "Adwaita"
-    '';
-    "xdg/gtk-3.0/settings.ini".text = ''
-      [Settings]
-      gtk-theme-name = Adwaita-dark
-      gtk-application-prefer-dark-theme = true
-      gtk-icon-theme-name = Adwaita
-    '';
+  #environment.sessionVariables.GTK_THEME = "Adwaita:dark";
+  #environment.etc = {
+    #"xdg/gtk-2.0/gtkrc".text = ''
+      #gtk-theme-name = "Adwaita-dark"
+      #gtk-icon-theme-name = "Adwaita"
+    #'';
+    #"xdg/gtk-3.0/settings.ini".text = ''
+      #[Settings]
+      #gtk-theme-name = Adwaita-dark
+      #gtk-application-prefer-dark-theme = true
+      #gtk-icon-theme-name = Adwaita
+    #'';
 
     # Qt4
-    "xdg/Trolltech.conf".text = ''
-      [Qt]
-      style=GTK+
-    '';
-  };
+    #"xdg/Trolltech.conf".text = ''
+      #[Qt]
+      #style=GTK+
+    #'';
+  #};
   qt = {
     enable = true;
     platformTheme = "gnome";
