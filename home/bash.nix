@@ -1,11 +1,11 @@
 { config, pkgs, ... }: {
-  imports = [
-    ./direnv.nix
-  ];
+  #imports = [
+    #./direnv.nix
+  #];
 
   home.packages = with pkgs; [
     fzf
-    bat
+    #bat
   ];
 
   # BASH
@@ -13,7 +13,6 @@
     enable = true;
     initExtra = ''
 # ALIASES
-eval "$(thefuck --alias)"
 alias nr="sudo nixos-rebuild switch --impure --flake /home/user/nixos"
 alias ns="nix search nixpkgs"
 alias dmesg="dmesg --color=always"
@@ -127,7 +126,7 @@ function parse_git_dirty {
 export PS1="\n\[$GREEN\]\u\[$RED\]|\[$WHITE\]\h\[$RED\]|\[$GREEN\]\w\[$PURPLE\]\$(parse_git_branch)\[$RED\]\$(nonzero_return)\[$WHITE\]> "
 
 # Direnv
-eval "$(direnv hook bash)"
+#eval "$(direnv hook bash)"
     '';
   };
 }

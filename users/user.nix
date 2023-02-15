@@ -12,12 +12,5 @@
       htop
     ];
   };
-  #home-manager.users.user = { pkgs, ... }: {
-    #programs.git = {
-      #enable = true;
-      #userName = "Sean Heath";
-      #userEmail = "heathsd@pm.me";
-    #};
-  #};
 }
 
