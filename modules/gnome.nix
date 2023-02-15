@@ -31,6 +31,7 @@
 		gnome.gnome-terminal
 		p7zip
 		openssl
+		profile-sync-daemon
   	keepassxc
 		pkg-config
 		vscodium
