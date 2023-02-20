@@ -7,25 +7,12 @@
     ./gnome.nix
   ];
 
-
-  home.sessionPath = [ "/home/user/go/bin" ];
-
   services.nextcloud-client = {
     enable = true;
     startInBackground = true;
   };
-  #services.syncthing = {
-    #enable = true;
-    #tray.enable = true;
-  #};
 
   dconf.settings = {
-    "org/gnome/mutter" = { workspaces-only-on-primary = "true"; };
-    "org/gnome/terminal/legacy" = { theme-variant = "dark"; };
-    "org/gnome/desktop/interface" = {
-      enable-hot-corners = false;
-      gtk-theme = "Adwaita-dark";
-    };
     "org/gnome/desktop/wm/keybindings" = {
       move-to-workspace-left = [ "<Primary><Shift><Alt>Left" ];
       move-to-workspace-right = [ "<Primary><Shift><Alt>Right" ];
