@@ -17,6 +17,17 @@
 	brgenml1lpr
   ];
 
+	environment.systemPackages = with pkgs; [
+		fishPlugins.done
+		fishPlugins.fzf-fish
+		fishPlugins.forgit
+		fishPlugins.hydro
+		fishPlugins.fish-bax
+		fzf
+		fishPlugins.grc
+		grc
+	];
+
 
   # GUI Packages
   environment.systemPackages = with pkgs; [
