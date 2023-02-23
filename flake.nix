@@ -2,32 +2,20 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     home-manager.url = "github:nix-community/home-manager";
-    sops-nix.url = "github:Mic92/sops-nix";
-    microvm.url = "github:astro/microvm.nix";
-    devel.url = "github:seandheath/nixpkgs";
+    impermanence.url = "github:nix-community/impermanence";
   };
   outputs = { self, ... }@inputs:
   let
     build-host = name: value: inputs.nixpkgs.lib.nixosSystem {
       system = value.system;
       modules = [
-        ({ pkgs, ... }: {
-          nixpkgs.overlays = [
-            (final: prev: {
-              devel = import inputs.devel {
-                system = final.system;
-                config.allowUnfree = true;
-              };
-            })
-          ];
-        })
         ./hosts/${name}.nix
         ./modules/core.nix
-        inputs.sops-nix.nixosModules.sops
+	"${inputs.impermanence}/nixos.nix"
         inputs.home-manager.nixosModules.home-manager {
           home-manager.useGlobalPkgs = true;
           home-manager.useUserPackages = true;
-          home-manager.users.user = import ./home/workstation.nix;
+          home-manager.users.lo = import ./home/workstation.nix;
         }
       ] ++ value.modules;
       specialArgs = {inherit inputs;};
@@ -74,6 +62,14 @@
           ./modules/gnome.nix
           ./modules/nvidia.nix
         ];
+      };
+
+      osmium = {
+        system = "x86_64-linux";
+	modules = [
+	  ./users/lo.nix
+	  ./modules/gnome.nix
+	];
       };
 
       router = {
