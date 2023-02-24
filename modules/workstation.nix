@@ -55,6 +55,7 @@
   };
 
   environment.systemPackages = with pkgs; [
+    rtorrent
     nmap
     p7zip
     pkg-config

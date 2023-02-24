@@ -74,7 +74,7 @@ in {
   fileSystems."/" =
     { device = "none";
       fsType = "tmpfs";
-      options = [ "defaults" "size=8G" "mode=755" "noatime" ];
+      options = [ "defaults" "size=32G" "mode=755" "noatime" ];
     };
 
   fileSystems."/boot" =
