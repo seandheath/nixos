@@ -8,7 +8,7 @@
   gtk = {
     enable = true;
     iconTheme = {
-      name = "Maia-dark";
+      name = "maia-dark";
       package = pkgs.maia-icon-theme;
     };
     theme = {

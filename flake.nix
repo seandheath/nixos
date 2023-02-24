@@ -68,7 +68,7 @@
         system = "x86_64-linux";
 	modules = [
 	  ./users/lo.nix
-	  ./modules/gnome.nix
+	  ./modules/workstation.nix
 	];
       };
 

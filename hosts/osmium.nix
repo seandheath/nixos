@@ -8,41 +8,6 @@ let
     exec -a "$0" "$@"
   '';
 in {
-  environment.persistence."/nix/persist" = {
-    hideMounts = true;
-    directories = [
-      "/etc/nixos"
-      "/etc/NetworkManager/system-connections"
-      "/var/log"
-      "/var/lib/systemd/coredump"
-      "/var/lib/bluetooth"
-      { directory = "/var/lib/colord"; user = "colord"; group = "colord"; mode = "0750"; }
-    ];
-    files = [
-      "/etc/machine-id"
-    ];
-    users.lo = {
-      directories = [
-        "Desktop"
-	"Documents"
-        "Downloads"
-	"Music"
-	"Pictures"
-	"Public"
-	"Templates"
-	"Videos"
-	"Sync"
-	"vms"
-	"workspace"
-	".mozilla"
-	{ directory = ".gnupg"; mode = "0700"; }
-	{ directory = ".ssh"; mode = "0700"; }
-	{ directory = ".nixops"; mode = "0700"; }
-	{ directory = ".local/share/keyrings"; mode = "0700"; }
-	".local/share/direnv"
-      ];
-    };
-  };
 
   hardware = {
     enableRedistributableFirmware = true;

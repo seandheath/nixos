@@ -7,12 +7,26 @@
     ./gnome.nix
   ];
 
-  services.nextcloud-client = {
-    enable = true;
-    startInBackground = true;
-  };
-
   dconf.settings = {
+    "org/gnome/desktop/interface" = {
+      enable-hot-corners = false;
+    };
+    "org/gnome/desktop/sound" = {
+      allow-volume-above-100-percent = true;
+    };
+    "org/gnome/shell" = {
+      disable-user-extensions = false;
+      enabled-extensions = [
+        "appindicatorsupport@rgcjonas.gmail.com"
+        "gTile@vibou"
+        "launch-new-instance@gnome-shell-extensions.gcampax.github.com"
+        "workspace-indicator@gnome-shell-extensions.gcampax.github.com"
+      ];
+    };
+    "org/gnome/desktop/peripherals/touchpad" = {
+      tap-to-click = true;
+      natural-scroll = true;
+    };
     "org/gnome/desktop/wm/keybindings" = {
       move-to-workspace-left = [ "<Primary><Shift><Alt>Left" ];
       move-to-workspace-right = [ "<Primary><Shift><Alt>Right" ];

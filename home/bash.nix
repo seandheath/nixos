@@ -13,7 +13,6 @@
     enable = true;
     initExtra = ''
 # ALIASES
-alias nr="sudo nixos-rebuild switch --impure --flake /home/user/nixos"
 alias ns="nix search nixpkgs"
 alias dmesg="dmesg --color=always"
 
@@ -23,7 +22,7 @@ bind 'set menu-complete-display-prefix on'
 
 export XZ_DEFAULTS='-T0 -9'
 export EDITOR=nvim
-export PATH=$PATH:/home/user/go/bin/:/home/user/.cargo/bin
+export PATH=$PATH:$HOME/go/bin/:$HOME/.cargo/bin
 
 function direnvinit {
   if [ ! -e ./.envrc ]; then
