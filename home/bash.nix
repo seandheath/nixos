@@ -15,6 +15,7 @@
       # ALIASES
       alias ns="nix search nixpkgs"
       alias dmesg="dmesg --color=always"
+      alias nr="sudo nixos-rebuild switch --flake /home/lo/nixos#"
 
       bind 'set show-all-if-ambiguous on'
       bind 'TAB:menu-complete'

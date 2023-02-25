@@ -23,6 +23,7 @@
     gnomeExtensions.appindicator
     gnomeExtensions.gtile
     gnomeExtensions.bluetooth-quick-connect
+    gnomeExtensions.syncthing-icon
     gnome.gnome-tweaks
     gnome.gnome-terminal
     p7zip
