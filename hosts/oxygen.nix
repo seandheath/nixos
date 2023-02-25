@@ -16,11 +16,11 @@
       enp4s0.mtu = 9000;
       br0 = {
         useDHCP = false;
-	ipv4.addresses = [{
-	  address = "10.0.0.10";
-	  prefixLength = 24;
-	}];
-	mtu = 9000;
+        ipv4.addresses = [{
+          address = "10.0.0.10";
+          prefixLength = 24;
+        }];
+        mtu = 9000;
       };
     };
     defaultGateway = "10.0.0.1";
@@ -38,17 +38,20 @@
   boot.extraModulePackages = [ ];
 
   fileSystems."/" =
-    { device = "/dev/disk/by-uuid/75d37fb7-2cff-4cc2-8e1a-29d612bdd0fe";
+    {
+      device = "/dev/disk/by-uuid/75d37fb7-2cff-4cc2-8e1a-29d612bdd0fe";
       fsType = "btrfs";
     };
 
   fileSystems."/boot" =
-    { device = "/dev/disk/by-uuid/0CBC-0A69";
+    {
+      device = "/dev/disk/by-uuid/0CBC-0A69";
       fsType = "vfat";
     };
 
   fileSystems."/home" =
-    { device = "/dev/disk/by-uuid/3fa331a2-eeb6-43e7-a8d0-8ae4f739c568";
+    {
+      device = "/dev/disk/by-uuid/3fa331a2-eeb6-43e7-a8d0-8ae4f739c568";
       fsType = "btrfs";
     };
 

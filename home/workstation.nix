@@ -8,6 +8,14 @@
   ];
 
   dconf.settings = {
+    "org/gnome/shell" = {
+      favorite-apps = [
+        "org.gnome.Nautilus.desktop"
+        "org.gnome.Terminal.desktop"
+        "firefox.desktop"
+        "org.keepassxc.KeePassXC.desktop"
+      ];
+    };
     "org/gnome/mutter" = {
       attach-modal-dialogs = false;
     };
@@ -27,7 +35,7 @@
         "gTile@vibou"
         "launch-new-instance@gnome-shell-extensions.gcampax.github.com"
         "workspace-indicator@gnome-shell-extensions.gcampax.github.com"
-	"bluetooth-quick-connect@bjarosze.gmail.com"
+        "bluetooth-quick-connect@bjarosze.gmail.com"
       ];
     };
     "org/gnome/desktop/peripherals/touchpad" = {

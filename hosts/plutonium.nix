@@ -13,21 +13,24 @@
   boot.extraModulePackages = [ ];
 
   fileSystems."/" =
-    { device = "/dev/mapper/cryptroot";
+    {
+      device = "/dev/mapper/cryptroot";
       fsType = "btrfs";
     };
 
   boot.initrd.luks.devices."cryptroot".device = "/dev/disk/by-uuid/3daf7260-166b-4e38-ab1b-2067eaa509a6";
 
   fileSystems."/home" =
-    { device = "/dev/disk/by-uuid/559d5879-a15a-48f1-a26e-e1792cfe6d3c";
+    {
+      device = "/dev/disk/by-uuid/559d5879-a15a-48f1-a26e-e1792cfe6d3c";
       fsType = "btrfs";
     };
 
   boot.initrd.luks.devices."crypthome".device = "/dev/disk/by-uuid/efe7c328-c994-4454-bed6-a465020b1bd9";
 
   fileSystems."/boot" =
-    { device = "/dev/disk/by-uuid/0777-932B";
+    {
+      device = "/dev/disk/by-uuid/0777-932B";
       fsType = "vfat";
     };
 
@@ -35,7 +38,7 @@
 
   powerManagement.cpuFreqGovernor = lib.mkDefault "performance";
   hardware.cpu.intel.updateMicrocode = lib.mkDefault config.hardware.enableRedistributableFirmware;
-# This value determines the NixOS release from which the default
+  # This value determines the NixOS release from which the default
   # settings for stateful data, like file locations and database versions
   # on your system were taken. It‘s perfectly fine and recommended to leave
   # this value at the release version of the first install of this system.

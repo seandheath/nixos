@@ -1,4 +1,4 @@
-{ config, pkgs, ... }:
+{ config, pkgs, lib, ... }:
 {
   # Desktop Environment
   services.xserver = {
@@ -9,6 +9,7 @@
   services.udev.packages = with pkgs; [
     gnome.gnome-settings-daemon
   ];
+  systemd.services.NetworkManager-wait-online.enable = false;
   services.printing.enable = true;
   services.printing.drivers = with pkgs; [
     gutenprint

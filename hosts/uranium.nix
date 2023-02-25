@@ -7,20 +7,21 @@
   boot.extraModulePackages = [ ];
 
   fileSystems."/" =
-    { device = "/dev/disk/by-uuid/a63da51c-e43b-4256-aa09-23369fc915d0";
+    {
+      device = "/dev/disk/by-uuid/a63da51c-e43b-4256-aa09-23369fc915d0";
       fsType = "btrfs";
     };
 
   boot.initrd.luks.devices."crypt".device = "/dev/disk/by-uuid/7da5fc35-9fec-4702-9dc5-bf566945c2bb";
 
   fileSystems."/boot" =
-    { device = "/dev/disk/by-uuid/6AE1-228E";
+    {
+      device = "/dev/disk/by-uuid/6AE1-228E";
       fsType = "vfat";
     };
 
   swapDevices =
-    [ { device = "/dev/disk/by-uuid/fb6817b2-b8e0-49d0-b80d-0095ebb81544"; }
-    ];
+    [{ device = "/dev/disk/by-uuid/fb6817b2-b8e0-49d0-b80d-0095ebb81544"; }];
 
   nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
   powerManagement.cpuFreqGovernor = lib.mkDefault "performance";
