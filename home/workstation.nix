@@ -8,8 +8,14 @@
   ];
 
   dconf.settings = {
+    "org/gnome/mutter" = {
+      attach-modal-dialogs = false;
+    };
     "org/gnome/desktop/interface" = {
       enable-hot-corners = false;
+      font-name = "Inconsolata 11";
+      document-font-name = "Inconsolata 11";
+      monospace-font-name = "Inconsolata 12";
     };
     "org/gnome/desktop/sound" = {
       allow-volume-above-100-percent = true;
@@ -21,6 +27,7 @@
         "gTile@vibou"
         "launch-new-instance@gnome-shell-extensions.gcampax.github.com"
         "workspace-indicator@gnome-shell-extensions.gcampax.github.com"
+	"bluetooth-quick-connect@bjarosze.gmail.com"
       ];
     };
     "org/gnome/desktop/peripherals/touchpad" = {
@@ -34,6 +41,10 @@
       switch-applications-backward = [ ];
       switch-windows = [ "<Alt>Tab" ];
       switch-windows-backward = [ "<Shift><Alt>Tab" ];
+    };
+    "org/gnome/desktop/wm/preferences" = {
+      button-layout = "appmenu:minimize,maximize,close";
+      titlebar-font = "Inconsolata Bold 11";
     };
     "org/gnome/settings-daemon/plugins/media-keys" = {
       custom-keybindings = [

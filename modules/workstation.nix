@@ -6,54 +6,6 @@
     ./syncthing.nix
   ];
 
-  environment.persistence."/nix/persist" = {
-    hideMounts = true;
-    directories = [
-      "/etc/nixos"
-      "/etc/NetworkManager/system-connections"
-      "/var/log"
-      "/var/lib/systemd/coredump"
-      "/var/lib/bluetooth"
-      { directory = "/var/lib/colord"; user = "colord"; group = "colord"; mode = "0750"; }
-    ];
-    files = [
-      "/etc/machine-id"
-    ];
-    users.lo = {
-      directories = [
-        "Desktop"
-        "Documents"
-        "Downloads"
-        "Music"
-        "Pictures"
-        "Public"
-        "Templates"
-        "Videos"
-        "Sync"
-        "vms"
-        "workspace"
-        "go"
-        ".mozilla"
-        ".steam"
-        ".cargo"
-	".rustup"
-	".vscode-oss"
-        { directory = ".gnupg"; mode = "0700"; }
-        { directory = ".ssh"; mode = "0700"; }
-        { directory = ".nixops"; mode = "0700"; }
-        { directory = ".local/share/keyrings"; mode = "0700"; }
-        ".local/share/direnv"
-        ".local/share/Steam"
-        ".local/share/vulkan"
-        ".config/syncthing"
-        ".config/Signal"
-        ".config/VSCodium"
-        ".config/Bitwarden"
-        ".config/coc"
-      ];
-    };
-  };
-
   environment.systemPackages = with pkgs; [
     rtorrent
     nmap
@@ -72,6 +24,10 @@
     tmux
     nixpkgs-fmt
     direnv
+    winetricks
+    wineWowPackages.waylandFull
+    nvtop
+    protonup
   ];
 
   virtualisation = {
@@ -83,6 +39,5 @@
     libvirtd.enable = true;
     spiceUSBRedirection.enable = true;
   };
-  programs.steam.enable = true;
 }
 

@@ -21,6 +21,7 @@
   environment.systemPackages = with pkgs; [
     gnomeExtensions.appindicator
     gnomeExtensions.gtile
+    gnomeExtensions.bluetooth-quick-connect
     gnome.gnome-tweaks
     gnome.gnome-terminal
     p7zip
@@ -31,7 +32,6 @@
     buildah
     protonvpn-gui
     vlc
-    nextcloud-client
     tor-browser-bundle-bin
     jellyfin-media-player
     wireshark
@@ -70,5 +70,6 @@
     alsa.support32Bit = true;
     pulse.enable = true;
   };
+  programs.steam.enable = true;
 }
 

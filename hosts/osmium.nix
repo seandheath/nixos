@@ -13,7 +13,6 @@ in {
     enableRedistributableFirmware = true;
     cpu.intel.updateMicrocode = true;
     nvidia = {
-      #open = true;
       modesetting.enable = true;
       powerManagement.enable = true;
       powerManagement.finegrained = true;
@@ -26,32 +25,14 @@ in {
     opengl = {
       enable = true;
       driSupport32Bit = true;
-      extraPackages = with pkgs; [
-        vaapiIntel
-        vaapiVdpau
-        libvdpau-va-gl
-      ];
-      extraPackages32 = with pkgs; [
-        libva
-        vaapiIntel
-      ];
     };
     system76.enableAll = true;
   };    
   nixpkgs.config.allowUnfree = true;
   services.xserver.videoDrivers = [ "nvidia" ];
 
-  boot.loader.systemd-boot.enable = true;
-  boot.loader.efi.canTouchEfiVariables = true;
-  boot.kernelPackages = pkgs.linuxPackages_zen;
   networking.hostName = "osmium"; # Define your hostname.
   networking.networkmanager.enable = true;  # Easiest to use and most distros use this by default.
-
-  # Define a user account. Don't forget to set a password with ‘passwd’.
-  users.mutableUsers = false;
-
-  # Optimise store
-  nix.settings.auto-optimise-store = true;
 
   environment.systemPackages = with pkgs; [
     firefox
@@ -68,33 +49,39 @@ in {
     nv
   ];
 
+  boot.loader.systemd-boot.enable = true;
+  boot.loader.efi.canTouchEfiVariables = true;
+  boot.kernelPackages = pkgs.linuxPackages_zen;
   boot.initrd.availableKernelModules = [ "xhci_pci" "thunderbolt" "nvme" "usb_storage" "sd_mod" "sdhci_pci" ];
   boot.kernelModules = [ "kvm-intel" ];
-
-  fileSystems."/" =
-    { device = "none";
-      fsType = "tmpfs";
-      options = [ "defaults" "size=32G" "mode=755" "noatime" ];
+    fileSystems."/" =
+    { device = "/dev/disk/by-uuid/0bf1b570-dcf4-4306-9370-0bd5151e9c74";
+      fsType = "xfs";
+      options = [ "noatime" ];
     };
 
   fileSystems."/boot" =
-    { device = "/dev/disk/by-uuid/3240-65FD";
+    { device = "/dev/disk/by-uuid/34C6-1652";
       fsType = "vfat";
     };
-
-  fileSystems."/nix" =
-    { device = "/dev/disk/by-uuid/748003a2-74e0-4111-bd1e-0dd3cd513b86";
-      fsType = "ext4";
+  boot.initrd.luks.devices."cryptRoot".device = "/dev/disk/by-uuid/27f28004-bc78-4ec4-9afa-7dce3b0465cc";
+    
+  fileSystems."/home" =
+    { device = "/dev/disk/by-uuid/b7b566b4-a3dc-460a-b22b-f0219b6f584c";
+      fsType = "xfs";
       options = [ "noatime" ];
-      neededForBoot = true;
     };
-
-  boot.initrd.luks.devices."cryptRoot".device = "/dev/md127";
-
-  swapDevices = [ ];
-
+  boot.initrd.luks.devices."cryptHome".device = "/dev/disk/by-uuid/3745008b-bb3c-438c-b45c-31d3badfaffb";
+        
+  swapDevices =
+    [{  
+      device = "/dev/disk/by-uuid/491b12ab-1a4f-4041-9f88-c8190c1d1e03";
+    }];
+  boot.initrd.luks.devices."cryptSwap".device = "/dev/disk/by-uuid/60ef28d4-9818-4155-acbb-b49bc56d533c";
+  
   networking.useDHCP = lib.mkDefault true;
   nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
+  powerManagement.cpuFreqGovernor = lib.mkDefault "performance";
 
   # This value determines the NixOS release from which the default
   # settings for stateful data, like file locations and database versions
