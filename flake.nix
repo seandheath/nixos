@@ -28,6 +28,7 @@
           home-manager = "server";
           modules = [
             ./users/lo.nix
+            ./modules/server.nix
             ./modules/nvidia.nix
             ./modules/usenet.nix
             ./modules/gnome.nix
