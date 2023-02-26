@@ -1,4 +1,4 @@
-{ config, pkgs, ... }:
+{ config, nixpkgs, pkgs, lib, ... }:
 let
   id = 2000;
 in {
@@ -30,4 +30,17 @@ in {
     user = "usenet";
     group = "usenet";
   };
+  nixpkgs.overlays = [
+    (self: super: {
+      my_ffmpeg = super.ffmpeg_5-full.overrideAttrs (old: {
+        postFixup = ''
+          addOpenGLRunpath ${placeholder "lib"}/lib/libavcodec.so
+          addOpenGLRunpath ${placeholder "lib"}/lib/libavutil.so
+        '';
+      });
+    })
+  ];
+  environment.systemPackages = with pkgs; [
+    my_ffmpeg
+  ];
 }
