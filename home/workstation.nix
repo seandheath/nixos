@@ -58,7 +58,6 @@
         "launch-new-instance@gnome-shell-extensions.gcampax.github.com"
         "workspace-indicator@gnome-shell-extensions.gcampax.github.com"
         "bluetooth-quick-connect@bjarosze.gmail.com"
-        "syncthingicon@jay.strict@posteo.de"
         "user-theme@gnome-shell-extensions.gcampax.github.com"
       ];
     };

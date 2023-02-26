@@ -23,8 +23,8 @@
     gnomeExtensions.appindicator
     gnomeExtensions.gtile
     gnomeExtensions.bluetooth-quick-connect
-    gnomeExtensions.syncthing-icon
     gnomeExtensions.user-themes
+    gnomeExtensions.syncthing-indicator
     gnome.gnome-tweaks
     gnome.gnome-terminal
     gnome.gnome-themes-extra
