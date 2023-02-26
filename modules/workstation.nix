@@ -24,10 +24,22 @@
     tmux
     nixpkgs-fmt
     direnv
+    libreoffice
     winetricks
     wineWowPackages.waylandFull
     nvtop
     protonup
+    bibletime
+    bitwarden
+    vscodium
+    keepassxc
+    virt-manager
+    brasero
+    signal-desktop
+    discord
+    tor-browser-bundle-bin
+    protonvpn-gui
+    virt-manager
   ];
 
   virtualisation = {

@@ -32,26 +32,16 @@
     numix-gtk-theme
     p7zip
     openssl
-    keepassxc
     pkg-config
-    vscodium
     buildah
-    protonvpn-gui
     vlc
-    tor-browser-bundle-bin
     jellyfin-media-player
     wireshark
-    discord
     graphviz
     google-chrome
-    brasero
-    signal-desktop
     filezilla
-    libreoffice
     joplin-desktop
-    bibletime
     firefox
-    bitwarden
     virt-manager
   ];
 
