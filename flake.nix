@@ -27,11 +27,11 @@
           system = "x86_64-linux";
           home-manager = "server";
           modules = [
-            ./users/user.nix
+            ./users/lo.nix
             ./profiles/server.nix
             ./modules/nvidia.nix
-            ./modules/nextcloud.nix
             ./modules/usenet.nix
+            ./modules/gnome.nix
           ];
         };
 
