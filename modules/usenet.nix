@@ -30,4 +30,9 @@ in {
     user = "usenet";
     group = "usenet";
   };
+  systemd.services."jellyfin".serviceConfig = {
+    DeviceAllow = pkgs.lib.mkForce [ "char-drm rw" "char-nvidia-frontend rw" "cahr-nvidia-uvm rw" ];
+    PrivateDevices = pkgs.lib.mkForce true;
+    RestrictAddressFamilies = pkgs.lib.mkForce [ "AF_UNIX" "AF_NETLINK" "AF_INET6" ];
+  };
 }
