@@ -52,7 +52,7 @@
     neovim 
     btrfs-progs
     firefox
-    ffmpeg-full
+    jellyfin-ffmpeg
     tmux
     go_1_18
   ];
