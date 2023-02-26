@@ -7,6 +7,7 @@ in {
     isSystemUser = true;
     uid = id;
     group = "usenet";
+    extraGroups = [ "video" ];
   };
   networking.firewall.allowedTCPPorts = [ 6789 8096 7878 8989 ];
   services.nzbget = {
