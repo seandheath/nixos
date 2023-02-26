@@ -4,9 +4,30 @@
     ./core.nix
     ./go.nix
     ./neovim.nix
-    ./gnome.nix
   ];
 
+  gtk = {
+    enable = true;
+    theme = {
+        name = "Materia-dark-compact";
+        package = pkgs.materia-theme;
+    };
+    cursorTheme = {
+        name = "Numix-Cursor";
+        package = pkgs.numix-cursor-theme;
+        };
+    gtk3.extraConfig = {
+        Settings = ''
+            gtk-application-prefer-dark-theme=1
+        '';
+    };
+    gtk4.extraConfig = {
+        Settings = ''
+            gtk-application-prefer-dark-theme=1
+        '';
+    };
+  };
+  home.sessionVariables.GTK_THEME = "Materia-dark-compact";
   dconf.settings = {
     "org/gnome/shell" = {
       favorite-apps = [
@@ -24,6 +45,7 @@
       font-name = "Inconsolata 11";
       document-font-name = "Inconsolata 11";
       monospace-font-name = "Inconsolata 12";
+      gtk-theme = "Materia-dark-compact";
     };
     "org/gnome/desktop/sound" = {
       allow-volume-above-100-percent = true;
@@ -36,7 +58,12 @@
         "launch-new-instance@gnome-shell-extensions.gcampax.github.com"
         "workspace-indicator@gnome-shell-extensions.gcampax.github.com"
         "bluetooth-quick-connect@bjarosze.gmail.com"
+        "syncthingicon@jay.strict@posteo.de"
+        "user-theme@gnome-shell-extensions.gcampax.github.com"
       ];
+    };
+    "org/gnome/shell/user-theme" = {
+        name = "Materia-dark-compact";
     };
     "org/gnome/desktop/peripherals/touchpad" = {
       tap-to-click = true;

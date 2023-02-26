@@ -7,13 +7,12 @@
   };
   gtk = {
     enable = true;
-    iconTheme = {
-      name = "maia-dark";
-      package = pkgs.maia-icon-theme;
-    };
+    #iconTheme = {
+      #name = "maia-dark";
+      #package = pkgs.maia-icon-theme;
+    #};
     theme = {
-      name = "Orchis-Dark";
-      package = pkgs.orchis-theme;
+      name = "Materia-dark-compact";
     };
     cursorTheme = {
       name = "Numix-Cursor";
@@ -30,5 +29,5 @@
       '';
     };
   };
-  home.sessionVariables.GTK_THEME = "Orchis-Dark";
+  home.sessionVariables.GTK_THEME = "Materia-dark-compact";
 }

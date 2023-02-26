@@ -24,8 +24,12 @@
     gnomeExtensions.gtile
     gnomeExtensions.bluetooth-quick-connect
     gnomeExtensions.syncthing-icon
+    gnomeExtensions.user-themes
     gnome.gnome-tweaks
     gnome.gnome-terminal
+    gnome.gnome-themes-extra
+    materia-theme
+    numix-gtk-theme
     p7zip
     openssl
     keepassxc
