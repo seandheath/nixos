@@ -23,7 +23,6 @@
     tectonic
     tmux
     nixpkgs-fmt
-    direnv
     libreoffice
     winetricks
     wineWowPackages.waylandFull

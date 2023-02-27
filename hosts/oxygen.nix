@@ -1,10 +1,4 @@
-# Edit this configuration file to define what should be installed on
-# your system.  Help is available in the configuration.nix(5) man page
-# and in the NixOS manual (accessible by running ‘nixos-help’).
-
-{ config, lib, pkgs, ... }:
-
-{
+{ config, lib, pkgs, ... }: {
   networking.hostName = "oxygen"; # Define your hostname.
   networking = {
     bridges = {
@@ -32,10 +26,13 @@
 
   virtualisation.libvirtd.allowedBridges = [ "br0" ];
 
+  programs.steam.enable = true;
+
+  boot.loader.systemd-boot.enable = true;
+  boot.loader.efi.canTouchEfiVariables = true;
+  boot.kernelPackages = pkgs.linuxPackages_zen;
   boot.initrd.availableKernelModules = [ "xhci_pci" "ahci" "nvme" "usb_storage" "usbhid" "sd_mod" ];
-  boot.initrd.kernelModules = [ ];
   boot.kernelModules = [ "kvm-amd" ];
-  boot.extraModulePackages = [ ];
 
   fileSystems."/" =
     {

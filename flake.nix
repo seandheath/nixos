@@ -39,9 +39,9 @@
           system = "x86_64-linux";
           home-manager = "workstation";
           modules = [
-            ./users/user.nix
+            ./users/lo.nix
             ./modules/nvidia.nix
-            ./modules/gnome.nix
+            ./modules/workstation.nix
             ./modules/dod_certs.nix
           ];
         };
