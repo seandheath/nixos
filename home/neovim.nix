@@ -30,6 +30,7 @@
       statix
       rust-vim
       vim-go
+      vim-nix
       nerdtree
       tagbar
       vim-airline
