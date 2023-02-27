@@ -3,7 +3,7 @@
   # Desktop Environment
   services.xserver = {
     enable = true;
-    displayManager.sddm.enable = true;
+    displayManager.lightdm.enable = true;
     desktopManager.gnome.enable = true;
   };
   services.udev.packages = with pkgs; [

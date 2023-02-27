@@ -39,12 +39,7 @@
   ];
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
-  boot.kernelPackages = pkgs.linuxPackages_zen;
-  boot.extraModulePackages = with config.boot.kernelPackages; [
-    system76-acpi
-    system76-io
-    system76-power
-  ];
+  #boot.kernelPackages = pkgs.linuxPackages_zen;
   boot.initrd.availableKernelModules = [ "xhci_pci" "thunderbolt" "nvme" "usb_storage" "sd_mod" "sdhci_pci" ];
   boot.kernelModules = [ "kvm-intel" ];
   fileSystems."/" =
