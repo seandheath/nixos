@@ -3,7 +3,7 @@
   # Desktop Environment
   services.xserver = {
     enable = true;
-    displayManager.lightdm.enable = true;
+    displayManager.gdm.enable = true;
     desktopManager.gnome.enable = true;
   };
   services.udev.packages = with pkgs; [
@@ -25,6 +25,7 @@
     gnomeExtensions.bluetooth-quick-connect
     gnomeExtensions.user-themes
     gnomeExtensions.syncthing-indicator
+    gnomeExtensions.easyeffects-preset-selector
     gnome.gnome-tweaks
     gnome.gnome-terminal
     gnome.gnome-themes-extra
@@ -42,6 +43,7 @@
     filezilla
     joplin-desktop
     firefox
+    easyeffects
     virt-manager
   ];
 
