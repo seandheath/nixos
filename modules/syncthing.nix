@@ -12,5 +12,6 @@
       pixel = { id = "CPSSA5L-J3PWVDU-53M3H4L-3ALJKMI-WXNEJEV-VM2PGIR-PNLJDUC-WQDRMQQ"; };
       oxygen = { id = "6U7GYZN-YJ7WMWZ-2TGEBHV-57KNAGM-BDTNWN3-VHXZYMK-P2M4YH2-C5KB6QU"; };
     };
+    openDefaultPorts = true;
   };
 }
