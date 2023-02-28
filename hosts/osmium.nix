@@ -14,9 +14,9 @@ in
     enableRedistributableFirmware = true;
     cpu.intel.updateMicrocode = true;
     nvidia = {
-      modesetting.enable = true;
-      powerManagement.enable = true;
-      powerManagement.finegrained = true;
+      #modesetting.enable = true;
+      #powerManagement.enable = true;
+      #powerManagement.finegrained = true;
       prime = {
         offload.enable = true;
         nvidiaBusId = "PCI:1:0:0";
@@ -76,9 +76,6 @@ in
   ];
   boot.initrd.availableKernelModules = [ "xhci_pci" "thunderbolt" "nvme" "usb_storage" "sd_mod" "sdhci_pci" ];
   boot.kernelModules = [ "kvm-intel" ];
-  boot.kernelParams = [
-    "pci=nommconf"
-  ];
   fileSystems."/" =
     {
       device = "/dev/disk/by-uuid/0bf1b570-dcf4-4306-9370-0bd5151e9c74";
@@ -104,12 +101,12 @@ in
   swapDevices =
     [{
       device = "/dev/disk/by-uuid/491b12ab-1a4f-4041-9f88-c8190c1d1e03";
-      encrypted = {
-        enable = true;
-        keyFile = "/mnt-root/root/swap.key";
-        label = "cryptSwap";
-        blkDev = "/dev/disk/by-uuid/491b12ab-1a4f-4041-9f88-c8190c1d1e03";
-      };
+      #encrypted = {
+        #enable = true;
+        #keyFile = "/mnt-root/root/swap.key";
+        #label = "cryptSwap";
+        #blkDev = "/dev/disk/by-uuid/491b12ab-1a4f-4041-9f88-c8190c1d1e03";
+      #};
     }];
   boot.initrd.luks.devices."cryptSwap".device = "/dev/disk/by-uuid/60ef28d4-9818-4155-acbb-b49bc56d533c";
 
