@@ -36,8 +36,8 @@
     brasero
     signal-desktop
     discord
-    tor-browser-bundle-bin
     protonvpn-gui
+    protonvpn-cli
     virt-manager
   ];
 
