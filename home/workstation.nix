@@ -59,6 +59,7 @@
         "workspace-indicator@gnome-shell-extensions.gcampax.github.com"
         "bluetooth-quick-connect@bjarosze.gmail.com"
         "user-theme@gnome-shell-extensions.gcampax.github.com"
+        "eepresetselector@ulville.github.io"
       ];
     };
     "org/gnome/shell/user-theme" = {
