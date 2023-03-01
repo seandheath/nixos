@@ -9,22 +9,22 @@
   gtk = {
     enable = true;
     theme = {
-        name = "Materia-dark-compact";
-        package = pkgs.materia-theme;
+      name = "Materia-dark-compact";
+      package = pkgs.materia-theme;
     };
     cursorTheme = {
-        name = "Numix-Cursor";
-        package = pkgs.numix-cursor-theme;
-        };
+      name = "Numix-Cursor";
+      package = pkgs.numix-cursor-theme;
+    };
     gtk3.extraConfig = {
-        Settings = ''
-            gtk-application-prefer-dark-theme=1
-        '';
+      Settings = ''
+        gtk-application-prefer-dark-theme=1
+      '';
     };
     gtk4.extraConfig = {
-        Settings = ''
-            gtk-application-prefer-dark-theme=1
-        '';
+      Settings = ''
+        gtk-application-prefer-dark-theme=1
+      '';
     };
   };
   home.sessionVariables.GTK_THEME = "Materia-dark-compact";
@@ -59,11 +59,11 @@
         "workspace-indicator@gnome-shell-extensions.gcampax.github.com"
         "bluetooth-quick-connect@bjarosze.gmail.com"
         "user-theme@gnome-shell-extensions.gcampax.github.com"
-        "eepresetselector@ulville.github.io"
+        #"eepresetselector@ulville.github.io"
       ];
     };
     "org/gnome/shell/user-theme" = {
-        name = "Materia-dark-compact";
+      name = "Materia-dark-compact";
     };
     "org/gnome/desktop/peripherals/touchpad" = {
       tap-to-click = true;

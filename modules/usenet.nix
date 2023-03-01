@@ -1,7 +1,8 @@
 { config, nixpkgs, pkgs, lib, ... }:
 let
   id = 2000;
-in {
+in
+{
   users.groups.usenet.gid = id;
   users.users.usenet = {
     isSystemUser = true;

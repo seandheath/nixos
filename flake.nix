@@ -4,7 +4,7 @@
     home-manager.url = "github:nix-community/home-manager";
     impermanence.url = "github:nix-community/impermanence";
   };
-  outputs = { self, ... }@inputs:
+  outputs = { self, home-manager, ... }@inputs:
     let
       build-host = name: value: inputs.nixpkgs.lib.nixosSystem {
         system = value.system;
@@ -12,7 +12,7 @@
           ./hosts/${name}.nix
           ./modules/core.nix
           "${inputs.impermanence}/nixos.nix"
-          inputs.home-manager.nixosModules.home-manager
+          home-manager.nixosModules.home-manager
           {
             home-manager.useGlobalPkgs = true;
             home-manager.useUserPackages = true;

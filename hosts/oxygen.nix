@@ -2,19 +2,19 @@
   networking.hostName = "oxygen"; # Define your hostname.
   networking = {
     #bridges = {
-      #"br0" = {
-        #interfaces = [ "enp4s0" ];
-      #};
+    #"br0" = {
+    #interfaces = [ "enp4s0" ];
+    #};
     #};
     interfaces = {
       #enp4s0.mtu = 9000;
       #br0 = {
-        #useDHCP = false;
-        #ipv4.addresses = [{
-          #address = "10.0.0.10";
-          #prefixLength = 24;
-        #}];
-        #mtu = 9000;
+      #useDHCP = false;
+      #ipv4.addresses = [{
+      #address = "10.0.0.10";
+      #prefixLength = 24;
+      #}];
+      #mtu = 9000;
       #};
       enp4s0 = {
         useDHCP = false;

@@ -9,6 +9,9 @@ let
   '';
 in
 {
+  imports = [
+    ../home/home-osmium.nix
+  ];
   programs.steam.enable = true;
   hardware = {
     enableRedistributableFirmware = true;
@@ -31,16 +34,26 @@ in
   };
   nixpkgs.config.allowUnfree = true;
   services.xserver.videoDrivers = [ "nvidia" ];
-  services.logind = {
-    lidSwitch = "suspend-then-hibernate";
-    extraConfig = ''
-      HandlePowerKey=suspend-then-hibernate
-      IdleAction=suspend-then-hibernate
-      IdleActionSec=2m
-    '';
-  };
-  systemd.sleep.extraConfig = "HibernateDelaySec=2h";
-
+  #services.logind = {
+  #lidSwitch = "suspend-then-hibernate";
+  #extraConfig = ''
+  #HandlePowerKey=suspend-then-hibernate
+  #IdleAction=suspend-then-hibernate
+  #IdleActionSec=2m
+  #'';
+  #};
+  #services.xserver.desktopManager.gnome = {
+  #enable = true;
+  #extraGSettingsOverrides = ''
+  #[org.gnome.settings-daemon.plugins.power]
+  #power-button-action='suspend-then-hibernate'
+  #idle-dim=true
+  #sleep-inactive-battery-type='nothing'
+  #sleep-inactive-ac-timeout=1200
+  #sleep-inactive-ac-type='suspend-then-hibernate'
+  #sleep-inactive-battery-timeout=600
+  #'';
+  #};
 
   networking.hostName = "osmium"; # Define your hostname.
   networking.networkmanager.enable = true; # Easiest to use and most distros use this by default.
@@ -76,6 +89,7 @@ in
   ];
   boot.initrd.availableKernelModules = [ "xhci_pci" "thunderbolt" "nvme" "usb_storage" "sd_mod" "sdhci_pci" ];
   boot.kernelModules = [ "kvm-intel" ];
+  boot.kernelParams = [ "mem_sleep_default=deep" ];
   fileSystems."/" =
     {
       device = "/dev/disk/by-uuid/0bf1b570-dcf4-4306-9370-0bd5151e9c74";
@@ -101,12 +115,6 @@ in
   swapDevices =
     [{
       device = "/dev/disk/by-uuid/491b12ab-1a4f-4041-9f88-c8190c1d1e03";
-      #encrypted = {
-        #enable = true;
-        #keyFile = "/mnt-root/root/swap.key";
-        #label = "cryptSwap";
-        #blkDev = "/dev/disk/by-uuid/491b12ab-1a4f-4041-9f88-c8190c1d1e03";
-      #};
     }];
   boot.initrd.luks.devices."cryptSwap".device = "/dev/disk/by-uuid/60ef28d4-9818-4155-acbb-b49bc56d533c";
 

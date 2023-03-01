@@ -34,7 +34,7 @@
     tree
     thefuck
     ripgrep
-    srm 
+    srm
     p7zip
   ];
   boot.loader.systemd-boot.enable = true;
