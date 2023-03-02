@@ -17,9 +17,6 @@ in
     enableRedistributableFirmware = true;
     cpu.intel.updateMicrocode = true;
     nvidia = {
-      #modesetting.enable = true;
-      #powerManagement.enable = true;
-      #powerManagement.finegrained = true;
       prime = {
         offload.enable = true;
         nvidiaBusId = "PCI:1:0:0";
@@ -30,30 +27,18 @@ in
       enable = true;
       driSupport32Bit = true;
     };
-    #system76.enableAll = true;
+    system76.enableAll = true;
   };
   nixpkgs.config.allowUnfree = true;
   services.xserver.videoDrivers = [ "nvidia" ];
-  #services.logind = {
-  #lidSwitch = "suspend-then-hibernate";
-  #extraConfig = ''
-  #HandlePowerKey=suspend-then-hibernate
-  #IdleAction=suspend-then-hibernate
-  #IdleActionSec=2m
-  #'';
-  #};
-  #services.xserver.desktopManager.gnome = {
-  #enable = true;
-  #extraGSettingsOverrides = ''
-  #[org.gnome.settings-daemon.plugins.power]
-  #power-button-action='suspend-then-hibernate'
-  #idle-dim=true
-  #sleep-inactive-battery-type='nothing'
-  #sleep-inactive-ac-timeout=1200
-  #sleep-inactive-ac-type='suspend-then-hibernate'
-  #sleep-inactive-battery-timeout=600
-  #'';
-  #};
+  services.logind = {
+  lidSwitch = "suspend-then-hibernate";
+  extraConfig = ''
+  HandlePowerKey=suspend-then-hibernate
+  IdleAction=suspend-then-hibernate
+  IdleActionSec=2m
+  '';
+  };
 
   networking.hostName = "osmium"; # Define your hostname.
   networking.networkmanager.enable = true; # Easiest to use and most distros use this by default.
@@ -72,10 +57,6 @@ in
     vulkan-tools
     system76-firmware
     system76-keyboard-configurator
-    #linuxPackages_zen.system76
-    #linuxPackages_zen.system76-acpi
-    #linuxPackages_zen.system76-io
-    #linuxPackages_zen.system76-power
     nv
   ];
 
@@ -116,6 +97,8 @@ in
     [{
       device = "/dev/disk/by-uuid/491b12ab-1a4f-4041-9f88-c8190c1d1e03";
     }];
+  boot.resumeDevice = "/dev/disk/by-uuid/491b12ab-1a4f-4041-9f88-c8190c1d1e03";
+  security.protectKernelImage = false;
   boot.initrd.luks.devices."cryptSwap".device = "/dev/disk/by-uuid/60ef28d4-9818-4155-acbb-b49bc56d533c";
 
   networking.useDHCP = lib.mkDefault true;

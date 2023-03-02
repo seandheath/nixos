@@ -39,6 +39,7 @@
     protonvpn-gui
     protonvpn-cli
     virt-manager
+    appflowy
   ];
 
   virtualisation = {
