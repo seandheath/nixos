@@ -32,12 +32,12 @@ in
   nixpkgs.config.allowUnfree = true;
   services.xserver.videoDrivers = [ "nvidia" ];
   services.logind = {
-  lidSwitch = "suspend-then-hibernate";
-  extraConfig = ''
-  HandlePowerKey=suspend-then-hibernate
-  IdleAction=suspend-then-hibernate
-  IdleActionSec=2m
-  '';
+    lidSwitch = "suspend-then-hibernate";
+    extraConfig = ''
+      HandlePowerKey=suspend-then-hibernate
+      IdleAction=suspend-then-hibernate
+      IdleActionSec=2m
+    '';
   };
 
   networking.hostName = "osmium"; # Define your hostname.

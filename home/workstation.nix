@@ -42,8 +42,8 @@
     };
     "org/gnome/desktop/interface" = {
       enable-hot-corners = false;
-      font-name = "Inconsolata 11";
-      document-font-name = "Inconsolata 11";
+      font-name = "Inconsolata 12";
+      document-font-name = "Inconsolata 12";
       monospace-font-name = "Inconsolata 12";
       gtk-theme = "Materia-dark-compact";
     };
