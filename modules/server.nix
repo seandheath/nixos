@@ -60,6 +60,9 @@
   services.openssh.enable = true;
 
   # Disable suspend
+  services.logind.lidSwitch = "ignore";
+  services.xserver.displayManager.gdm.autoSuspend = false;
+  services.xserver.displayManager.gdm.debug = true;
   systemd.targets.sleep.enable = false;
   systemd.targets.suspend.enable = false;
   systemd.targets.hibernate.enable = false;
