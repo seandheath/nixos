@@ -17,10 +17,10 @@ in
     enableRedistributableFirmware = true;
     cpu.intel.updateMicrocode = true;
     nvidia = {
-      package = config.boot.kernelPackages.nvidiaPackages.beta;
-      open = true;
+      #package = config.boot.kernelPackages.nvidiaPackages.beta;
+      #open = true;
       nvidiaSettings = false;
-      nvidiaPersistenced = true;
+      #nvidiaPersistenced = true;
       modesetting.enable = true;
       prime = {
         offload.enable = true;
@@ -68,12 +68,12 @@ in
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
   #boot.kernelPackages = pkgs.linuxPackages_zen;
-  boot.kernelPackages = pkgs.linuxPackages_latest;
-  boot.extraModulePackages = with config.boot.kernelPackages; [
+  #boot.kernelPackages = pkgs.linuxPackages_latest;
+  #boot.extraModulePackages = with config.boot.kernelPackages; [
     #system76-acpi
-    system76-io
-    system76-power
-  ];
+    #system76-io
+    #system76-power
+  #];
   boot.initrd.availableKernelModules = [ "xhci_pci" "thunderbolt" "nvme" "usb_storage" "sd_mod" "sdhci_pci" ];
   boot.kernelModules = [ "kvm-intel" ];
   #boot.kernelParams = [ "mem_sleep_default=deep" ];
@@ -104,12 +104,10 @@ in
       device = "/dev/disk/by-uuid/491b12ab-1a4f-4041-9f88-c8190c1d1e03";
     }];
   boot.resumeDevice = "/dev/disk/by-uuid/491b12ab-1a4f-4041-9f88-c8190c1d1e03";
-  security.protectKernelImage = false;
   boot.initrd.luks.devices."cryptSwap".device = "/dev/disk/by-uuid/60ef28d4-9818-4155-acbb-b49bc56d533c";
 
   networking.useDHCP = lib.mkDefault true;
   nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
-  powerManagement.cpuFreqGovernor = lib.mkDefault "performance";
 
   # This value determines the NixOS release from which the default
   # settings for stateful data, like file locations and database versions
