@@ -17,6 +17,11 @@ in
     enableRedistributableFirmware = true;
     cpu.intel.updateMicrocode = true;
     nvidia = {
+      package = config.boot.kernelPackages.nvidiaPackages.beta;
+      open = true;
+      nvidiasetttings = false;
+      nvidiaPersistenced = true;
+      modesetting.enable = true;
       prime = {
         offload.enable = true;
         nvidiaBusId = "PCI:1:0:0";
@@ -62,15 +67,16 @@ in
 
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
-  boot.kernelPackages = pkgs.linuxPackages_zen;
+  #boot.kernelPackages = pkgs.linuxPackages_zen;
+  boot.kernelPackages = pkgs.linuxPackages_latest;
   boot.extraModulePackages = with config.boot.kernelPackages; [
-    system76-acpi
+    #system76-acpi
     system76-io
     system76-power
   ];
   boot.initrd.availableKernelModules = [ "xhci_pci" "thunderbolt" "nvme" "usb_storage" "sd_mod" "sdhci_pci" ];
   boot.kernelModules = [ "kvm-intel" ];
-  boot.kernelParams = [ "mem_sleep_default=deep" ];
+  #boot.kernelParams = [ "mem_sleep_default=deep" ];
   fileSystems."/" =
     {
       device = "/dev/disk/by-uuid/0bf1b570-dcf4-4306-9370-0bd5151e9c74";

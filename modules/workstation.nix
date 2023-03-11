@@ -7,6 +7,8 @@
   ];
 
   environment.systemPackages = with pkgs; [
+    nextcloud-client
+    teams-for-linux
     rtorrent
     nmap
     p7zip
@@ -26,7 +28,6 @@
     libreoffice
     winetricks
     wineWowPackages.waylandFull
-    nvtop
     protonup
     bibletime
     bitwarden
@@ -39,6 +40,7 @@
     protonvpn-gui
     protonvpn-cli
     virt-manager
+    appimage-run
   ];
 
   virtualisation = {
