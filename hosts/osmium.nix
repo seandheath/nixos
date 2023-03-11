@@ -19,7 +19,7 @@ in
     nvidia = {
       package = config.boot.kernelPackages.nvidiaPackages.beta;
       open = true;
-      nvidiasetttings = false;
+      nvidiaSettings = false;
       nvidiaPersistenced = true;
       modesetting.enable = true;
       prime = {
