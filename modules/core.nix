@@ -2,7 +2,7 @@
 # your system.  Help is available in the configuration.nix(5) man page
 # and in the NixOS manual (accessible by running ‘nixos-help’).
 
-{ config, nixpkgs, system, ... }: {
+{ config, nixpkgs, system, pkgs, ... }: {
   nixpkgs.config.allowUnfree = true;
   nix.settings = {
     auto-optimise-store = true;
