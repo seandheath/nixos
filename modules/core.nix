@@ -16,5 +16,8 @@
     dates = "weekly";
     options = "--delete-older-than 30d";
   };
+  environment.systemPackages = with pkgs; [
+    rsync
+  ];
   time.timeZone = "America/New_York";
 }

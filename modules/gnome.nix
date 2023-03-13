@@ -18,8 +18,16 @@
     brgenml1lpr
   ];
 
+  qt = {
+    enable = true;
+    style = lib.mkForce "gtk2";
+    platformTheme = lib.mkForce "gtk2";
+  };
+
   # GUI Packages
   environment.systemPackages = with pkgs; [
+    libsForQt5.qtstyleplugins
+    qgnomeplatform
     gnomeExtensions.appindicator
     gnomeExtensions.gtile
     gnomeExtensions.bluetooth-quick-connect
