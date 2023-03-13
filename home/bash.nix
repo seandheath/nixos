@@ -23,7 +23,7 @@
 
       export XZ_DEFAULTS='-T0 -9'
       export EDITOR=nvim
-      export PATH=$PATH:$HOME/go/bin/:$HOME/.cargo/bin
+      export PATH=$PATH:$HOME/go/bin/:$HOME/.cargo/bin:$HOME/.local/bin
 
       function direnvinit {
         if [ ! -e ./.envrc ]; then
