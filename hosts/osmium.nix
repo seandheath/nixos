@@ -32,8 +32,13 @@ in
       enable = true;
       driSupport32Bit = true;
     };
-    system76.enableAll = true;
+    #system76.enableAll = true;
+    system76.power-daemon.enable = true;
+    system76.kernel-modules.enable = true;
+    system76.firmware-daemon.enable = true;
   };
+  systemd.services.power-profiles-daemon.enable = false;
+  systemd.services.ModemManager.enable = false;
   nixpkgs.config.allowUnfree = true;
   services.xserver.videoDrivers = [ "nvidia" ];
   services.logind = {
@@ -69,11 +74,11 @@ in
   boot.loader.efi.canTouchEfiVariables = true;
   #boot.kernelPackages = pkgs.linuxPackages_zen;
   #boot.kernelPackages = pkgs.linuxPackages_latest;
-  #boot.extraModulePackages = with config.boot.kernelPackages; [
-    #system76-acpi
-    #system76-io
-    #system76-power
-  #];
+  boot.extraModulePackages = with config.boot.kernelPackages; [
+    system76-acpi
+    system76-io
+    system76-power
+  ];
   boot.initrd.availableKernelModules = [ "xhci_pci" "thunderbolt" "nvme" "usb_storage" "sd_mod" "sdhci_pci" ];
   boot.kernelModules = [ "kvm-intel" ];
   #boot.kernelParams = [ "mem_sleep_default=deep" ];

@@ -70,7 +70,7 @@
           modules = [
             ./users/lo.nix
             ./modules/workstation.nix
-            ./modules/gnome.nix
+            ./modules/sway.nix
           ];
         };
 

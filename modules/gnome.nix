@@ -10,6 +10,7 @@
     gnome.gnome-settings-daemon
   ];
   systemd.services.NetworkManager-wait-online.enable = false;
+  systemd.services.ModemManager.enable = false;
   services.printing.enable = true;
   services.printing.drivers = with pkgs; [
     gutenprint
@@ -23,6 +24,7 @@
     style = lib.mkForce "gtk2";
     platformTheme = lib.mkForce "gtk2";
   };
+  programs.evolution.enable = lib.mkForce false;
 
   # GUI Packages
   environment.systemPackages = with pkgs; [

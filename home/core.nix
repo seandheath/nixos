@@ -9,6 +9,11 @@
   # paths it should manage.
   home.username = "lo";
   home.homeDirectory = "/home/lo";
+  home.sessionPath = [
+    "$HOME/go/bin/"
+    "$HOME/.cargo/bin/"
+    "$HOME/.local/bin/"
+  ];
 
   # This value determines the Home Manager release that your
   # configuration is compatible with. This helps avoid breakage
