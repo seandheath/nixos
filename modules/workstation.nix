@@ -2,7 +2,6 @@
 {
 
   imports = [
-    ./gnome.nix
     ./kicad.nix
     ./syncthing.nix
   ];

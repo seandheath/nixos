@@ -12,7 +12,11 @@
     openssl
     vlc
     jellyfin-media-player
+    xfce.xfce4-whiskermenu-plugin
+    pavucontrol
   ];
+  hardware.bluetooth.enable = true;
+  services.blueman.enable = true;
   hardware.pulseaudio.enable = false;
   security.rtkit.enable = true;
   services.pipewire = {

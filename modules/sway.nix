@@ -38,56 +38,59 @@ let
         gnome_schema=org.gnome.desktop.interface
         gsettings set $gnome_schema gtk-theme 'Dracula'
       '';
-  };
-in
-{
-  environment.systemPackages = with pkgs; [
-    alacritty
-    sway
-    dbus-sway-environment
-    configure-gtk
-    wayland
-    xdg-utils
-    glib
-    dracula-theme
-    gnome3.adwaita-icon-theme
-    swaylock
-    swayidle
-    grim
-    slurp
-    wl-clipboard
-    bemenu
-    mako
-  ];
-  services.pipewire = {
-    enable = true;
-    alsa.enable = true;
-    pulse.enable = true;
-  };
-  services.dbus.enable = true;
-  xdg.portal = {
-    enable = true;
-    wlr.enable = true;
-    extraPortals = [ pkgs.xdg-desktop-portal-gtk ];
+    };
+  in
+  {
+    environment.systemPackages = with pkgs; [
+      alacritty
+      sway
+      dbus-sway-environment
+      configure-gtk
+      wayland
+      xdg-utils
+      glib
+      dracula-theme
+      gnome3.adwaita-icon-theme
+      swaylock
+      swayidle
+      grim
+      slurp
+      wl-clipboard
+      bemenu
+      mako
+    ];
+    services.pipewire = {
+      enable = true;
+      alsa.enable = true;
+      pulse.enable = true;
+    };
+    services.dbus.enable = true;
+    xdg.portal = {
+      enable = true;
+      wlr.enable = true;
   };
   programs.sway = {
     enable = true;
     wrapperFeatures.gtk = true;
-  };
-  programs.light.enable = true;
-  fonts = {
-    fonts = with pkgs; [
-      noto-fonts
-      noto-fonts-cjk
-      noto-fonts-emoji
-      font-awesome
-      source-han-sans
-      source-han-sans-japanese
-      source-han-serif-japanese
+    extraPackages = with pkgs; [
+      swaylock
+      swayidle
+      wl-clipboard
+      wf-recorder
+      mako
+      grim
+      slurp
+      alacritty
+      dmenu
     ];
-    fontconfig.defaultFonts = {
-      serif = [ "Noto Serif" "Source Han Serif" ];
-      sansSerif = [ "Noto Sans" "Source Han Sans" ];
-    };
+    extraSessionCommands = ''
+      export SDL_VIDEODRIVER=wayland
+      export QT_QPA_PLATFORM=wayland
+      export QT_WAYLAND_DISABLE_WINDOWDECORATION="1"
+      export _JAVA_AWT_WM_NONREPARENTING=1
+      export MOZ_ENABLE_WAYLAND=1
+    '';
   };
+  programs.waybar.enable = true;
+  programs.light.enable = true;
 }
