@@ -10,6 +10,9 @@
     "org/gnome/mutter" = {
       attach-modal-dialogs = false;
     };
+    "org/gnome/desktop/interface" = {
+      color-scheme = "perfer-dark";
+    };
     "org/gnome/desktop/sound" = {
       allow-volume-above-100-percent = true;
     };
