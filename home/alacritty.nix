@@ -88,12 +88,10 @@ in
     enable = true;
     settings = {
       scrolling.history = 100000;
-      font = {
-        #normal.family = "Inconsolata";
-        size = 14;
-      };
       draw_bold_text_with_bright_colors = true;
       colors = campbell;
+      env.TERM = "xterm-256color";
+      selection.save_to_clipboard = true;
     };
   };
 }

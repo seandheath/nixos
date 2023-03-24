@@ -1,64 +1,38 @@
-{ config, pkgs, lib, ... }:
-{
-  # Desktop Environment
-  services.xserver = {
-    enable = true;
-    displayManager.gdm.enable = true;
-    desktopManager.gnome.enable = true;
-  };
-  services.udev.packages = with pkgs; [
-    gnome.gnome-settings-daemon
+{ config, pkgs, ... }:
+let
+  home-manager = builtins.fetchTarball "https://github.com/nix-community/home-manager/archive/master.tar.gz";
+in {
+  imports = [
+    (import "${home-manager}/nixos")
   ];
-  systemd.services.NetworkManager-wait-online.enable = false;
-  systemd.services.ModemManager.enable = false;
-  services.printing.enable = true;
-  services.printing.drivers = with pkgs; [
-    gutenprint
-    gutenprintBin
-    brlaser
-    brgenml1lpr
-  ];
-
-  qt = {
-    enable = true;
-    style = lib.mkForce "gtk2";
-    platformTheme = lib.mkForce "gtk2";
-  };
-  programs.evolution.enable = lib.mkForce false;
-
-  # GUI Packages
   environment.systemPackages = with pkgs; [
-    libsForQt5.qtstyleplugins
-    qgnomeplatform
+    alacritty
+    pavucontrol
+    firefox
     gnomeExtensions.appindicator
     gnomeExtensions.gtile
     gnomeExtensions.bluetooth-quick-connect
-    gnomeExtensions.user-themes
-    gnomeExtensions.syncthing-indicator
-    gnomeExtensions.easyeffects-preset-selector
     gnome.gnome-tweaks
-    gnome.gnome-terminal
-    gnome.gnome-themes-extra
-    gnome.zenity
-    materia-theme
-    numix-gtk-theme
-    p7zip
-    openssl
-    pkg-config
-    buildah
     vlc
     jellyfin-media-player
     wireshark
     graphviz
-    google-chrome
     filezilla
     joplin-desktop
-    firefox
-    easyeffects
     virt-manager
     kicad
+    nextcloud-client
+    libreoffice
+    vscodium
+    keepassxc
+    brasero
+    signal-desktop
+    discord
+    protonvpn-gui
+    appimage-run
+    pandoc
+    tectonic
   ];
-
   environment.gnome.excludePackages = with pkgs; [
     gnome.cheese
     gnome.gnome-music
@@ -71,14 +45,32 @@
     gnome-tour
     evolution
   ];
-
-  hardware.pulseaudio.enable = false;
-  security.rtkit.enable = true;
-  services.pipewire = {
+  services.xserver = {
     enable = true;
-    alsa.enable = true;
-    alsa.support32Bit = true;
-    pulse.enable = true;
+    displayManager.gdm.enable = true;
+    desktopManager.gnome.enable = true;
+    layout = "us";
+    xkbVariant = "";
+  };
+  services.printing.enable = true;
+  services.printing.drivers = with pkgs; [
+    gutenprint
+    gutenprintBin
+    brlaser
+    brgenml1lpr
+  ];
+  sound.enable = true;
+  hardware.pulseaudio.enable = true;
+  home-manager.users.luckyobserver = {
+    imports = [
+      ../home/gnome.nix
+    ];
+  };
+  virtualisation = {
+    oci-containers.backend = "podman";
+    podman.enable = true;
+    podman.dockerCompat = true;
+    libvirtd.enable = true;
+    spiceUSBRedirection.enable = true;
   };
 }
-

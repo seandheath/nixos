@@ -1,4 +1,1 @@
-sudo git config - -global - -add safe.directory /etc/nixos
-  sudo
-  git
-  config - -global advice.addIgnoredFile false
+sudo ln -s $(pwd)/hosts/$HOSTNAME.nix /etc/nixos/configuration.nix

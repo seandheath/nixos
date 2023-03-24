@@ -3,12 +3,13 @@
   imports = [
     ./git.nix
     ./bash.nix
+    ./alacritty.nix
   ];
 
   # Home Manager needs a bit of information about you and the
   # paths it should manage.
-  home.username = "lo";
-  home.homeDirectory = "/home/lo";
+  home.username = "luckyobserver";
+  home.homeDirectory = "/home/luckyobserver";
   home.sessionPath = [
     "$HOME/go/bin/"
     "$HOME/.cargo/bin/"
