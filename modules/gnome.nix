@@ -6,6 +6,7 @@ in {
     (import "${home-manager}/nixos")
   ];
   environment.systemPackages = with pkgs; [
+    teams
     alacritty
     pavucontrol
     firefox
