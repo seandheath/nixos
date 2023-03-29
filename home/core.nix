@@ -4,6 +4,7 @@
     ./git.nix
     ./bash.nix
     ./alacritty.nix
+    ./go.nix
   ];
 
   # Home Manager needs a bit of information about you and the

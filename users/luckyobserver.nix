@@ -12,8 +12,6 @@ in {
   home-manager.users.luckyobserver = {
     imports = [
       ../home/core.nix
-      ../home/go.nix
-      ../home/neovim.nix
     ];
   };
 }

@@ -12,6 +12,7 @@ in {
     ];
 
   environment.systemPackages = with pkgs; [
+    nix-index
     wormhole-william
     neovim
     git

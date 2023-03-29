@@ -11,7 +11,10 @@
       attach-modal-dialogs = false;
     };
     "org/gnome/desktop/interface" = {
-      color-scheme = "perfer-dark";
+      color-scheme = "prefer-dark";
+      enable-hot-corners = false;
+      font-hinting = "slight";
+      font-antialiasing = "grayscale";
     };
     "org/gnome/desktop/sound" = {
       allow-volume-above-100-percent = true;
