@@ -12,6 +12,8 @@ in {
     ];
 
   environment.systemPackages = with pkgs; [
+    pv
+    progress
     nix-index
     wormhole-william
     neovim
