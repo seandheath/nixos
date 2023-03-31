@@ -10,6 +10,12 @@
     "org/gnome/mutter" = {
       attach-modal-dialogs = false;
     };
+    "org/gnome/desktop/background" = {
+      picture-uri = "none";
+      picture-uri-dark = "none";
+      primary-color = "0x000000";
+      color-shading-type = "solid";
+    };
     "org/gnome/desktop/interface" = {
       color-scheme = "prefer-dark";
       enable-hot-corners = false;
@@ -61,11 +67,6 @@
         command = "/run/current-system/sw/bin/alacritty";
         name = "open-terminal";
       };
-    "org/gnome/desktop/background" = {
-      picture-uri = "none";
-      primary-color = "0x000000";
-      color-shading-type = "solid";
-    };
   };
 
   programs.direnv.enable = true;
