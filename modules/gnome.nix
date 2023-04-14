@@ -6,6 +6,9 @@ in {
     (import "${home-manager}/nixos")
   ];
   environment.systemPackages = with pkgs; [
+    gopls
+    go
+    rustup
     teams
     alacritty
     pavucontrol
@@ -33,11 +36,11 @@ in {
     appimage-run
     pandoc
     tectonic
+    realesrgan-ncnn-vulkan
   ];
   environment.gnome.excludePackages = with pkgs; [
     gnome.cheese
     gnome.gnome-music
-    gnome.totem
     gnome.tali
     gnome.iagno
     gnome.hitori
