@@ -28,7 +28,7 @@ in {
   boot.initrd.kernelModules = [ ];
   boot.kernelModules = [ "kvm-intel" ];
   boot.extraModulePackages = [ ];
-  boot.kernelParams = [ "pci=nommconf" ];
+  #boot.kernelParams = [ "pci=nommconf" ];
 
   networking.hostName = "osmium"; # Define your hostname.
 
@@ -40,7 +40,7 @@ in {
     nvidia = {
       package = config.boot.kernelPackages.nvidiaPackages.beta;
       #open = true;
-      #nvidiaSettings = false;
+      nvidiaSettings = false;
       modesetting.enable = true;
       powerManagement.enable = true;
       prime = {
@@ -51,7 +51,11 @@ in {
     };
     opengl = {
       enable = true;
-      driSupport32Bit = true;
+      #driSupport32Bit = true;
+      #extraPackages = with pkgs; [
+        #vaapiVdpau
+        #libvdpau-va-gl
+      #];
     };
     system76.enableAll = true;
   };
