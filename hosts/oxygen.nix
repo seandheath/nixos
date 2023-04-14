@@ -26,6 +26,11 @@
   programs.steam.enable = true;
   hardware = {
     enableRedistributableFirmware = true;
+    nvidia = {
+      package = config.boot.kernelPackages.nvidiaPackages.beta;
+      modesetting.enable = true;
+      powerManagement.enable = true;
+    };
     opengl.enable = true;
     opengl.driSupport32Bit = true;
   };
