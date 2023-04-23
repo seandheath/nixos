@@ -16,7 +16,6 @@ in {
     progress
     nix-index
     wormhole-william
-    neovim
     git
     curl
     wget

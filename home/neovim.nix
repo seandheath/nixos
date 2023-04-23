@@ -29,6 +29,7 @@
       nmap <silent> gy <Plug>(coc-type-definition)
       nmap <silent> gi <Plug>(coc-implementation)
       nmap <silent> gr <Plug>(coc-references)
+      nmap <C-t> NerdTreeToggle<CR>
     '';
     plugins = with pkgs.vimPlugins; [
       statix
