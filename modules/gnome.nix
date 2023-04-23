@@ -5,6 +5,7 @@ in {
   imports = [
     (import "${home-manager}/nixos")
   ];
+  environment.sessionVariables.NIXOS_OZONE_WL = "1";
   environment.systemPackages = with pkgs; [
     gopls
     go
