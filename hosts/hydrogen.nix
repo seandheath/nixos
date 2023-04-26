@@ -25,6 +25,7 @@
     14004
   ];
   environment.systemPackages = with pkgs; [
+    rustup
     firefox
     git
     curl
