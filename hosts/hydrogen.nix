@@ -11,6 +11,10 @@
   };
   nixpkgs.config.allowUnfree = true;
   services.xserver.videoDrivers = [ "nvidia" ];
+  services.xserver.displayManager = {
+    autoLogin.enable = true;
+    autoLogin.user = "luckyobserver";
+  };
   hardware.opengl.enable = true;
   services.syncthing.enable = true;
   networking.hostName = "hydrogen"; # Define your hostname.
