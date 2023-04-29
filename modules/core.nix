@@ -2,18 +2,11 @@
 # your system.  Help is available in the configuration.nix(5) man page
 # and in the NixOS manual (accessible by running ‘nixos-help’).
 
-{ config, pkgs, lib, ... }:
-let
-	home-manager = builtins.fetchTarball "https://github.com/nix-community/home-manager/archive/release-22.05.tar.gz";
-in {
-  imports =
-    [ # Include the results of the hardware scan.
-      (import "${home-manager}/nixos")
-    ];
-
+{ config, pkgs, lib, ... }:{
   environment.systemPackages = with pkgs; [
     pv
     progress
+    neovim
     nix-index
     wormhole-william
     git
