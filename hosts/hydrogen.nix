@@ -10,6 +10,8 @@
     cpu.amd.updateMicrocode = true;
   };
   nixpkgs.config.allowUnfree = true;
+  services.xserver.videoDrivers = [ "nvidia" ];
+  hardware.opengl.enable = true;
   services.syncthing.enable = true;
   networking.hostName = "hydrogen"; # Define your hostname.
   networking.wireless.enable = false;
