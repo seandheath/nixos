@@ -1,4 +1,10 @@
 { config, pkgs, lib, ... }: {
+  imports = [
+  	../modules/core.nix
+	../modules/usenet.nix
+	../modules/kodi.nix
+	../users/luckyobserver.nix
+  ];
   hardware = {
     enableRedistributableFirmware = true;
     cpu.amd.updateMicrocode = true;
@@ -22,7 +28,7 @@
     7878
     8096
     8989
-    14004
+    #14004
   ];
   environment.systemPackages = with pkgs; [
     rustup
@@ -39,7 +45,6 @@
   ];
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
-  #boot.kernelPackages = pkgs.linuxPackages_zen;
   boot.initrd.availableKernelModules = [ "xhci_pci" "thunderbolt" "nvme" "usb_storage" "sd_mod" "sdhci_pci" ];
   boot.kernelModules = [ "kvm-intel" ];
   fileSystems."/" =
@@ -71,6 +76,18 @@
         "discard"
       ];
     };
+
+  services.openssh = {
+    enable = true;
+    passwordAuthentication = false;
+    permitRootLogin = "no";
+  };
+
+  # Disable suspend
+  systemd.targets.sleep.enable = false;
+  systemd.targets.suspend.enable = false;
+  systemd.targets.hibernate.enable = false;
+  systemd.targets.hybrid-sleep.enable = false;
 
   swapDevices =
     [{ device = "/dev/disk/by-uuid/14d0d66b-7286-4a37-a2c0-afc2a9d2ed65"; }];
