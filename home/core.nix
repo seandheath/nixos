@@ -5,7 +5,6 @@
     ./bash.nix
     ./alacritty.nix
     ./go.nix
-    ./neovim.nix
   ];
 
   # Home Manager needs a bit of information about you and the
@@ -26,5 +25,5 @@
   # You can update Home Manager without changing this value. See
   # the Home Manager release notes for a list of state version
   # changes in each release.
-  home.stateVersion = "22.11";
+  home.stateVersion = "22.05";
 }

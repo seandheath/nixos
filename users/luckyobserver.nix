@@ -1,6 +1,6 @@
 { config, ... }:
 let
-  home-manager = builtins.fetchTarball "https://github.com/nix-community/home-manager/archive/release-22.11.tar.gz";
+  home-manager = builtins.fetchTarball "https://github.com/nix-community/home-manager/archive/release-22.05.tar.gz";
 in {
   users.users.luckyobserver = {
     isNormalUser = true;
@@ -10,6 +10,7 @@ in {
     ];
   };
   home-manager.users.luckyobserver = {
+    home.stateVersion = "22.05";
     imports = [
       ../home/core.nix
     ];
