@@ -2,7 +2,7 @@
   imports = [
   	../modules/core.nix
 	../modules/usenet.nix
-	../modules/kodi.nix
+	../modules/gnome.nix
 	../users/luckyobserver.nix
   ];
   hardware = {
