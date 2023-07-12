@@ -13,6 +13,7 @@
     curl
     wget
     htop
+    btop
     tree
     pciutils
     p7zip
