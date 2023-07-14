@@ -11,6 +11,7 @@
     jellyfin-media-player
     keepassxc
     appimage-run
+    brasero
   ];
   environment.gnome.excludePackages = with pkgs; [
     gnome.cheese

@@ -7,6 +7,8 @@
   hardware.nvidia = {
     modesetting.enable = true;
     nvidiaSettings = true;
+    powerManagement.enable = true;
+    forceFullCompositionPipeline = true;
   };
   services.xserver.videoDrivers = ["nvidia"];
 }

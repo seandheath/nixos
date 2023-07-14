@@ -51,7 +51,8 @@
   boot.initrd.luks.devices."cryptroot".device = "/dev/disk/by-id/md-name-nixos:0";
 
   fileSystems."/boot" =
-    { device = "/dev/disk/by-uuid/CF66-57EF";
+    {
+      device = "/dev/disk/by-uuid/CF66-57EF";
       fsType = "vfat";
     };
 
