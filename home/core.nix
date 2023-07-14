@@ -2,6 +2,7 @@
 
   imports = [
     ./git.nix
+    ./gnome.nix
     ./bash.nix
     ./alacritty.nix
     ./go.nix

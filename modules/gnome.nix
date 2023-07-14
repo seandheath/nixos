@@ -1,6 +1,7 @@
 { config, pkgs, ... }:{
   environment.sessionVariables.NIXOS_OZONE_WL = "1";
   environment.systemPackages = with pkgs; [
+    obsidian
     pavucontrol
     firefox
     gnomeExtensions.appindicator
@@ -12,6 +13,7 @@
     keepassxc
     appimage-run
     brasero
+    alacritty
   ];
   environment.gnome.excludePackages = with pkgs; [
     gnome.cheese

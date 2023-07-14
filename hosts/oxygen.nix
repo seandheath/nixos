@@ -1,10 +1,4 @@
 { config, lib, pkgs, ... }: {
-  imports = [
-    ../modules/core.nix
-    ../modules/gnome.nix
-    ../modules/syncthing.nix
-    ../users/sheath.nix
-  ];
   networking.hostName = "oxygen";
   networking = {
     interfaces = {
@@ -24,19 +18,8 @@
     };
   };
   programs.steam.enable = true;
-  hardware = {
-    enableRedistributableFirmware = true;
-    nvidia = {
-      modesetting.enable = true;
-      nvidiaSettings = true;
-    };
-    opengl = {
-      enable = true;
-      driSupport = true;
-      driSupport32Bit = true;
-    };
-  };
-  services.xserver.videoDrivers = [ "nvidia" ];
+  services.printing.enable = true;
+  services.printing.drivers = [ pkgs.brlaser ];
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
   boot.kernelPackages = pkgs.linuxPackages_zen;
