@@ -8,7 +8,6 @@
   let
   build-host = name: value: inputs.nixpkgs.lib.nixosSystem {
       system = value.system;
-      #system.stateVersion = value.stateVersion;
       modules = [
         ({ pkgs, ... }: {
           nixpkgs.overlays = [
@@ -27,7 +26,6 @@
         ./hosts/${name}.nix
         inputs.sops-nix.nixosModules.sops
         inputs.home-manager.nixosModules.home-manager {
-          #home-manager.useUserPackages = true;
           home-manager.useGlobalPkgs = true;
           home-manager.users.sheath = {
 	    home.stateVersion = value.stateVersion;
@@ -81,7 +79,6 @@
         modules = [
           ./users/sheath.nix
           ./modules/ddlient.nix
-          inputs.nixos-hardware.nixosModules.common-cpu-amd
         ];
       };
     };
