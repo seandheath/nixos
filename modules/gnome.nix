@@ -7,6 +7,7 @@
     gnomeExtensions.appindicator
     gnomeExtensions.gtile
     gnomeExtensions.bluetooth-quick-connect
+    gnomeExtensions.vitals
     gnome.gnome-tweaks
     vlc
     jellyfin-media-player
@@ -14,6 +15,7 @@
     appimage-run
     brasero
     alacritty
+    blightmud
   ];
   environment.gnome.excludePackages = with pkgs; [
     gnome.cheese

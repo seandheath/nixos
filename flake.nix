@@ -70,7 +70,6 @@
 	  ./modules/core.nix
 	  ./modules/gnome.nix
 	  ./modules/syncthing.nix
-	  ./modules/nvidia.nix
         ];
       };
       router = {
