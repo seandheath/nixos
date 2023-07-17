@@ -7,6 +7,7 @@
     gnomeExtensions.appindicator
     gnomeExtensions.gtile
     gnomeExtensions.bluetooth-quick-connect
+    gnomeExtensions.vitals
     gnome.gnome-tweaks
     vlc
     jellyfin-media-player
@@ -14,6 +15,17 @@
     appimage-run
     brasero
     alacritty
+    blightmud
+    signal-desktop
+    libreoffice-fresh
+    google-chrome
+    lutris
+    wine
+    wine64
+    wine-wayland
+    winetricks
+    vscodium
+    discord
   ];
   environment.gnome.excludePackages = with pkgs; [
     gnome.cheese

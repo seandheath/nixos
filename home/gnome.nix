@@ -35,6 +35,7 @@
         "bluetooth-quick-connect@bjarosze.gmail.com"
         "user-theme@gnome-shell-extensions.gcampax.github.com"
         "eepresetselector@ulville.github.io"
+	"Vitals@CoreCoding.com"
       ];
     };
     "org/gnome/desktop/peripherals/touchpad" = {
