@@ -16,6 +16,15 @@
     brasero
     alacritty
     blightmud
+    signal-desktop
+    libreoffice-fresh
+    google-chrome
+    lutris
+    wine
+    wine64
+    wine-wayland
+    winetricks
+    vscodium
   ];
   environment.gnome.excludePackages = with pkgs; [
     gnome.cheese
