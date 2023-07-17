@@ -9,12 +9,12 @@
     gnomeExtensions.bluetooth-quick-connect
     gnomeExtensions.vitals
     gnome.gnome-tweaks
+    gnome.gnome-terminal
     vlc
     jellyfin-media-player
     keepassxc
     appimage-run
     brasero
-    alacritty
     blightmud
     signal-desktop
     libreoffice-fresh
@@ -26,6 +26,7 @@
     winetricks
     vscodium
     discord
+    xournalpp
   ];
   environment.gnome.excludePackages = with pkgs; [
     gnome.cheese

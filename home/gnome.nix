@@ -65,7 +65,7 @@
     "org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0" =
       {
         binding = "<Alt>Return";
-        command = "/run/current-system/sw/bin/alacritty";
+        command = "/run/current-system/sw/bin/gnome-terminal";
         name = "open-terminal";
       };
   };
