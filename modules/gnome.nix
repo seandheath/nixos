@@ -25,6 +25,7 @@
     wine-wayland
     winetricks
     vscodium
+    discord
   ];
   environment.gnome.excludePackages = with pkgs; [
     gnome.cheese

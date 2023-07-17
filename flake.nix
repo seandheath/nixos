@@ -70,6 +70,7 @@
 	  ./modules/core.nix
 	  ./modules/gnome.nix
 	  ./modules/syncthing.nix
+	  ./modules/pentest.nix
         ];
       };
       router = {
