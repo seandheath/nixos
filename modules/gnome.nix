@@ -3,7 +3,7 @@
   environment.systemPackages = with pkgs; [
     obsidian
     pavucontrol
-    firefox
+    firefox-wayland
     gnomeExtensions.appindicator
     gnomeExtensions.gtile
     gnomeExtensions.bluetooth-quick-connect
