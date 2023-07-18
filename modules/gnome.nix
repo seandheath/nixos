@@ -3,7 +3,7 @@
   environment.systemPackages = with pkgs; [
     obsidian
     pavucontrol
-    firefox-wayland
+    firefox
     gnomeExtensions.appindicator
     gnomeExtensions.gtile
     gnomeExtensions.bluetooth-quick-connect
@@ -18,7 +18,7 @@
     blightmud
     signal-desktop
     libreoffice-fresh
-    google-chrome
+    ungoogled-chromium
     lutris
     wine
     wine64
