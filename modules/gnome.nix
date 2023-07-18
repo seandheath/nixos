@@ -27,6 +27,7 @@
     vscodium
     discord
     xournalpp
+    mullvad-vpn
   ];
   environment.gnome.excludePackages = with pkgs; [
     gnome.cheese
