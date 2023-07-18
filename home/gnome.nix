@@ -21,6 +21,7 @@
       enable-hot-corners = false;
       font-hinting = "slight";
       font-antialiasing = "grayscale";
+      gtk-theme = "Adwaita-dark";
     };
     "org/gnome/desktop/sound" = {
       allow-volume-above-100-percent = true;
@@ -68,6 +69,7 @@
         command = "/run/current-system/sw/bin/gnome-terminal";
         name = "open-terminal";
       };
+    "org/gnome/germinal/legacy".theme-variant = "dark";
   };
 
   programs.direnv.enable = true;
