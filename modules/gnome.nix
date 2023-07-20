@@ -47,6 +47,7 @@
     layout = "us";
     xkbVariant = "";
   };
+  services.mullvad-vpn.enable = true;
   sound.enable = true;
   hardware.pulseaudio.enable = true;
 }
