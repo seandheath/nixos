@@ -7,7 +7,6 @@
     cpupower-gui
     system76-firmware
     system76-keyboard-configurator
-    nvtop
   ];
 
   boot.loader.systemd-boot.enable = true;

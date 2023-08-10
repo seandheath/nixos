@@ -2,6 +2,7 @@
   environment.sessionVariables.NIXOS_OZONE_WL = "1";
   environment.systemPackages = with pkgs; [
     obsidian
+    joplin-desktop
     pavucontrol
     firefox
     gnomeExtensions.appindicator
@@ -28,6 +29,8 @@
     discord
     xournalpp
     mullvad-vpn
+    ledger
+    ghostscript
   ];
   environment.gnome.excludePackages = with pkgs; [
     gnome.cheese
@@ -47,6 +50,7 @@
     layout = "us";
     xkbVariant = "";
   };
+  services.printing.enable = true;
   sound.enable = true;
   hardware.pulseaudio.enable = true;
 }
