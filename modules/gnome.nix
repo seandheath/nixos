@@ -29,7 +29,6 @@
     vscodium
     discord
     xournalpp
-    mullvad-vpn
     ledger
     ghostscript
   ];
@@ -51,6 +50,7 @@
     layout = "us";
     xkbVariant = "";
   };
+  services.mullvad-vpn.enable = true;
   services.printing.enable = true;
   sound.enable = true;
   hardware.pulseaudio.enable = true;
