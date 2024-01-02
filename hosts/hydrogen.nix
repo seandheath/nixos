@@ -106,8 +106,8 @@
   services.openssh = {
     enable = true;
     #TODO Fix this
-    settings.passwordAuthentication = true;
-    settings.permitRootLogin = "no";
+    settings.PasswordAuthentication = true;
+    settings.PermitRootLogin = "no";
   };
 
   # Enable NVIDIA
