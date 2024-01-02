@@ -9,9 +9,8 @@
   networking.hostName = "hydrogen"; # Define your hostname.
 
   # Enable networking
-  networking.useDHCP = lib.mkDefault true;
-  networking.networkmanager.enable = true;
-  #networking.wireless.enable = false; # TODO
+  networking.useDHCP = lib.mkDefault false;
+  networking.wireless.enable = false;
   networking.interfaces.enp0s31f6.ipv4.addresses = [{
     address = "10.0.0.2";
     prefixLength = 24;
@@ -153,10 +152,6 @@
         #"discard"
       #];
     #};
-
-  # TODO disable
-  # networking.interfaces.enp0s31f6.useDHCP = lib.mkDefault true;
-  # networking.interfaces.wlp0s20f3.useDHCP = lib.mkDefault true;
 
   nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
   hardware.enableRedistributableFirmware = true;
