@@ -3,23 +3,19 @@
   	../modules/core.nix
 	../modules/usenet.nix
 	../modules/gnome.nix
-	../users/luckyobserver.nix
+	../users/user.nix
   ];
-  hardware = {
-    enableRedistributableFirmware = true;
-    cpu.amd.updateMicrocode = true;
-  };
-  nixpkgs.config.allowUnfree = true;
-  services.xserver.videoDrivers = [ "nvidia" ];
-  services.xserver.displayManager = {
-    autoLogin.enable = true;
-    autoLogin.user = "luckyobserver";
-  };
-  hardware.opengl.enable = true;
-  services.syncthing.enable = true;
+  # NEW
+  boot.loader.systemd-boot.enable = true;
+  boot.loader.efi.canTouchEfiVariables = true;
+
   networking.hostName = "hydrogen"; # Define your hostname.
-  networking.wireless.enable = false;
-  networking.interfaces.enp5s0.ipv4.addresses = [{
+
+  # Enable networking
+  networking.useDHCP = lib.mkDefault true;
+  networking.networkmanager.enable = true;
+  #networking.wireless.enable = false; # TODO
+  networking.interfaces.enp0s31f6.ipv4.addresses = [{
     address = "10.0.0.2";
     prefixLength = 24;
   }];
@@ -34,7 +30,7 @@
     7878
     8096
     8989
-    #14004
+    #14004 # Veloren
   ];
   environment.systemPackages = with pkgs; [
     rustup
@@ -47,47 +43,59 @@
     thefuck
     ripgrep
     srm
+    vlc
     p7zip
   ];
-  boot.loader.systemd-boot.enable = true;
-  boot.loader.efi.canTouchEfiVariables = true;
-  boot.initrd.availableKernelModules = [ "xhci_pci" "thunderbolt" "nvme" "usb_storage" "sd_mod" "sdhci_pci" ];
-  boot.kernelModules = [ "kvm-intel" ];
-  fileSystems."/" =
-    {
-      device = "/dev/disk/by-uuid/acacae35-6fbb-44f7-a80d-673a178405e4";
-      fsType = "btrfs";
-      options = [
-        "noatime"
-        "nodiratime"
-        "compress=lzo"
-        "discard"
-      ];
-    };
 
-  fileSystems."/boot" =
-    {
-      device = "/dev/disk/by-uuid/4381-F118";
-      fsType = "vfat";
-    };
+  # Set your time zone.
+  time.timeZone = "America/New_York";
 
-  fileSystems."/data" =
-    {
-      device = "/dev/disk/by-uuid/75c4fbbf-7ab0-42f2-b333-31d825d280c2";
-      fsType = "btrfs";
-      options = [
-        "noatime"
-        "nodiratime"
-        "compress=lzo"
-        "discard"
-      ];
-    };
+  # Select internationalisation properties.
+  i18n.defaultLocale = "en_US.UTF-8";
 
-  services.openssh = {
-    enable = true;
-    passwordAuthentication = false;
-    permitRootLogin = "no";
+  i18n.extraLocaleSettings = {
+    LC_ADDRESS = "en_US.UTF-8";
+    LC_IDENTIFICATION = "en_US.UTF-8";
+    LC_MEASUREMENT = "en_US.UTF-8";
+    LC_MONETARY = "en_US.UTF-8";
+    LC_NAME = "en_US.UTF-8";
+    LC_NUMERIC = "en_US.UTF-8";
+    LC_PAPER = "en_US.UTF-8";
+    LC_TELEPHONE = "en_US.UTF-8";
+    LC_TIME = "en_US.UTF-8";
   };
+
+  # Enable the X11 windowing system.
+  services.xserver.enable = true;
+
+  # Enable the GNOME Desktop Environment.
+  services.xserver.displayManager.gdm.enable = true;
+  services.xserver.desktopManager.gnome.enable = true;
+
+  # Configure keymap in X11
+  services.xserver = {
+    layout = "us";
+    xkbVariant = "";
+  };
+
+  # Enable sound with pipewire.
+  sound.enable = true;
+  hardware.pulseaudio.enable = false;
+  security.rtkit.enable = true;
+  services.pipewire = {
+    enable = true;
+    alsa.enable = true;
+    alsa.support32Bit = true;
+    pulse.enable = true;
+  };
+
+  # Enable automatic login for the user.
+  services.xserver.displayManager.autoLogin.enable = true;
+  services.xserver.displayManager.autoLogin.user = "user";
+
+  # Workaround for GNOME autologin: https://github.com/NixOS/nixpkgs/issues/103746#issuecomment-945091229
+  systemd.services."getty@tty1".enable = false;
+  systemd.services."autovt@tty1".enable = false;
 
   # Disable suspend
   systemd.targets.sleep.enable = false;
@@ -95,11 +103,67 @@
   systemd.targets.hibernate.enable = false;
   systemd.targets.hybrid-sleep.enable = false;
 
-  swapDevices =
-    [{ device = "/dev/disk/by-uuid/14d0d66b-7286-4a37-a2c0-afc2a9d2ed65"; }];
+  # Allow unfree packages
+  nixpkgs.config.allowUnfree = true;
 
-  #nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
-  powerManagement.cpuFreqGovernor = lib.mkDefault "performance";
+  # Enable the OpenSSH daemon.
+  services.openssh = {
+    enable = true;
+    #TODO Fix this
+    passwordAuthentication = true;
+    permitRootLogin = "no";
+  };
+
+  # Enable NVIDIA
+  services.xserver.videoDrivers = [ "nvidia" ];
+  hardware.opengl.enable = true;
+
+  # Enable Syncthing
+  services.syncthing.enable = true;
+
+  fileSystems."/" =
+    { device = "/dev/disk/by-uuid/f9785601-458e-4fa4-b6e7-4627923f19da";
+      fsType = "ext4";
+      options = [
+        "noatime"
+        "nodiratime"
+      ]
+    };
+
+  boot.initrd.availableKernelModules = [ "xhci_pci" "ahci" "nvme" "usbhid" "usb_storage" "sd_mod" "rtsx_pci_sdmmc" ];
+  boot.initrd.kernelModules = [ ];
+  boot.kernelModules = [ "kvm-intel" ];
+  boot.extraModulePackages = [ ];
+
+  fileSystems."/boot" =
+    { device = "/dev/disk/by-uuid/1972-68C4";
+      fsType = "vfat";
+    };
+
+  swapDevices =
+    [ { device = "/dev/disk/by-uuid/07903a2a-35f9-4e70-8296-0f053d1513d0"; }
+    ];
+
+  # TODO update once HDDs connected
+  #fileSystems."/data" =
+    #{
+      #device = "/dev/disk/by-uuid/75c4fbbf-7ab0-42f2-b333-31d825d280c2";
+      #fsType = "btrfs";
+      #options = [
+        #"noatime"
+        #"nodiratime"
+        #"compress=lzo"
+        #"discard"
+      #];
+    #};
+
+  # TODO disable
+  # networking.interfaces.enp0s31f6.useDHCP = lib.mkDefault true;
+  # networking.interfaces.wlp0s20f3.useDHCP = lib.mkDefault true;
+
+  nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
+  hardware.enableRedistributableFirmware = true;
+  hardware.cpu.intel.updateMicrocode = true;
 
   # This value determines the NixOS release from which the default
   # settings for stateful data, like file locations and database versions
@@ -107,5 +171,5 @@
   # this value at the release version of the first install of this system.
   # Before changing this value read the documentation for this option
   # (e.g. man configuration.nix or on https://nixos.org/nixos/options.html).
-  system.stateVersion = "22.05"; # Did you read the comment?
+  system.stateVersion = "23.11"; # Did you read the comment?
 }
