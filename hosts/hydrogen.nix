@@ -1,9 +1,6 @@
 { config, pkgs, lib, ... }: {
   imports = [
-  	../modules/core.nix
-	../modules/usenet.nix
-	../modules/gnome.nix
-	../users/user.nix
+    ../users/user.nix
   ];
   # NEW
   boot.loader.systemd-boot.enable = true;
