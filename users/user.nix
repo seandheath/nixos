@@ -1,5 +1,5 @@
 { config, pkgs, ... }:{
-  users.users.sheath = {
+  users.users.user = {
     isNormalUser = true;
     extraGroups = [ "wheel" "networkmanager" "video" "libvirtd" ];
     openssh.authorizedKeys.keys = [
