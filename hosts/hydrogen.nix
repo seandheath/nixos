@@ -142,17 +142,17 @@
     ];
 
   # TODO update once HDDs connected
-  #fileSystems."/data" =
-    #{
-      #device = "/dev/disk/by-uuid/75c4fbbf-7ab0-42f2-b333-31d825d280c2";
-      #fsType = "btrfs";
-      #options = [
-        #"noatime"
-        #"nodiratime"
-        #"compress=lzo"
-        #"discard"
-      #];
-    #};
+  fileSystems."/data" =
+    {
+      device = "/dev/disk/by-uuid/75c4fbbf-7ab0-42f2-b333-31d825d280c2";
+      fsType = "btrfs";
+      options = [
+        "noatime"
+        "nodiratime"
+        "compress=lzo"
+        "discard"
+      ];
+    };
 
   nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
   hardware.enableRedistributableFirmware = true;
