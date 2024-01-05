@@ -1,13 +1,12 @@
 { config, pkgs, lib, ... }: {
   imports = [
   	../modules/core.nix
-	../modules/usenet.nix
-	../modules/gnome.nix
-	../users/luckyobserver.nix
+    ../modules/gnome.nix
+    ../users/user.nix
   ];
   hardware = {
     enableRedistributableFirmware = true;
-    cpu.amd.updateMicrocode = true;
+    cpu.intel.updateMicrocode = true;
   };
   nixpkgs.config.allowUnfree = true;
   services.xserver.videoDrivers = [ "nvidia" ];
@@ -48,6 +47,9 @@
     ripgrep
     srm
     p7zip
+    tmux
+    rsync
+    go
   ];
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
@@ -95,9 +97,6 @@
   systemd.targets.hibernate.enable = false;
   systemd.targets.hybrid-sleep.enable = false;
 
-  swapDevices =
-    [{ device = "/dev/disk/by-uuid/14d0d66b-7286-4a37-a2c0-afc2a9d2ed65"; }];
-
   #nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
   powerManagement.cpuFreqGovernor = lib.mkDefault "performance";
 
@@ -107,5 +106,5 @@
   # this value at the release version of the first install of this system.
   # Before changing this value read the documentation for this option
   # (e.g. man configuration.nix or on https://nixos.org/nixos/options.html).
-  system.stateVersion = "22.05"; # Did you read the comment?
+  # system.stateVersion = "22.05"; # Did you read the comment?
 }
