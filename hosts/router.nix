@@ -9,7 +9,7 @@
     # Include the results of the hardware scan.
     ../modules/reverse-proxy.nix
     ../modules/core.nix
-    ../users/lo.nix
+    ../users/user.nix
   ];
 
   boot.kernel.sysctl = {
