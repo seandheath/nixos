@@ -14,7 +14,7 @@
       enableACME = true;
       forceSSL = true;
       locations."/" = {
-        proxyPass = "10.0.0.2:14004";
+        proxyPass = "10.0.0.10:14004";
         proxyWebsockets = true;
       };
     };
@@ -32,12 +32,12 @@
       #};
     #};
     # Config for valoren server
-    streamConfig = ''
-      server {
-        listen 14004;
-        proxy_timeout 20s;
-        proxy_pass 10.0.0.10:14004;
-      }
-    '';
+    #streamConfig = ''
+      #server {
+        #listen 14004;
+        #proxy_timeout 20s;
+        #proxy_pass 10.0.0.10:14004;
+      #}
+    #'';
   };
 }
