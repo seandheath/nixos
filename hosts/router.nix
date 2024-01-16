@@ -127,7 +127,7 @@
     {
       sourcePort = 14004;
       proto = "tcp";
-      destination = "10.0.0.10:14004"
+      destination = "10.0.0.10:14004";
     }
   ];
   networking.nameservers = [ "10.0.0.1" ];
