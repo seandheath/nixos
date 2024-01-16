@@ -223,8 +223,8 @@
 
   services.openssh = {
     enable = true;
-    settings.passwordAuthentication = false;
-    settings.permitRootLogin = "no";
+    settings.PasswordAuthentication = false;
+    settings.PermitRootLogin = "no";
   };
 
   users.groups.ddclient = { };
