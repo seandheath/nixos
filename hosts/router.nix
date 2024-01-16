@@ -10,7 +10,7 @@
     ../modules/reverse-proxy.nix
     ../modules/core.nix
     ../users/user.nix
-    "${(import ./nix/sources.nix).sops-nix}/modules/sops"
+    "${builtins.fetchTarball "https://github.com/Mic92/sops-nix/archive/master.tar.gz"}/modules/sops"
   ];
 
   boot.kernel.sysctl = {
