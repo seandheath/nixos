@@ -3,6 +3,9 @@
 # and in the NixOS manual (accessible by running ‘nixos-help’).
 
 { config, pkgs, lib, ... }:{
+  imports = [
+    "./sops.nix"
+  ];
   environment.systemPackages = with pkgs; [
     pv
     progress
