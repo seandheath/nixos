@@ -150,6 +150,7 @@
   services.dnsmasq = {
     enable = true;
     settings = {
+      port = 0;
       server = [
         "10.0.0.1"
       ];
