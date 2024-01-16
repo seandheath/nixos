@@ -9,6 +9,7 @@
     # Include the results of the hardware scan.
     ../modules/reverse-proxy.nix
     ../modules/core.nix
+    ../modules/sops.nix
     ../users/user.nix
     #<sops-nix/modules/sops>
   ];
