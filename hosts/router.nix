@@ -191,7 +191,7 @@
       ];
       interface = "enp3s0f0";
       domain-needed = true;
-      dhcp-range = ["10.0.0.100,10.0.0.200"]
+      dhcp-range = ["10.0.0.100,10.0.0.200"];
     }
   }
 
