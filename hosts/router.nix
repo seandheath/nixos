@@ -145,36 +145,6 @@
         cache
       }
       
-      veloren.nheath.com {
-        template IN A {
-          answer "{{ .Name }} 0 IN A 10.0.0.1"
-        }
-      }
-
-      sunrise.nheath.com {
-        template IN A {
-          answer "{{ .Name }} 0 IN A 10.0.0.1"
-        }
-      }
-
-      hs.nheath.com {
-        template IN A {
-          answer "{{ .Name }} 0 IN A 10.0.0.1"
-        }
-      }
-
-      nc.nheath.com {
-        template IN A {
-          answer "{{ .Name }} 0 IN A 10.0.0.1"
-        }
-      }
-
-      trilium.nheath.com {
-        template IN A {
-          answer "{{ .Name }} 0 IN A 10.0.0.1"
-        }
-      }
-
       brother-printer.local {
         template IN A {
           answer "{{ .Name }} 0 IN A 10.0.0.30"
