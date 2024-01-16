@@ -41,6 +41,7 @@
     srm
     vlc
     p7zip
+    neovim
   ];
 
   # Set your time zone.
@@ -63,6 +64,9 @@
 
   # Enable the X11 windowing system.
   services.xserver.enable = true;
+
+  # Enable libvirt
+  virtualisation.libvirtd.enable = true;
 
   # Enable the GNOME Desktop Environment.
   services.xserver.displayManager.gdm.enable = true;
