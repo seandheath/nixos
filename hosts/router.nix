@@ -183,25 +183,37 @@
     '';
   };
 
-  services.dhcpd4 = {
+  services.dnsmasq = {
     enable = true;
-    interfaces = [ "enp3s0f0" ];
-    extraConfig = ''
-      option domain-name-servers 10.0.0.1;
-      option subnet-mask 255.255.255.0;
+    settings = {
+      server = [
+        "10.0.0.1"
+      ];
+      interface = "enp3s0f0";
+      domain-needed = true;
+      dhcp-range = ["10.0.0.100,10.0.0.200"]
+    }
+  }
 
-      subnet 10.0.0.0 netmask 255.255.255.0 {
-        option broadcast-address 10.0.0.255;
-        option routers 10.0.0.1;
-        interface enp3s0f0;
-        range 10.0.0.100 10.0.0.200;
-      }
-      host brother {
-        hardware ethernet 30:05:5c:98:f0:a6;
-        fixed-address 10.0.0.5;
-      }
-    '';
-  };
+  #services.dhcpd4 = {
+    #enable = true;
+    #interfaces = [ "enp3s0f0" ];
+    #extraConfig = ''
+      #option domain-name-servers 10.0.0.1;
+      #option subnet-mask 255.255.255.0;
+#
+      #subnet 10.0.0.0 netmask 255.255.255.0 {
+        #option broadcast-address 10.0.0.255;
+        #option routers 10.0.0.1;
+        #interface enp3s0f0;
+        #range 10.0.0.100 10.0.0.200;
+      #}
+      #host brother {
+        #hardware ethernet 30:05:5c:98:f0:a6;
+        #fixed-address 10.0.0.5;
+      #}
+    #'';
+  #};
 
   services.openssh = {
     enable = true;
