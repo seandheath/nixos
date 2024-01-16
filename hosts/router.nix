@@ -11,7 +11,7 @@
     ../modules/core.nix
     ../modules/sops.nix
     ../users/user.nix
-    #<sops-nix/modules/sops>
+    ../modules/ddclient.nix
   ];
 
   boot.kernel.sysctl = {
@@ -143,6 +143,12 @@
         # Cloudflare
         forward . 1.1.1.1 1.0.0.1
         cache
+      }
+      
+      veloren.nheath.com {
+        template IN A {
+          answer "{{ .Name }} 0 IN A 10.0.0.1"
+        }
       }
 
       sunrise.nheath.com {

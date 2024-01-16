@@ -14,23 +14,23 @@
       enableACME = true;
       forceSSL = true;
       locations."/" = {
-        proxyPass = "http://10.0.0.2:8096";
+        proxyPass = "10.0.0.2:14004";
         proxyWebsockets = true;
       };
     };
-    virtualHosts."nc.nheath.com" = {
-      enableACME = true;
-      forceSSL = true;
-      locations."/" = {
-        proxyPass = "http://10.0.0.2/";
-        proxyWebsockets = true;
-        extraConfig = ''
-          client_max_body_size 32G;
-          client_body_timeout 300s;
-          fastcgi_buffers 64 4k;
-        '';
-      };
-    };
+    #virtualHosts."nc.nheath.com" = {
+      #enableACME = true;
+      #forceSSL = true;
+      #locations."/" = {
+        #proxyPass = "http://10.0.0.2/";
+        #proxyWebsockets = true;
+        #extraConfig = ''
+          #client_max_body_size 32G;
+          #client_body_timeout 300s;
+          #fastcgi_buffers 64 4k;
+        #'';
+      #};
+    #};
     # Config for valoren server
     streamConfig = ''
       server {
