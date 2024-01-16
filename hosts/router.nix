@@ -157,8 +157,10 @@
     enable = true;
     settings = {
       #port = 0;
+      cache-size=1000;
       server = [
-        "10.0.0.1"
+        "1.1.1.1"
+        "1.0.0.1"
       ];
       interface = "enp3s0f0";
       domain-needed = true;
