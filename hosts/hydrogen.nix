@@ -2,7 +2,6 @@
   imports = [
     ../users/user.nix
   ];
-  # NEW
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
 
@@ -42,6 +41,9 @@
     vlc
     p7zip
     neovim
+    tmux
+    rsync
+    go
   ];
 
   # Set your time zone.
@@ -109,7 +111,6 @@
   # Enable the OpenSSH daemon.
   services.openssh = {
     enable = true;
-    #TODO Fix this
     settings.PasswordAuthentication = true;
     settings.PermitRootLogin = "no";
   };
@@ -145,17 +146,17 @@
     ];
 
   # TODO update once HDDs connected
-  #fileSystems."/data" =
-    #{
-      #device = "/dev/disk/by-uuid/75c4fbbf-7ab0-42f2-b333-31d825d280c2";
-      #fsType = "btrfs";
-      #options = [
-        #"noatime"
-        #"nodiratime"
-        #"compress=lzo"
-        #"discard"
-      #];
-    #};
+  fileSystems."/data" =
+    {
+      device = "/dev/disk/by-uuid/75c4fbbf-7ab0-42f2-b333-31d825d280c2";
+      fsType = "btrfs";
+      options = [
+        "noatime"
+        "nodiratime"
+        "compress=lzo"
+        "discard"
+      ];
+    };
 
   nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
   hardware.enableRedistributableFirmware = true;
