@@ -144,18 +144,6 @@
         forward . 1.1.1.1 1.0.0.1
         cache
       }
-      
-      brother-printer.local {
-        template IN A {
-          answer "{{ .Name }} 0 IN A 10.0.0.30"
-        }
-      }
-
-      reddit.com {
-        template IN A {
-          answer "{{ .Name }} 0 IN A 127.0.0.1"
-        }
-      }
     '';
   };
 
