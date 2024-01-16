@@ -136,27 +136,27 @@
   networking.dhcpcd.persistent = true;
 
   # set up DNS
-  services.coredns = {
-    enable = true;
-    config = ''
-      . {
-        # Cloudflare
-        forward . 1.1.1.1 1.0.0.1
-        cache
-      }
-
-      sunrise.nheath.com {
-        template IN A {
-          answer "{{ .Name }} 0 IN A 10.0.0.10"
-        }
-      }
-    '';
-  };
+  #services.coredns = {
+    #enable = true;
+    #config = ''
+      #. {
+        ## Cloudflare
+        #forward . 1.1.1.1 1.0.0.1
+        #cache
+      #}
+#
+      #sunrise.nheath.com {
+        #template IN A {
+          #answer "{{ .Name }} 0 IN A 10.0.0.10"
+        #}
+      #}
+    #'';
+  #};
 
   services.dnsmasq = {
     enable = true;
     settings = {
-      port = 0;
+      #port = 0;
       server = [
         "10.0.0.1"
       ];
