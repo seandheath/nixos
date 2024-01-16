@@ -126,11 +126,11 @@
       proto = "tcp";
       sourcePort = 2345;
     }
-    #{
-      #sourcePort = 14004;
-      #proto = "tcp";
-      #destination = "10.0.0.10:14004";
-    #}
+    {
+      sourcePort = 14004;
+      proto = "tcp";
+      destination = "10.0.0.10:14004";
+    }
   ];
   networking.nameservers = [ "10.0.0.1" ];
   networking.dhcpcd.persistent = true;
