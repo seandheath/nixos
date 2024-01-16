@@ -4,7 +4,7 @@
 
 { config, pkgs, lib, ... }:{
   imports = [
-    "./sops.nix"
+    "sops.nix"
   ];
   environment.systemPackages = with pkgs; [
     pv
