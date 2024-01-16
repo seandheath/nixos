@@ -10,6 +10,7 @@
     ../modules/reverse-proxy.nix
     ../modules/core.nix
     ../users/user.nix
+    "${(import ./nix/sources.nix).sops-nix}/modules/sops"
   ];
 
   boot.kernel.sysctl = {
