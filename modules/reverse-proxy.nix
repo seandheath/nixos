@@ -10,14 +10,14 @@
     recommendedTlsSettings = true;
     recommendedGzipSettings = true;
     recommendedOptimisation = true;
-    virtualHosts."sunrise.nheath.com" = {
-      enableACME = true;
-      forceSSL = true;
-      locations."/" = {
-        proxyPass = "10.0.0.10:14004";
-        proxyWebsockets = true;
-      };
-    };
+    #virtualHosts."sunrise.nheath.com" = {
+      #enableACME = true;
+      #forceSSL = true;
+      #locations."/" = {
+        #proxyPass = "10.0.0.10:14004";
+        #proxyWebsockets = true;
+      #};
+    #};
     #virtualHosts."nc.nheath.com" = {
       #enableACME = true;
       #forceSSL = true;
