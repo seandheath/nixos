@@ -10,10 +10,19 @@
   # Enable networking
   networking.useDHCP = lib.mkDefault false;
   networking.wireless.enable = false;
-  networking.interfaces.enp0s31f6.ipv4.addresses = [{
+  networking.bridges = {
+    "br0" = {
+      interfaces = ["enp0s31f6"];
+    };
+  };
+  networking.interfaces.br0.ipv4.addresses = [{
     address = "10.0.0.2";
     prefixLength = 24;
   }];
+  #networking.interfaces.enp0s31f6.ipv4.addresses = [{
+    #address = "10.0.0.2";
+    #prefixLength = 24;
+  #}];
   networking.defaultGateway = "10.0.0.1";
   networking.nameservers = [ "10.0.0.1" ];
   networking.firewall.enable = true;
