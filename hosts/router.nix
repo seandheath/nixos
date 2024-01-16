@@ -10,7 +10,7 @@
     ../modules/reverse-proxy.nix
     ../modules/core.nix
     ../users/user.nix
-    <sops-nix/modules/sops>
+    #<sops-nix/modules/sops>
   ];
 
   boot.kernel.sysctl = {
