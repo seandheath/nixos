@@ -110,7 +110,7 @@
     53
     80
     443
-    #14004
+    14004
   ];
   networking.nat.enable = true;
   networking.nat.internalIPs = [
@@ -123,6 +123,11 @@
       destination = "10.0.0.2:22";
       proto = "tcp";
       sourcePort = 2345;
+    }
+    {
+      sourcePort = 14004;
+      proto = "tcp";
+      destination = "10.0.0.10:14004"
     }
   ];
   networking.nameservers = [ "10.0.0.1" ];
