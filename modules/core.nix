@@ -29,6 +29,7 @@
     gcc
     tmux
     nixpkgs-fmt
+    niv
   ];
 
   i18n.defaultLocale = "en_US.UTF-8";

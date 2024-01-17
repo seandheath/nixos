@@ -7,9 +7,11 @@
 {
   imports = [
     # Include the results of the hardware scan.
-    ../modules/reverse-proxy.nix
+    #../modules/reverse-proxy.nix
     ../modules/core.nix
-    ../users/lo.nix
+    ../modules/sops.nix
+    ../users/user.nix
+    ../modules/ddclient.nix
   ];
 
   boot.kernel.sysctl = {
@@ -103,14 +105,13 @@
     "enp3s0f0"
   ];
   networking.firewall.allowedUDPPorts = [
-    53
+    #53
   ];
   networking.firewall.allowedTCPPorts = [
     22
-    53
-    80
-    443
-    #14004
+    #53
+    #80
+    #443
   ];
   networking.nat.enable = true;
   networking.nat.internalIPs = [
@@ -124,82 +125,33 @@
       proto = "tcp";
       sourcePort = 2345;
     }
+    #{
+      #sourcePort = 14004;
+      #proto = "tcp";
+      #destination = "10.0.0.10:14004";
+    #}
   ];
   networking.nameservers = [ "10.0.0.1" ];
   networking.dhcpcd.persistent = true;
 
-  # set up DNS
-  services.coredns = {
+  services.dnsmasq = {
     enable = true;
-    config = ''
-      . {
-        # Cloudflare
-        forward . 1.1.1.1 1.0.0.1
-        cache
-      }
-
-      sunrise.nheath.com {
-        template IN A {
-          answer "{{ .Name }} 0 IN A 10.0.0.1"
-        }
-      }
-
-      hs.nheath.com {
-        template IN A {
-          answer "{{ .Name }} 0 IN A 10.0.0.1"
-        }
-      }
-
-      nc.nheath.com {
-        template IN A {
-          answer "{{ .Name }} 0 IN A 10.0.0.1"
-        }
-      }
-
-      trilium.nheath.com {
-        template IN A {
-          answer "{{ .Name }} 0 IN A 10.0.0.1"
-        }
-      }
-
-      brother-printer.local {
-        template IN A {
-          answer "{{ .Name }} 0 IN A 10.0.0.30"
-        }
-      }
-
-      reddit.com {
-        template IN A {
-          answer "{{ .Name }} 0 IN A 127.0.0.1"
-        }
-      }
-    '';
-  };
-
-  services.dhcpd4 = {
-    enable = true;
-    interfaces = [ "enp3s0f0" ];
-    extraConfig = ''
-      option domain-name-servers 10.0.0.1;
-      option subnet-mask 255.255.255.0;
-
-      subnet 10.0.0.0 netmask 255.255.255.0 {
-        option broadcast-address 10.0.0.255;
-        option routers 10.0.0.1;
-        interface enp3s0f0;
-        range 10.0.0.100 10.0.0.200;
-      }
-      host brother {
-        hardware ethernet 30:05:5c:98:f0:a6;
-        fixed-address 10.0.0.5;
-      }
-    '';
+    settings = {
+      cache-size=1000;
+      server = [
+        "1.1.1.1"
+        "1.0.0.1"
+      ];
+      interface = "enp3s0f0";
+      domain-needed = true;
+      dhcp-range = ["10.0.0.100,10.0.0.200"];
+    };
   };
 
   services.openssh = {
     enable = true;
-    passwordAuthentication = false;
-    permitRootLogin = "no";
+    settings.PasswordAuthentication = true;
+    settings.PermitRootLogin = "no";
   };
 
   users.groups.ddclient = { };
@@ -234,6 +186,8 @@
   boot.initrd.kernelModules = [ ];
   boot.kernelModules = [ ];
   boot.extraModulePackages = [ ];
+  boot.loader.systemd-boot.enable = true;
+  boot.loader.efi.canTouchEfiVariables = true;
 
   fileSystems."/" =
     {

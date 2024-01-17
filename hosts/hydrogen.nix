@@ -34,7 +34,7 @@
     7878
     8096
     8989
-    #14004 # Veloren
+    14004 # Veloren
   ];
   environment.systemPackages = with pkgs; [
     rustup
