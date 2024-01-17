@@ -11,6 +11,7 @@
     ../modules/core.nix
     ../modules/sops.nix
     ../users/user.nix
+    ../users/veloren.nix
     ../modules/ddclient.nix
   ];
 
