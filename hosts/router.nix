@@ -151,8 +151,19 @@
 
   services.openssh = {
     enable = true;
-    settings.PasswordAuthentication = true;
-    settings.PermitRootLogin = "no";
+    extraConfig = ''
+      AuthorizedKeysFile .ssh/authorized_keys
+      UsePAM yes
+      UsePrivilegeSeparation sandbox
+      PermitRootLogin no
+      PasswordAuthentication no
+      Match User veloren
+        PasswordAuthentication yes
+        AllowAgentForwarding no
+        AllowTcpForwarding yes
+        PermitOpen 10.0.0.10:14004
+        ForceCommand /bin/echo "Veloren Forwarding Enabled"
+    '';
   };
 
   users.groups.ddclient = { };
