@@ -162,7 +162,7 @@
         AllowAgentForwarding no
         AllowTcpForwarding yes
         PermitOpen 10.0.0.10:14004
-        ForceCommand /run/current-system/sw/bin/echo "Wake up, Neo...\nThe Matrix has you...\nFollow the white rabbit.\nKnock, knock, Neo."
+        ForceCommand /run/current-system/sw/bin/echo -e "Wake up, Neo...\nThe Matrix has you...\nFollow the white rabbit.\nKnock, knock, Neo."
     '';
   };
 
