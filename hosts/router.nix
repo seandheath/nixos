@@ -162,7 +162,7 @@
         AllowAgentForwarding no
         AllowTcpForwarding yes
         PermitOpen 10.0.0.10:14004
-        ForceCommand /run/current-system/sw/bin/echo "Veloren Forwarding Enabled"
+        ForceCommand /run/current-system/sw/bin/true
     '';
   };
 
