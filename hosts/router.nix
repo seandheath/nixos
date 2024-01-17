@@ -105,14 +105,13 @@
     "enp3s0f0"
   ];
   networking.firewall.allowedUDPPorts = [
-    53
+    #53
   ];
   networking.firewall.allowedTCPPorts = [
     22
-    53
-    80
-    443
-    14004
+    #53
+    #80
+    #443
   ];
   networking.nat.enable = true;
   networking.nat.internalIPs = [
@@ -126,37 +125,18 @@
       proto = "tcp";
       sourcePort = 2345;
     }
-    {
-      sourcePort = 14004;
-      proto = "tcp";
-      destination = "10.0.0.10:14004";
-    }
+    #{
+      #sourcePort = 14004;
+      #proto = "tcp";
+      #destination = "10.0.0.10:14004";
+    #}
   ];
   networking.nameservers = [ "10.0.0.1" ];
   networking.dhcpcd.persistent = true;
 
-  # set up DNS
-  #services.coredns = {
-    #enable = true;
-    #config = ''
-      #. {
-        ## Cloudflare
-        #forward . 1.1.1.1 1.0.0.1
-        #cache
-      #}
-#
-      #sunrise.nheath.com {
-        #template IN A {
-          #answer "{{ .Name }} 0 IN A 10.0.0.10"
-        #}
-      #}
-    #'';
-  #};
-
   services.dnsmasq = {
     enable = true;
     settings = {
-      #port = 0;
       cache-size=1000;
       server = [
         "1.1.1.1"
@@ -168,29 +148,9 @@
     };
   };
 
-  #services.dhcpd4 = {
-    #enable = true;
-    #interfaces = [ "enp3s0f0" ];
-    #extraConfig = ''
-      #option domain-name-servers 10.0.0.1;
-      #option subnet-mask 255.255.255.0;
-#
-      #subnet 10.0.0.0 netmask 255.255.255.0 {
-        #option broadcast-address 10.0.0.255;
-        #option routers 10.0.0.1;
-        #interface enp3s0f0;
-        #range 10.0.0.100 10.0.0.200;
-      #}
-      #host brother {
-        #hardware ethernet 30:05:5c:98:f0:a6;
-        #fixed-address 10.0.0.5;
-      #}
-    #'';
-  #};
-
   services.openssh = {
     enable = true;
-    settings.PasswordAuthentication = false;
+    settings.PasswordAuthentication = true;
     settings.PermitRootLogin = "no";
   };
 
