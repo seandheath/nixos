@@ -17,4 +17,5 @@
     "$HOME/.cargo/bin/"
     "$HOME/.local/bin/"
   ];
+  home.stateVersion = "24.05";
 }

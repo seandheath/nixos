@@ -1,9 +1,10 @@
 { config, pkgs, ... }:{
   environment.sessionVariables.NIXOS_OZONE_WL = "1";
   environment.systemPackages = with pkgs; [
+    prusa-slicer
+    openscad
     obsidian
     pavucontrol
-    firefox
     gnomeExtensions.appindicator
     gnomeExtensions.gtile
     gnomeExtensions.bluetooth-quick-connect
@@ -44,10 +45,6 @@
     enable = true;
     displayManager.gdm.enable = true;
     desktopManager.gnome.enable = true;
-    layout = "us";
-    xkbVariant = "";
   };
   services.mullvad-vpn.enable = true;
-  sound.enable = true;
-  hardware.pulseaudio.enable = true;
 }

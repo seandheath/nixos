@@ -81,6 +81,7 @@ let
       cyan = "0x61d6d6";
       white = "0xf2f2f2";
     };
+    draw_bold_text_with_bright_colors = true;
   };
 in
 {
@@ -88,10 +89,11 @@ in
     enable = true;
     settings = {
       scrolling.history = 100000;
-      draw_bold_text_with_bright_colors = true;
       colors = campbell;
       env.TERM = "xterm-256color";
       selection.save_to_clipboard = true;
+      window.opacity = 0.85;
+      font.size = 13;
     };
   };
 }
