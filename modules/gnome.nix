@@ -1,6 +1,10 @@
 { config, pkgs, ... }:{
   environment.sessionVariables.NIXOS_OZONE_WL = "1";
   environment.systemPackages = with pkgs; [
+    mullvad-vpn
+    vmware-horizon-client
+    element-desktop
+    hexo-cli
     prusa-slicer
     openscad
     obsidian
@@ -9,8 +13,8 @@
     gnomeExtensions.gtile
     gnomeExtensions.bluetooth-quick-connect
     gnomeExtensions.vitals
-    gnome.gnome-tweaks
-    gnome.gnome-terminal
+    gnome-tweaks
+    gnome-terminal
     vlc
     jellyfin-media-player
     keepassxc
@@ -19,7 +23,7 @@
     blightmud
     signal-desktop
     libreoffice-fresh
-    ungoogled-chromium
+    google-chrome
     lutris
     wine
     wine64
@@ -28,16 +32,15 @@
     vscodium
     discord
     xournalpp
-    mullvad-vpn
   ];
   environment.gnome.excludePackages = with pkgs; [
-    gnome.cheese
+    cheese
+    epiphany
     gnome.gnome-music
     gnome.tali
     gnome.iagno
     gnome.hitori
     gnome.atomix
-    gnome.epiphany
     gnome-tour
     evolution
   ];
@@ -47,4 +50,5 @@
     desktopManager.gnome.enable = true;
   };
   services.mullvad-vpn.enable = true;
+  services.mullvad-vpn.package = pkgs.mullvad-vpn;
 }

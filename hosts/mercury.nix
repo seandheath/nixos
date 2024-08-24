@@ -11,7 +11,7 @@
     ../modules/syncthing.nix
     ../modules/pentest.nix
     "${builtins.fetchGit { url = "https://github.com/NixOS/nixos-hardware.git"; }}/framework/16-inch/7040-amd"
-    (import "${builtins.fetchTarball https://github.com/nix-community/home-manager/archive/release-24.05.tar.gz}/nixos")
+    (import "${builtins.fetchTarball https://github.com/nix-community/home-manager/archive/master.tar.gz}/nixos")
   ];
 
   # Bootloader.
@@ -26,6 +26,7 @@
   boot.initrd.luks.devices."luks-3c408b8b-2354-4cc4-8588-2330b9a6caeb".device = "/dev/disk/by-uuid/3c408b8b-2354-4cc4-8588-2330b9a6caeb";
   services.fprintd.enable = false;
   services.logind.lidSwitchExternalPower = "ignore";
+  services.fwupd.enable = true;
 
   # Disk Drives
   fileSystems."/" =
@@ -50,11 +51,7 @@
   hardware.keyboard.qmk.enable = true;
 
   # Graphics
-  hardware.opengl = {
-    enable = true;
-    driSupport = true;
-    driSupport32Bit = true;
-  };
+  hardware.graphics.enable = true;
 
   # Networking
   networking.hostName = "mercury"; # Define your hostname.
@@ -112,6 +109,14 @@
   # Syncthing
   systemd.services.syncthing.environment.STNODEFAULTFOLDER = "true"; # Don't create default ~/Sync foldeudo
 
+  # Disable suspend
+  systemd.targets = {
+    sleep.enable = false;
+    suspend.enable = false;
+    hibernate.enable = false;
+    hybrid-sleep.enable = false;
+  };
+
   # Define a user account. Don't forget to set a password with ‘passwd’.
   users.users.sheath = {
     isNormalUser = true;
@@ -134,6 +139,7 @@
   # Enable libvirt
   virtualisation.libvirtd.enable = true;
   programs.virt-manager.enable = true;
+  virtualisation.spiceUSBRedirection.enable = true;
 
   # This value determines the NixOS release from which the default
   # settings for stateful data, like file locations and database versions
