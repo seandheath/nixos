@@ -1,6 +1,11 @@
 { config, pkgs, ... }:{
   environment.sessionVariables.NIXOS_OZONE_WL = "1";
   environment.systemPackages = with pkgs; [
+    librsvg
+    tectonic
+    pandoc
+    hugo
+    mermaid-filter
     mullvad-vpn
     vmware-horizon-client
     element-desktop
@@ -34,7 +39,6 @@
     xournalpp
   ];
   environment.gnome.excludePackages = with pkgs; [
-    cheese
     epiphany
     gnome.gnome-music
     gnome.tali

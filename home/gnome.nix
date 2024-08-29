@@ -1,5 +1,8 @@
 { config, pkgs, ... }: {
   dconf.settings = {
+    "org/gnome/SessionManager" = {
+      logout-prompt = false;
+    };
     "org/gnome/shell" = {
       favorite-apps = [
         "org.gnome.Nautilus.desktop"
