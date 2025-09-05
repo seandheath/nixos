@@ -1,1 +1,1 @@
-nixos-rebuild switch --flake .#osmium
+sudo nixos-rebuild switch --flake .#osmium
