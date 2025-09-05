@@ -5,6 +5,11 @@
 { lib, pkgs, config, ... }:
 
 {
+  imports = [
+    ../modules/dconf.nix
+    ../modules/libvirt.nix
+    ../modules/syncthing.nix
+  ];
 
   # Boot
   boot.loader.systemd-boot.enable = true;
