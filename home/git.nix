@@ -2,7 +2,7 @@
   programs.git = {
     enable = true;
     userName = "Sean Heath";
-    userEmail = "heathsd@pm.me";
+    userEmail = "seanheath87@gmail.com";
     extraConfig = {
       pull.rebase = false;
     };
