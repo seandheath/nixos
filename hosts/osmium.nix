@@ -100,6 +100,7 @@
     displaylink
     tectonic
     pandoc
+    btop-cuda
     mullvad-vpn
     element-desktop
     obsidian
