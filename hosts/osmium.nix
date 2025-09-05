@@ -109,6 +109,7 @@
     ripgrep
     thunderbird
     gemini-cli
+    claude-code
     gnomeExtensions.appindicator
     gnomeExtensions.gtile
     gnomeExtensions.bluetooth-quick-connect
@@ -147,6 +148,10 @@
     graphics.enable = true;
     system76.enableAll = true;
   };
+
+  sops.defaultSopsFile = ../secrets/secrets.yaml;
+  sops.age.keyFile = "/home/sheath/.config/sops/age/keys.txt";
+  sops.age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
 
   system.stateVersion = "25.05";
 }

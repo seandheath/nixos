@@ -30,7 +30,7 @@
           {
             home-manager.useGlobalPkgs = true;
             home-manager.useUserPackages = true;
-            home-manager.users.sheath = import ./home/home-osmium.nix;
+            home-manager.users.sheath = import ./users/sheath.nix;
             home-manager.extraSpecialArgs = { inherit inputs; };
             users.users.sheath = {
               isNormalUser = true;

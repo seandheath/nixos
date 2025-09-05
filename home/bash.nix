@@ -1,17 +1,16 @@
 { config, pkgs, ... }: {
-  #imports = [
-  #./direnv.nix
-  #];
 
   home.packages = with pkgs; [
     fzf
-    #bat
   ];
 
   # BASH
   programs.bash = {
     enable = true;
     initExtra = ''
+      # Environment Variables
+      export GEMINI_API_KEY="$(cat ${config.sops.secrets.gemini-api-key.path})"
+      
       # ALIASES
       alias ns="nix search nixpkgs"
       alias dmesg="dmesg --color=always"
