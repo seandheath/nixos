@@ -69,6 +69,9 @@
       CYAN='\e[0;36m'         # Cyan
       WHITE='\e[0;37m'        # White
 
+      # Free games claimer
+      alias checkgames="podman run --rm -it -p 6080:6080 -v fgc:/fgc/data --pull=always ghcr.io/vogler/free-games-claimer"
+
       # get current status of git repo
       function nonzero_return() {
         RETVAL=$?

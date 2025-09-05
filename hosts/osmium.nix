@@ -7,7 +7,7 @@
 {
   imports = [
     ../modules/dconf.nix
-    ../modules/libvirt.nix
+    ../modules/virtualisation.nix
     ../modules/syncthing.nix
   ];
 
