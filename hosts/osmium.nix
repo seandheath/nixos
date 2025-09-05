@@ -4,6 +4,13 @@
 
 { config, pkgs, lib, ... }:{
 
+  imports = [
+    ../users/sheath.nix
+    ../modules/libvirt.nix
+    ../modules/dconf.nix
+    ../modules/syncthing.nix
+  ];
+
   # Boot
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
@@ -86,6 +93,7 @@
   environment.systemPackages = with pkgs; [
     system76-firmware
     system76-keyboard-configurator
+    alacritty
     neovim
     git
     wget
@@ -95,6 +103,8 @@
     mullvad-vpn
     element-desktop
     obsidian
+    ripgrep
+    thunderbird
     gnomeExtensions.appindicator
     gnomeExtensions.gtile
     gnomeExtensions.bluetooth-quick-connect
@@ -128,29 +138,6 @@
     };
     graphics.enable = true;
     system76.enableAll = true;
-  };
-  services.syncthing = {
-    enable = true;
-    openDefaultPorts = true;
-    user = "sheath";
-    configDir = "/home/sheath/.config/syncthing";
-    settings = {
-      devices = {
-        "Pixel 7" = {
-	  id = "K5LK7O6-LRBP7CK-BNWDEWX-2TQR47P-UXRRDB2-6CGV4W3-774IMIJ-TISMQQA";
-	};
-	"hydrogen" = {
-	  id = "OGJ73O3-263HXLB-32WUWCS-3C2AYK4-B243VTT-FOCVB6X-UWMQTK6-5CCYQQD";
-	};
-      };
-    };
-  };
-
-  # User
-  users.users.sheath = {
-    isNormalUser = true;
-    description = "sheath";
-    extraGroups = [ "networkmanager" "wheel" ];
   };
 
   system.stateVersion = "25.05";
