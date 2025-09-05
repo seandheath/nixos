@@ -105,6 +105,7 @@
     obsidian
     ripgrep
     thunderbird
+    gemini-cli
     gnomeExtensions.appindicator
     gnomeExtensions.gtile
     gnomeExtensions.bluetooth-quick-connect
