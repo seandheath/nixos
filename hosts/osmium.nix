@@ -3,28 +3,120 @@
 # and in the NixOS manual (accessible by running ‘nixos-help’).
 
 { config, pkgs, lib, ... }:{
-  environment.systemPackages = with pkgs; [
-    cpupower-gui
-    system76-firmware
-    system76-keyboard-configurator
-    nvtop
-  ];
 
+  # Boot
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
-  boot.kernelPackages = pkgs.linuxPackages_zen;
-  boot.initrd.availableKernelModules = [ "xhci_pci" "thunderbolt" "nvme" "usb_storage" "sd_mod" "sdhci_pci" ];
+  boot.initrd.availableKernelModules = [ "xhci_pci" "thunderbolt" "nvme" "uas" "sd_mod" "sdhci_pci" ];
   boot.initrd.kernelModules = [ ];
-  boot.kernelModules = [ "kvm-intel" ];
-  boot.extraModulePackages = [ ];
+  boot.kernelModules = [ "kvm-intel" "evdi" ];
+  boot.extraModulePackages = [ config.boot.kernelPackages.evdi ];
+  boot.initrd.luks.devices."luks-a6ea78d6-7a09-4994-b09c-48863e41e765".device = "/dev/disk/by-uuid/a6ea78d6-7a09-4994-b09c-48863e41e765";
+  boot.initrd.luks.devices."luks-b1189935-07c6-416d-9201-b555aa272104".device = "/dev/disk/by-uuid/b1189935-07c6-416d-9201-b555aa272104";
+
+  # Filesystem
+  fileSystems."/" =
+    { device = "/dev/disk/by-uuid/2ba22a8f-7299-45c8-a4ca-6fd1a087c629";
+      fsType = "ext4";
+    };
+  fileSystems."/boot" =
+    { device = "/dev/disk/by-uuid/96EB-2493";
+      fsType = "vfat";
+      options = [ "fmask=0077" "dmask=0077" ];
+    };
+  swapDevices =
+    [ { device = "/dev/disk/by-uuid/14158464-b3bd-4eb2-bcf0-2fbee84f782c"; }
+    ];
+
+  # Kernel
+  boot.kernelPackages = pkgs.linuxPackages_latest;
+
+  # Configuration
+  time.timeZone = "America/New_York";
+  i18n.defaultLocale = "en_US.UTF-8";
+  i18n.extraLocaleSettings = {
+    LC_ADDRESS = "en_US.UTF-8";
+    LC_IDENTIFICATION = "en_US.UTF-8";
+    LC_MEASUREMENT = "en_US.UTF-8";
+    LC_MONETARY = "en_US.UTF-8";
+    LC_NAME = "en_US.UTF-8";
+    LC_NUMERIC = "en_US.UTF-8";
+    LC_PAPER = "en_US.UTF-8";
+    LC_TELEPHONE = "en_US.UTF-8";
+    LC_TIME = "en_US.UTF-8";
+  };
+  services.xserver.xkb = {
+    layout = "us";
+    variant = "";
+  };
+  services.printing.enable = true;
+
+  # Sound
+  services.pulseaudio.enable = false;
+  security.rtkit.enable = true;
+  services.pipewire = {
+    enable = true;
+    alsa.enable = true;
+    alsa.support32Bit = true;
+    pulse.enable = true;
+  };
+
+  # Display
+  services.xserver = {
+  	enable = true;
+	videoDrivers = [ "nvidia" "displaylink" "modesetting" ];
+  };
+  # DisplayLink
+  systemd.services.dlm.wantedBy = [ "multi-user.target" ];
+  boot = {
+  };
+
+  # GNOME
+  services.xserver.displayManager.gdm.enable = true;
+  services.xserver.desktopManager.gnome.enable = true;
+
+  # Networking
   networking.hostName = "osmium"; # Define your hostname.
+  networking.networkmanager.enable = true;
+  networking.useDHCP = lib.mkDefault true;
+
+  # Programs
+  nixpkgs.config.allowUnfree = true;
+  nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
+  environment.systemPackages = with pkgs; [
+    system76-firmware
+    system76-keyboard-configurator
+    neovim
+    git
+    wget
+    displaylink
+    tectonic
+    pandoc
+    mullvad-vpn
+    element-desktop
+    obsidian
+    gnomeExtensions.appindicator
+    gnomeExtensions.gtile
+    gnomeExtensions.bluetooth-quick-connect
+    gnomeExtensions.vitals 
+    gnomeExtensions.display-configuration-switcher
+    gnome-tweaks
+    keepassxc
+    signal-desktop
+    google-chrome
+    lutris
+    xournalpp
+    (heroic.override { extraPkgs = pkgs: [ pkgs.gamescope ]; })
+  ];
+  programs.firefox.enable = true;
+  programs.gamescope.enable = true;
+  programs.gamemode.enable = true;
   programs.steam.enable = true;
   hardware = {
     enableRedistributableFirmware = true;
     cpu.intel.updateMicrocode = true;
     nvidia = {
-      package = config.boot.kernelPackages.nvidiaPackages.beta;
-      #open = true;
+      open = false;
       nvidiaSettings = false;
       modesetting.enable = true;
       powerManagement.enable = true;
@@ -34,28 +126,32 @@
         intelBusId = "PCI:0:2:0";
       };
     };
-    opengl = {
-      enable = true;
-      driSupport = true;
-      driSupport32Bit = true;
-    };
+    graphics.enable = true;
     system76.enableAll = true;
   };
-  services.xserver.videoDrivers = [ "nvidia" ];
-  networking.useDHCP = lib.mkDefault true;
-
-  fileSystems."/" =
-    { device = "/dev/disk/by-uuid/ac03f934-fa1c-4133-a3a5-c45fa088a833";
-      fsType = "f2fs";
+  services.syncthing = {
+    enable = true;
+    openDefaultPorts = true;
+    user = "sheath";
+    configDir = "/home/sheath/.config/syncthing";
+    settings = {
+      devices = {
+        "Pixel 7" = {
+	  id = "K5LK7O6-LRBP7CK-BNWDEWX-2TQR47P-UXRRDB2-6CGV4W3-774IMIJ-TISMQQA";
+	};
+	"hydrogen" = {
+	  id = "OGJ73O3-263HXLB-32WUWCS-3C2AYK4-B243VTT-FOCVB6X-UWMQTK6-5CCYQQD";
+	};
+      };
     };
+  };
 
-  boot.initrd.luks.devices."cryptroot".device = "/dev/disk/by-uuid/5f6760a7-e4bd-4742-a273-ced722eb0d48";
+  # User
+  users.users.sheath = {
+    isNormalUser = true;
+    description = "sheath";
+    extraGroups = [ "networkmanager" "wheel" ];
+  };
 
-  fileSystems."/boot" =
-    { device = "/dev/disk/by-uuid/02C4-3AD3";
-      fsType = "vfat";
-    };
-
-  swapDevices = [ ];
-  nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
+  system.stateVersion = "25.05";
 }
