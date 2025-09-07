@@ -15,6 +15,7 @@
       alias ns="nix search nixpkgs"
       alias dmesg="dmesg --color=always"
       alias nr="sudo nixos-rebuild switch --flake /home/sheath/nixos#$HOSTNAME"
+      alias nb="sudo nixos-rebuild boot --flake /home/sheath/nixos#$HOSTNAME"
 
       bind 'set show-all-if-ambiguous on'
       bind 'TAB:menu-complete'
@@ -70,7 +71,7 @@
       WHITE='\e[0;37m'        # White
 
       # Free games claimer
-      alias checkgames="podman run --rm -it -p 6080:6080 -v fgc:/fgc/data --pull=always ghcr.io/vogler/free-games-claimer"
+      alias checkgames="podman run --rm -it -p 6080:6080 -v fgc:/fgc/data --pull=always ghcr.io/vogler/free-games-claimer bash -c 'node prime-gaming; node gog'"
 
       # get current status of git repo
       function nonzero_return() {
