@@ -10,6 +10,8 @@
     initExtra = ''
       # Environment Variables
       export GEMINI_API_KEY="$(cat ${config.sops.secrets.gemini-api-key.path})"
+      export GITLAB_TOKEN="$(cat ${config.sops.secrets.gitlab-token.path})"
+      export GITLAB_USER="$(cat ${config.sops.secrets.gitlab-user.path})"
       
       # ALIASES
       alias ns="nix search nixpkgs"

@@ -35,7 +35,6 @@
       statix
       coc-go
       coc-rust-analyzer
-      vim-nix
       nerdtree
       tagbar
       vim-airline
