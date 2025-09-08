@@ -57,6 +57,7 @@
     variant = "";
   };
   services.printing.enable = true;
+  services.flatpak.enable = true;
 
   # Sound
   services.pulseaudio.enable = false;
@@ -121,6 +122,16 @@
     google-chrome
     mullvad-browser
     lutris
+    protontricks
+    winetricks
+    wineWowPackages.waylandFull
+    wineWowPackages.staging
+    toybox
+    zenity
+    protonup
+    python3
+    zlib
+    p7zip
     xournalpp
     vscode-fhs
     (heroic.override { extraPkgs = pkgs: [ pkgs.gamescope ]; })
@@ -148,6 +159,8 @@
     graphics.enable = true;
     system76.enableAll = true;
   };
+  services.logind.settings.Login.HandleLidSwitchExternalPower = "ignore";
+
 
   sops.defaultSopsFile = ../secrets/secrets.yaml;
   sops.age.keyFile = "/home/sheath/.config/sops/age/keys.txt";
