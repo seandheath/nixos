@@ -14,6 +14,43 @@
 
   # Essential Wayland and Hyprland packages
   environment.systemPackages = with pkgs; [
+    # Workspace monitor setup script
+    (writeScriptBin "workspace-monitor-setup" ''
+      #!/usr/bin/env bash
+
+      # Workspace Monitor Setup Script for Hyprland
+      # Distributes workspaces based on docking station connection status
+
+      # Monitor identifiers from your hyprland config
+      LEFT_MONITOR="Hewlett Packard HP Z27x CNK71609WJ"
+      CENTER_MONITOR="Samsung Electric Company QN90D 0x01000E00"
+      RIGHT_MONITOR="Hewlett Packard HP Z27x CNK6200PD8"
+      LAPTOP_MONITOR="BOE 0x08EA"
+
+      # Function to check if monitor is connected
+      monitor_connected() {
+          hyprctl monitors | grep -q "$1"
+      }
+
+      # Main logic
+      if monitor_connected "$LEFT_MONITOR" && monitor_connected "$CENTER_MONITOR" && monitor_connected "$RIGHT_MONITOR"; then
+          hyprctl dispatch moveworkspacetomonitor "1 desc:$LEFT_MONITOR"
+          hyprctl dispatch moveworkspacetomonitor "2 desc:$CENTER_MONITOR"
+          hyprctl dispatch moveworkspacetomonitor "3 desc:$RIGHT_MONITOR"
+          hyprctl dispatch moveworkspacetomonitor "4 desc:$LAPTOP_MONITOR"
+      else
+          # Undocked configuration: Laptop=1
+          echo "Undocked configuration detected"
+          hyprctl dispatch moveworkspacetomonitor "1 $LAPTOP_MONITOR"
+          
+          # Move other workspaces to laptop as well if they exist
+          for ws in {2..10}; do
+              hyprctl dispatch moveworkspacetomonitor "$ws $LAPTOP_MONITOR" 2>/dev/null || true
+          done
+      fi
+
+      echo "Workspace setup complete"
+    '')
     # Wayland utilities
     wayland
     wayland-protocols
@@ -158,6 +195,25 @@
   hardware.bluetooth.enable = true;
   hardware.bluetooth.powerOnBoot = true;
   services.blueman.enable = true;
+
+  # Systemd user service for workspace monitor setup
+  systemd.user.services.workspace-monitor-setup = {
+    description = "Setup Hyprland workspaces based on monitor configuration";
+    serviceConfig = {
+      Type = "oneshot";
+      ExecStart = "${pkgs.writeShellScript "workspace-setup-wrapper" ''
+        # Wait a bit for Hyprland to be ready and monitors to be detected
+        sleep 2
+        workspace-monitor-setup
+      ''}";
+      Environment = "PATH=/run/current-system/sw/bin";
+    };
+  };
+
+  # Udev rule to trigger workspace setup on monitor changes
+  services.udev.extraRules = ''
+    ACTION=="change", SUBSYSTEM=="drm", TAG+="systemd", ENV{SYSTEMD_USER_WANTS}+="workspace-monitor-setup.service"
+  '';
 
   # Default Hyprland configuration
   environment.etc."xdg/hypr/hyprland.conf".text = ''

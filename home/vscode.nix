@@ -4,9 +4,9 @@
     package = pkgs.vscode;
   };
   home.file.".vscode/argv.json".text = builtins.toJSON {
-    enable-crash-reporter: false;
-    password-store: "gnome-libsecret";
-    ozone-platform: "wayland";
-    enable-features: "UseOzonePlatform";
+    enable-crash-reporter = false;
+    password-store = "gnome-libsecret";
+    ozone-platform = "wayland";
+    enable-features = "UseOzonePlatform";
   };
 }
