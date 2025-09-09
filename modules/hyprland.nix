@@ -87,9 +87,10 @@
     xdg-desktop-portal-hyprland
     xdg-desktop-portal-gtk
     
-    # Authentication agent
+    # Authentication agent and keyring
     gnome-keyring
     seahorse
+    libsecret
     
     # Media player
     mpv
@@ -107,6 +108,7 @@
   # Enable necessary services
   services.gnome.gnome-keyring.enable = true;
   security.pam.services.sddm.enableGnomeKeyring = true;
+  security.pam.services.login.enableGnomeKeyring = true;
   
   # Polkit
   security.polkit.enable = true;
@@ -160,7 +162,19 @@
 
   # Default Hyprland configuration
   environment.etc."xdg/hypr/hyprland.conf".text = ''
-    # Monitor configuration
+    # Monitor configuration - automatic docking/undocking using descriptions/serials
+    # External monitors (when docked) - vertically centered
+    # Left HP monitor (portrait-right: 1440x2560) - Serial: CNK71609WJ
+    monitor=desc:Hewlett Packard HP Z27x CNK71609WJ,2560x1440@60,0x0,1,transform,1
+    # Center Samsung 4K (landscape, no scaling) - centered beside HP monitors - Serial: 0x01000E00
+    monitor=desc:Samsung Electric Company QN90D 0x01000E00,3840x2160@120,1440x200,1
+    # Right HP monitor (portrait-right: 1440x2560) - Serial: CNK6200PD8
+    monitor=desc:Hewlett Packard HP Z27x CNK6200PD8,2560x1440@60,5280x0,1,transform,1
+    
+    # Laptop screen configuration - positioned under Samsung monitor when docked - BOE 0x08EA
+    monitor=desc:BOE 0x08EA,preferred,3360x2360,1
+    
+    # Fallback configuration - ensure laptop screen is always available when undocked
     monitor=,preferred,auto,1
 
     # Debug configuration
