@@ -7,10 +7,9 @@
   };
 
   # Display Manager
-  services.displayManager.sddm = {
+  services.displayManager.gdm = {
     enable = true;
-    wayland.enable = true;
-    theme = "breeze";
+    wayland = true;
   };
 
   # Essential Wayland and Hyprland packages
@@ -91,6 +90,7 @@
     gnome-keyring
     seahorse
     libsecret
+    gcr_4
     
     # Media player
     mpv
@@ -107,8 +107,9 @@
 
   # Enable necessary services
   services.gnome.gnome-keyring.enable = true;
-  security.pam.services.sddm.enableGnomeKeyring = true;
+  security.pam.services.gdm.enableGnomeKeyring = true;
   security.pam.services.login.enableGnomeKeyring = true;
+  programs.seahorse.enable = true;
   
   # Polkit
   security.polkit.enable = true;
@@ -119,8 +120,11 @@
     extraPortals = [ pkgs.xdg-desktop-portal-gtk pkgs.xdg-desktop-portal-hyprland ];
   };
 
+  # Session management
+  programs.dconf.enable = true;
+
   # Environment variables for Wayland
-  environment.sessionVariables = {
+  environment.variables = {
     # Wayland-specific
     MOZ_ENABLE_WAYLAND = "1";
     QT_QPA_PLATFORM = "wayland";
@@ -136,13 +140,17 @@
     XDG_SESSION_DESKTOP = "Hyprland";
     
     # Cursor theme
-    XCURSOR_THEME = "Vanilla-DMZ";
-    XCURSOR_SIZE = "24";
-    HYPRCURSOR_THEME = "Vanilla-DMZ";
-    HYPRCURSOR_SIZE = "24";
+    #XCURSOR_THEME = "Vanilla-DMZ";
+    #XCURSOR_SIZE = "24";
+    #HYPRCURSOR_THEME = "Vanilla-DMZ";
+    #HYPRCURSOR_SIZE = "24";
     
     # Electron Wayland support
     NIXOS_OZONE_WL = "1";
+    
+    # Keyring
+    SSH_AUTH_SOCK = "\${XDG_RUNTIME_DIR}/keyring/ssh";
+    GNOME_KEYRING_CONTROL = "\${XDG_RUNTIME_DIR}/keyring";
   };
 
   # Enable sound
@@ -187,7 +195,7 @@
     exec-once = dunst
     exec-once = hyprpaper
     exec-once = ${pkgs.polkit_gnome}/libexec/polkit-gnome-authentication-agent-1
-    exec-once = gnome-keyring-daemon --start --components=secrets
+    # Let PAM handle gnome-keyring startup instead of manual exec-once
     exec-once = nm-applet --indicator
 
     # Input configuration

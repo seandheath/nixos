@@ -10,6 +10,7 @@
     ../modules/workstation.nix
     ../modules/virtualisation.nix
     ../modules/syncthing.nix
+    ../modules/auto-update.nix
   ];
 
   # Boot
