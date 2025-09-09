@@ -7,6 +7,7 @@
 {
   imports = [
     ../modules/hyprland.nix
+    ../modules/workstation.nix
     ../modules/virtualisation.nix
     ../modules/syncthing.nix
   ];
@@ -56,8 +57,6 @@
     layout = "us";
     variant = "";
   };
-  services.printing.enable = true;
-  services.flatpak.enable = true;
 
   # Sound
   services.pulseaudio.enable = false;
@@ -76,18 +75,11 @@
   };
   # DisplayLink
   systemd.services.dlm.wantedBy = [ "multi-user.target" ];
-  boot = {
-  };
-
-  # Hyprland is configured in modules/hyprland.nix
 
   # Networking
   networking.hostName = "osmium"; # Define your hostname.
   networking.networkmanager.enable = true;
   networking.useDHCP = lib.mkDefault true;
-
-  ## Mullvad
-  services.mullvad-vpn.enable = true;
 
   # Programs
   nixpkgs.config.allowUnfree = true;
@@ -96,45 +88,8 @@
     (heroic.override { extraPkgs = pkgs: [ pkgs.gamescope ]; })
     system76-firmware
     system76-keyboard-configurator
-    alacritty
-    neovim
-    git
-    wget
     displaylink
-    tectonic
-    pandoc
-    btop-cuda
-    element-desktop
-    obsidian
-    ripgrep
-    thunderbird
-    gemini-cli
-    claude-code
-    keepassxc
-    signal-desktop
-    google-chrome
-    mullvad-browser
-    lutris
-    protontricks
-    winetricks
-    wineWowPackages.waylandFull
-    wineWowPackages.staging
-    toybox
-    zenity
-    protonup
-    python3
-    zlib
-    p7zip
-    xournalpp
-    sops
-    age
-    vscode
-    libreoffice
   ];
-  programs.firefox.enable = true;
-  programs.gamescope.enable = true;
-  programs.gamemode.enable = true;
-  programs.steam.enable = true;
   hardware = {
     enableRedistributableFirmware = true;
     cpu.intel.updateMicrocode = true;
@@ -153,7 +108,6 @@
     system76.enableAll = true;
   };
   services.logind.settings.Login.HandleLidSwitchExternalPower = "ignore";
-
 
   sops.defaultSopsFile = ../secrets/secrets.yaml;
   sops.age.keyFile = "/home/sheath/.config/sops/age/keys.txt";

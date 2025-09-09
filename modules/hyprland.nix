@@ -47,7 +47,7 @@
     swww
     
     # File manager
-    dolphin
+    kdePackages.dolphin
     pcmanfm
     
     # Polkit agent
@@ -57,7 +57,6 @@
     networkmanagerapplet
     
     # Audio control
-    pavucontrol
     pamixer
     
     # Brightness control
@@ -68,14 +67,13 @@
     
     # Font packages
     noto-fonts
-    noto-fonts-cjk
+    noto-fonts-cjk-sans
     noto-fonts-emoji
     font-awesome
     
     # Theme packages
     papirus-icon-theme
-    breeze-gtk
-    breeze-qt5
+    kdePackages.breeze-gtk
     
     # XDG utilities
     xdg-utils
@@ -84,7 +82,7 @@
     xdg-desktop-portal-gtk
     
     # Authentication agent
-    gnome.gnome-keyring
+    gnome-keyring
     seahorse
     
     # Media player
@@ -97,7 +95,7 @@
     zathura
     
     # Archive manager
-    ark
+    kdePackages.ark
   ];
 
   # Enable necessary services
@@ -116,7 +114,6 @@
   # Environment variables for Wayland
   environment.sessionVariables = {
     # Wayland-specific
-    NIXOS_OZONE_WL = "1";
     MOZ_ENABLE_WAYLAND = "1";
     QT_QPA_PLATFORM = "wayland";
     QT_WAYLAND_DISABLE_WINDOWDECORATION = "1";
@@ -229,7 +226,7 @@
     bind = $mainMod, Return, exec, alacritty
     bind = $mainMod, Q, killactive,
     bind = $mainMod, M, exit,
-    bind = $mainMod, E, exec, dolphin
+    bind = $mainMod, E, exec, kdePackages.dolphin
     bind = $mainMod, V, togglefloating,
     bind = $mainMod, Space, exec, wofi --show drun
     bind = $mainMod, P, pseudo,

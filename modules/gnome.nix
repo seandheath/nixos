@@ -1,7 +1,4 @@
 { config, pkgs, lib, ... }: {
-  # Wayland support for Electron apps
-  environment.sessionVariables.NIXOS_OZONE_WL = "1";
-  
   # GNOME-specific system packages
   environment.systemPackages = with pkgs; [
     # GNOME Extensions
@@ -14,40 +11,7 @@
     # GNOME Tools
     gnome-tweaks
     gnome-terminal
-    
-    # Desktop applications that integrate well with GNOME
-    librsvg
-    tectonic
-    pandoc
-    hugo
-    mermaid-filter
-    mullvad-vpn
-    vmware-horizon-client
-    element-desktop
-    hexo-cli
-    prusa-slicer
-    openscad
-    obsidian
-    pavucontrol
-    vlc
-    jellyfin-media-player
-    keepassxc
-    appimage-run
-    brasero
-    blightmud
-    signal-desktop
-    libreoffice-fresh
-    google-chrome
-    lutris
-    wine
-    wine64
-    wine-wayland
-    winetricks
-    vscodium
-    discord
-    xournalpp
   ];
-  
   # Exclude unwanted GNOME packages
   environment.gnome.excludePackages = with pkgs; [
     epiphany
@@ -67,9 +31,6 @@
     desktopManager.gnome.enable = true;
   };
   
-  # Enable Mullvad VPN
-  services.mullvad-vpn.enable = true;
-  services.mullvad-vpn.package = pkgs.mullvad-vpn;
   
   # GNOME dconf settings
   programs.dconf.profiles = {
