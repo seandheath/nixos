@@ -2,6 +2,7 @@
   # Enable Hyprland
   programs.hyprland = {
     enable = true;
+    withUWSM = true;
     xwayland.enable = true;
   };
 
@@ -75,6 +76,11 @@
     papirus-icon-theme
     kdePackages.breeze-gtk
     
+    # Cursor themes
+    vanilla-dmz
+    hyprcursor
+    
+    
     # XDG utilities
     xdg-utils
     xdg-desktop-portal
@@ -108,7 +114,7 @@
   # XDG portals
   xdg.portal = {
     enable = true;
-    extraPortals = [ pkgs.xdg-desktop-portal-gtk ];
+    extraPortals = [ pkgs.xdg-desktop-portal-gtk pkgs.xdg-desktop-portal-hyprland ];
   };
 
   # Environment variables for Wayland
@@ -126,6 +132,15 @@
     XDG_CURRENT_DESKTOP = "Hyprland";
     XDG_SESSION_TYPE = "wayland";
     XDG_SESSION_DESKTOP = "Hyprland";
+    
+    # Cursor theme
+    XCURSOR_THEME = "Vanilla-DMZ";
+    XCURSOR_SIZE = "24";
+    HYPRCURSOR_THEME = "Vanilla-DMZ";
+    HYPRCURSOR_SIZE = "24";
+    
+    # Electron Wayland support
+    NIXOS_OZONE_WL = "1";
   };
 
   # Enable sound
@@ -148,11 +163,16 @@
     # Monitor configuration
     monitor=,preferred,auto,1
 
+    # Debug configuration
+    debug {
+        disable_logs = false
+    }
+
     # Execute at launch
     exec-once = waybar
     exec-once = dunst
     exec-once = hyprpaper
-    exec-once = /usr/lib/polkit-gnome/polkit-gnome-authentication-agent-1
+    exec-once = ${pkgs.polkit_gnome}/libexec/polkit-gnome-authentication-agent-1
     exec-once = gnome-keyring-daemon --start --components=secrets
     exec-once = nm-applet --indicator
 
@@ -185,10 +205,12 @@
             size = 3
             passes = 1
         }
-        drop_shadow = true
-        shadow_range = 4
-        shadow_render_power = 3
-        col.shadow = rgba(1a1a1aee)
+        shadow {
+            enabled = true
+            range = 4
+            render_power = 3
+            color = rgba(1a1a1aee)
+        }
     }
 
     # Animations
@@ -211,13 +233,13 @@
 
     # Master layout
     master {
-        new_is_master = true
+        new_status = master
     }
 
     # Window rules
-    windowrule = float, ^(pavucontrol)$
-    windowrule = float, ^(nm-connection-editor)$
-    windowrule = float, ^(blueman-manager)$
+    windowrulev2 = float, class:^(pavucontrol)$
+    windowrulev2 = float, class:^(nm-connection-editor)$
+    windowrulev2 = float, class:^(blueman-manager)$
 
     # Keybindings
     $mainMod = SUPER

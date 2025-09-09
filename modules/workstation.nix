@@ -25,12 +25,11 @@
     openscad
     
     # Note-taking and productivity
-    obsidian
+    obsidian 
     xournalpp
     
     # Multimedia
     vlc
-    jellyfin-media-player
     pavucontrol
     
     # System utilities
