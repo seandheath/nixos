@@ -95,6 +95,7 @@
   nixpkgs.config.allowUnfree = true;
   nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
   environment.systemPackages = with pkgs; [
+    (heroic.override { extraPkgs = pkgs: [ pkgs.gamescope ]; })
     system76-firmware
     system76-keyboard-configurator
     alacritty
@@ -133,10 +134,10 @@
     zlib
     p7zip
     xournalpp
-    vscode-fhs
-    (heroic.override { extraPkgs = pkgs: [ pkgs.gamescope ]; })
     sops
     age
+    vscode
+    libreoffice
   ];
   programs.firefox.enable = true;
   programs.gamescope.enable = true;
