@@ -13,11 +13,11 @@
     
     # Development tools
     hexo-cli
-    vscodium
     gemini-cli 
     claude-code 
     git
     python3
+    vscode
     
     # 3D printing and CAD
     prusa-slicer
