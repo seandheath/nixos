@@ -91,6 +91,7 @@
     seahorse
     libsecret
     gcr_4
+    hyprpolkitagent
     
     # Media player
     mpv
@@ -108,17 +109,14 @@
   # Enable necessary services
   services.gnome.gnome-keyring.enable = true;
   security.pam.services.gdm.enableGnomeKeyring = true;
-  security.pam.services.login.enableGnomeKeyring = true;
-  programs.seahorse.enable = true;
-  
-  # Polkit
   security.polkit.enable = true;
+  #xdg.portal.extraPortals = [ pkgs.gnome-keyring ];
   
   # XDG portals
-  xdg.portal = {
-    enable = true;
-    extraPortals = [ pkgs.xdg-desktop-portal-gtk pkgs.xdg-desktop-portal-hyprland ];
-  };
+  #xdg.portal = {
+    #enable = true;
+    #extraPortals = [ pkgs.xdg-desktop-portal-gtk pkgs.xdg-desktop-portal-hyprland ];
+  #};
 
   # Session management
   programs.dconf.enable = true;
@@ -139,18 +137,11 @@
     XDG_SESSION_TYPE = "wayland";
     XDG_SESSION_DESKTOP = "Hyprland";
     
-    # Cursor theme
-    #XCURSOR_THEME = "Vanilla-DMZ";
-    #XCURSOR_SIZE = "24";
-    #HYPRCURSOR_THEME = "Vanilla-DMZ";
-    #HYPRCURSOR_SIZE = "24";
-    
     # Electron Wayland support
     NIXOS_OZONE_WL = "1";
     
-    # Keyring
-    SSH_AUTH_SOCK = "\${XDG_RUNTIME_DIR}/keyring/ssh";
-    GNOME_KEYRING_CONTROL = "\${XDG_RUNTIME_DIR}/keyring";
+    # GNOME Keyring
+    GNOME_KEYRING_CONTROL = "/run/user/$UID/keyring";
   };
 
   # Enable sound
@@ -172,10 +163,13 @@
   environment.etc."xdg/hypr/hyprland.conf".text = ''
     # Monitor configuration - automatic docking/undocking using descriptions/serials
     # External monitors (when docked) - vertically centered
+
     # Left HP monitor (portrait-right: 1440x2560) - Serial: CNK71609WJ
     monitor=desc:Hewlett Packard HP Z27x CNK71609WJ,2560x1440@60,0x0,1,transform,1
+
     # Center Samsung 4K (landscape, no scaling) - centered beside HP monitors - Serial: 0x01000E00
     monitor=desc:Samsung Electric Company QN90D 0x01000E00,3840x2160@120,1440x200,1
+
     # Right HP monitor (portrait-right: 1440x2560) - Serial: CNK6200PD8
     monitor=desc:Hewlett Packard HP Z27x CNK6200PD8,2560x1440@60,5280x0,1,transform,1
     
@@ -185,18 +179,13 @@
     # Fallback configuration - ensure laptop screen is always available when undocked
     monitor=,preferred,auto,1
 
-    # Debug configuration
-    debug {
-        disable_logs = false
-    }
-
     # Execute at launch
     exec-once = waybar
     exec-once = dunst
     exec-once = hyprpaper
-    exec-once = ${pkgs.polkit_gnome}/libexec/polkit-gnome-authentication-agent-1
-    # Let PAM handle gnome-keyring startup instead of manual exec-once
     exec-once = nm-applet --indicator
+    exec-once = systemctl --user start hyprpolkitagent
+    exec-once = gnome-keyring-daemon --start --components=secrets
 
     # Input configuration
     input {

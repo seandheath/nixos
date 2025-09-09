@@ -2,99 +2,123 @@
   # Automatic system updates with smart reboot notifications
   system.autoUpgrade = {
     enable = true;
-    channel = "nixos-unstable";  # Match your current channel
+    flake = "github:nixos/nixpkgs/nixos-unstable";  # Use flake format
     dates = "04:00";          # Run at 4 AM daily
     allowReboot = false;      # We'll handle reboot notifications manually
+  };
+  
+  # Service to check for reboot requirements after update
+  systemd.services.nixos-upgrade-notifier = {
+    description = "Notify user about NixOS upgrade results";
+    after = [ "nixos-upgrade.service" ];
+    wants = [ "nixos-upgrade.service" ];
     
-    # Notify on successful update and check if reboot is needed
-    onSuccess = ''
-      # Set up environment for notifications
-      export DISPLAY=:0
-      export DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/1000/bus"
+    serviceConfig = {
+      Type = "oneshot";
+      User = "sheath";
+      Environment = [
+        "DISPLAY=:0"
+        "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus"
+      ];
+    };
+    
+    script = ''
+      # Wait a moment for the upgrade to complete
+      sleep 5
       
-      # Check if kernel was updated (main reason for reboot)
-      CURRENT_KERNEL=$(readlink /run/current-system/kernel 2>/dev/null || echo "none")
-      NEXT_KERNEL=$(readlink /nix/var/nix/profiles/system/kernel 2>/dev/null || echo "none")
-      
-      # Check if systemd was updated (another reason for reboot)
-      CURRENT_SYSTEMD=$(readlink /run/current-system/systemd 2>/dev/null || echo "none")
-      NEXT_SYSTEMD=$(readlink /nix/var/nix/profiles/system/systemd 2>/dev/null || echo "none")
-      
-      # Log the update
-      echo "NixOS auto-update completed successfully at $(date)" | ${pkgs.systemd}/bin/systemd-cat -t nixos-upgrade
-      
-      # Check what changed and notify accordingly
-      REBOOT_REQUIRED=false
-      REASONS=""
-      
-      if [ "$CURRENT_KERNEL" != "$NEXT_KERNEL" ]; then
-        REBOOT_REQUIRED=true
-        REASONS="$REASONS kernel"
-        echo "Kernel update detected: $CURRENT_KERNEL -> $NEXT_KERNEL" | ${pkgs.systemd}/bin/systemd-cat -t nixos-upgrade
-      fi
-      
-      if [ "$CURRENT_SYSTEMD" != "$NEXT_SYSTEMD" ]; then
-        REBOOT_REQUIRED=true
-        REASONS="$REASONS systemd"
-        echo "Systemd update detected: $CURRENT_SYSTEMD -> $NEXT_SYSTEMD" | ${pkgs.systemd}/bin/systemd-cat -t nixos-upgrade
-      fi
-      
-      # Send appropriate notification
-      if [ "$REBOOT_REQUIRED" = "true" ]; then
-        # Critical notification that persists
+      # Check if the upgrade service succeeded
+      if systemctl is-active --quiet nixos-upgrade.service || systemctl show -p ExecMainStatus nixos-upgrade.service | grep -q "ExecMainStatus=0"; then
+        # Upgrade succeeded, check if reboot is needed
+        
+        # Check if kernel was updated (main reason for reboot)
+        CURRENT_KERNEL=$(readlink /run/current-system/kernel 2>/dev/null || echo "none")
+        NEXT_KERNEL=$(readlink /nix/var/nix/profiles/system/kernel 2>/dev/null || echo "none")
+        
+        # Check if systemd was updated (another reason for reboot)
+        CURRENT_SYSTEMD=$(readlink /run/current-system/systemd 2>/dev/null || echo "none")
+        NEXT_SYSTEMD=$(readlink /nix/var/nix/profiles/system/systemd 2>/dev/null || echo "none")
+        
+        # Log the update
+        echo "NixOS auto-update completed successfully at $(date)" | ${pkgs.systemd}/bin/systemd-cat -t nixos-upgrade-notifier
+        
+        # Check what changed and notify accordingly
+        REBOOT_REQUIRED=false
+        REASONS=""
+        
+        if [ "$CURRENT_KERNEL" != "$NEXT_KERNEL" ]; then
+          REBOOT_REQUIRED=true
+          REASONS="$REASONS kernel"
+          echo "Kernel update detected: $CURRENT_KERNEL -> $NEXT_KERNEL" | ${pkgs.systemd}/bin/systemd-cat -t nixos-upgrade-notifier
+        fi
+        
+        if [ "$CURRENT_SYSTEMD" != "$NEXT_SYSTEMD" ]; then
+          REBOOT_REQUIRED=true
+          REASONS="$REASONS systemd"
+          echo "Systemd update detected: $CURRENT_SYSTEMD -> $NEXT_SYSTEMD" | ${pkgs.systemd}/bin/systemd-cat -t nixos-upgrade-notifier
+        fi
+        
+        # Send appropriate notification
+        if [ "$REBOOT_REQUIRED" = "true" ]; then
+          # Critical notification that persists
+          ${pkgs.libnotify}/bin/notify-send \
+            -u critical \
+            -t 0 \
+            -i system-restart \
+            "🔄 Reboot Required" \
+            "NixOS updated successfully. Reboot required for:$REASONS
+
+Click to dismiss, then reboot when convenient."
+          
+          # Also log to journal for remote monitoring
+          echo "REBOOT REQUIRED: Updated components:$REASONS" | ${pkgs.systemd}/bin/systemd-cat -t nixos-upgrade-notifier -p warning
+          
+          # Create a flag file for other scripts to check
+          touch /tmp/nixos-reboot-required
+          echo "$(date): Reboot required for:$REASONS" > /tmp/nixos-reboot-required
+          
+        else
+          # Normal notification for successful update without reboot
+          ${pkgs.libnotify}/bin/notify-send \
+            -u normal \
+            -t 10000 \
+            -i system-software-update \
+            "✅ NixOS Updated" \
+            "System updated successfully. No reboot required.
+
+Services will restart automatically as needed."
+          
+          # Clean up reboot flag if it exists
+          rm -f /tmp/nixos-reboot-required
+        fi
+        
+      else
+        # Upgrade failed
+        echo "NixOS auto-update failed at $(date)" | ${pkgs.systemd}/bin/systemd-cat -t nixos-upgrade-notifier -p err
+        
+        # Send critical notification
         ${pkgs.libnotify}/bin/notify-send \
           -u critical \
           -t 0 \
-          -i system-restart \
-          "🔄 Reboot Required" \
-          "NixOS updated successfully. Reboot required for:$REASONS
-
-Click to dismiss, then reboot when convenient."
-        
-        # Also log to journal for remote monitoring
-        echo "REBOOT REQUIRED: Updated components:$REASONS" | ${pkgs.systemd}/bin/systemd-cat -t nixos-upgrade -p warning
-        
-        # Create a flag file for other scripts to check
-        touch /tmp/nixos-reboot-required
-        echo "$(date): Reboot required for:$REASONS" > /tmp/nixos-reboot-required
-        
-      else
-        # Normal notification for successful update without reboot
-        ${pkgs.libnotify}/bin/notify-send \
-          -u normal \
-          -t 10000 \
-          -i system-software-update \
-          "✅ NixOS Updated" \
-          "System updated successfully. No reboot required.
-
-Services will restart automatically as needed."
-        
-        # Clean up reboot flag if it exists
-        rm -f /tmp/nixos-reboot-required
-      fi
-    '';
-    
-    # Notify on update failure
-    onFailure = ''
-      # Set up environment for notifications
-      export DISPLAY=:0
-      export DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/1000/bus"
-      
-      # Log the failure
-      echo "NixOS auto-update failed at $(date)" | ${pkgs.systemd}/bin/systemd-cat -t nixos-upgrade -p err
-      
-      # Send critical notification
-      ${pkgs.libnotify}/bin/notify-send \
-        -u critical \
-        -t 0 \
-        -i dialog-error \
-        "❌ NixOS Update Failed" \
-        "Automatic system update failed at $(date).
+          -i dialog-error \
+          "❌ NixOS Update Failed" \
+          "Automatic system update failed at $(date).
 
 Check logs with: journalctl -u nixos-upgrade.service
 
 You may need to run updates manually."
+      fi
     '';
+  };
+  
+  # Timer to trigger the notifier after upgrade attempts
+  systemd.timers.nixos-upgrade-notifier = {
+    wantedBy = [ "timers.target" ];
+    after = [ "nixos-upgrade.timer" ];
+    
+    timerConfig = {
+      OnCalendar = "04:05";  # Run 5 minutes after the upgrade
+      Persistent = true;
+    };
   };
   
   # Additional service to periodically remind about pending reboots

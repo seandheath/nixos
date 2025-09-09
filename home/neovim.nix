@@ -32,7 +32,7 @@
       nmap <C-t> NerdTreeToggle<CR>
     '';
     plugins = with pkgs.vimPlugins; [
-      statix
+      vim-nix
       coc-go
       coc-rust-analyzer
       nerdtree
