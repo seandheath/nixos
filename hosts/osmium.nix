@@ -6,7 +6,7 @@
 
 {
   imports = [
-    ../modules/dconf.nix
+    ../modules/hyprland.nix
     ../modules/virtualisation.nix
     ../modules/syncthing.nix
   ];
@@ -79,9 +79,7 @@
   boot = {
   };
 
-  # GNOME
-  services.displayManager.gdm.enable = true;
-  services.desktopManager.gnome.enable = true;
+  # Hyprland is configured in modules/hyprland.nix
 
   # Networking
   networking.hostName = "osmium"; # Define your hostname.
@@ -112,12 +110,6 @@
     thunderbird
     gemini-cli
     claude-code
-    gnomeExtensions.appindicator
-    gnomeExtensions.gtile
-    gnomeExtensions.bluetooth-quick-connect
-    gnomeExtensions.vitals 
-    gnomeExtensions.display-configuration-switcher
-    gnome-tweaks
     keepassxc
     signal-desktop
     google-chrome
