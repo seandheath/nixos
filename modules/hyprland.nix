@@ -208,10 +208,10 @@
     }
 
     # Environment variables for cursor theme
-    env = HYPRCURSOR_THEME,default
-    env = HYPRCURSOR_SIZE,24
-    env = XCURSOR_THEME,default
-    env = XCURSOR_SIZE,24
+    env = HYPRCURSOR_THEME,Vanilla-DMZ-AA
+    env = HYPRCURSOR_SIZE,32
+    env = XCURSOR_THEME,Vanilla-DMZ-AA
+    env = XCURSOR_SIZE,32
 
     # General configuration
     general {
