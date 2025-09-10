@@ -49,13 +49,18 @@
     blightmud
     lutris
     wine
-    wine64
     wine-wayland
     winetricks
     protontricks 
     wineWowPackages.waylandFull 
     wineWowPackages.staging
     protonup
+    pcre
+    pcre2
+    bottles
+    mono
+    dotnet-sdk_8
+    cabextract
     
     # Office suite
     libreoffice-fresh

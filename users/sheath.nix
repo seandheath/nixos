@@ -9,6 +9,7 @@
     ../home/vscode.nix
     ../home/hyprlock.nix
     ../home/hyprland-dock.nix
+    ../home/mod-organizer.nix
     inputs.sops-nix.homeManagerModules.sops
   ];
   sops.defaultSopsFile = ../secrets/secrets.yaml;
