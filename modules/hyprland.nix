@@ -12,6 +12,12 @@
     wayland = true;
   };
 
+  # Gaming-specific packages
+  programs.gamescope = {
+    enable = true;
+    capSysNice = true;
+  };
+  
   # Essential Wayland and Hyprland packages
   environment.systemPackages = with pkgs; [
     # Wayland utilities
@@ -266,6 +272,11 @@
     windowrulev2 = float, class:^(pavucontrol)$
     windowrulev2 = float, class:^(nm-connection-editor)$
     windowrulev2 = float, class:^(blueman-manager)$
+    
+    # Gamescope rules for better gaming experience
+    windowrulev2 = fullscreen, class:^(gamescope)$
+    windowrulev2 = immediate, class:^(gamescope)$
+    windowrulev2 = noborder, class:^(gamescope)$
 
     # Keybindings
     $mainMod = SUPER
@@ -281,6 +292,9 @@
     #bind = $mainMod, J, togglesplit,
     bind = $mainMod, F, fullscreen,
     bind = $mainMod ALT, L, exec, hyprlock
+    
+    # Gaming shortcuts
+    bind = $mainMod, G, exec, gamescope -W 2560 -H 1440 -w 2560 -h 1440 -f -e -- steam -gamepadui
     
     # Manual splitting controls
     bind = $mainMod SHIFT, V, layoutmsg, preselect d
