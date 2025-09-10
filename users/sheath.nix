@@ -8,6 +8,7 @@
     ../home/neovim.nix
     ../home/vscode.nix
     ../home/hyprlock.nix
+    ../home/hyprland-dock.nix
     inputs.sops-nix.homeManagerModules.sops
   ];
   sops.defaultSopsFile = ../secrets/secrets.yaml;
