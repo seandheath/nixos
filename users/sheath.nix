@@ -6,6 +6,7 @@
     ../home/git.nix
     ../home/go.nix
     ../home/neovim.nix
+    ../home/mod-organizer.nix
     inputs.sops-nix.homeManagerModules.sops
   ];
   sops.defaultSopsFile = ../secrets/secrets.yaml;
