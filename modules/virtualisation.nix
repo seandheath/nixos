@@ -18,5 +18,6 @@
     dive 
     podman-tui 
     podman-compose
+    fuse-overlayfs
   ];
 }

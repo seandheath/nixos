@@ -65,6 +65,9 @@
     # System monitor
     btop
     
+    # Lock screen
+    hyprlock
+    
     # Font packages
     noto-fonts
     noto-fonts-cjk-sans
@@ -78,6 +81,7 @@
     # Cursor themes
     vanilla-dmz
     hyprcursor
+    adwaita-icon-theme
     
     
     # XDG utilities
@@ -198,6 +202,17 @@
         sensitivity = 0
     }
 
+    # Cursor configuration
+    cursor {
+        no_hardware_cursors = false
+    }
+
+    # Environment variables for cursor theme
+    env = HYPRCURSOR_THEME,default
+    env = HYPRCURSOR_SIZE,24
+    env = XCURSOR_THEME,default
+    env = XCURSOR_SIZE,24
+
     # General configuration
     general {
         gaps_in = 5
@@ -263,8 +278,13 @@
     bind = $mainMod, V, togglefloating,
     bind = $mainMod, Space, exec, wofi --show drun
     bind = $mainMod, P, pseudo,
-    bind = $mainMod, J, togglesplit,
+    #bind = $mainMod, J, togglesplit,
     bind = $mainMod, F, fullscreen,
+    bind = $mainMod ALT, L, exec, hyprlock
+    
+    # Manual splitting controls
+    bind = $mainMod SHIFT, V, layoutmsg, preselect d
+    bind = $mainMod SHIFT, X, layoutmsg, preselect r
 
     # Focus movement
     bind = $mainMod, left, movefocus, l
