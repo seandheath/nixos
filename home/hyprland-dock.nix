@@ -8,10 +8,10 @@ let
     # This script should be run when dock state changes
 
     # Monitor descriptions from your config
-    LEFT_MONITOR="desc:Hewlett Packard HP Z27x CNK71609WJ"
-    CENTER_MONITOR="desc:Samsung Electric Company QN90D 0x01000E00"
-    RIGHT_MONITOR="desc:Hewlett Packard HP Z27x CNK6200PD8"
-    LAPTOP_MONITOR="desc:BOE 0x08EA"
+    LEFT_MONITOR="Hewlett Packard HP Z27x CNK71609WJ"
+    CENTER_MONITOR="Samsung Electric Company QN90D 0x01000E00"
+    RIGHT_MONITOR="Hewlett Packard HP Z27x CNK6200PD8"
+    LAPTOP_MONITOR="BOE 0x08EA"
 
     # Function to check if external monitors are connected
     check_dock_state() {
@@ -44,16 +44,16 @@ let
         echo "Setting up docked configuration..."
         
         # Assign workspaces to monitors
-        ${pkgs.hyprland}/bin/hyprctl keyword workspace "1, monitor:$LEFT_MONITOR, default:true"
-        ${pkgs.hyprland}/bin/hyprctl keyword workspace "2, monitor:$CENTER_MONITOR, default:true"
-        ${pkgs.hyprland}/bin/hyprctl keyword workspace "3, monitor:$RIGHT_MONITOR, default:true"
-        ${pkgs.hyprland}/bin/hyprctl keyword workspace "4, monitor:$LAPTOP_MONITOR, default:true"
+        ${pkgs.hyprland}/bin/hyprctl keyword workspace "1, monitor:desc:$LEFT_MONITOR, default:true"
+        ${pkgs.hyprland}/bin/hyprctl keyword workspace "2, monitor:desc:$CENTER_MONITOR, default:true"
+        ${pkgs.hyprland}/bin/hyprctl keyword workspace "3, monitor:desc:$RIGHT_MONITOR, default:true"
+        ${pkgs.hyprland}/bin/hyprctl keyword workspace "4, monitor:desc:$LAPTOP_MONITOR, default:true"
         
         # Move existing workspaces to their designated monitors
-        ${pkgs.hyprland}/bin/hyprctl dispatch moveworkspacetomonitor "1 $LEFT_MONITOR"
-        ${pkgs.hyprland}/bin/hyprctl dispatch moveworkspacetomonitor "2 $CENTER_MONITOR"
-        ${pkgs.hyprland}/bin/hyprctl dispatch moveworkspacetomonitor "3 $RIGHT_MONITOR"
-        ${pkgs.hyprland}/bin/hyprctl dispatch moveworkspacetomonitor "4 $LAPTOP_MONITOR"
+        ${pkgs.hyprland}/bin/hyprctl dispatch moveworkspacetomonitor "1 desc:$LEFT_MONITOR"
+        ${pkgs.hyprland}/bin/hyprctl dispatch moveworkspacetomonitor "2 desc:$CENTER_MONITOR"
+        ${pkgs.hyprland}/bin/hyprctl dispatch moveworkspacetomonitor "3 desc:$RIGHT_MONITOR"
+        ${pkgs.hyprland}/bin/hyprctl dispatch moveworkspacetomonitor "4 desc:$LAPTOP_MONITOR"
         
         # Set default workspaces for additional workspaces (5-10)
         for i in {5..10}; do
