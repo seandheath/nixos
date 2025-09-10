@@ -5,6 +5,10 @@
     xorg.xrandr
   ];
 
+  home.sessionPath = [
+    "$HOME/.local/bin"
+  ];
+
   home.file.".local/bin/dock-monitors" = {
     executable = true;
     text = ''
