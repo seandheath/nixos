@@ -7,6 +7,7 @@
 {
   imports = [
     ../modules/gnome.nix
+    ../modules/dconf.nix
     ../modules/workstation.nix
     ../modules/virtualisation.nix
     ../modules/syncthing.nix
