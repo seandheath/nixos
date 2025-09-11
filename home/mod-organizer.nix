@@ -2,6 +2,9 @@
 
 {
   home.packages = [
+    # MinGW cross-compiler for building Windows executables
+    pkgs.pkgsCross.mingwW64.stdenv.cc
+    
     (pkgs.writeShellScriptBin "mo2" ''
       #!/usr/bin/env bash
       
@@ -200,16 +203,19 @@
         # Check dependencies
         check_dependencies
         
-        # Find Steam library
-        log_info "Looking for Skyrim Special Edition installation..."
-        if ! steam_library=$(find_steam_library); then
-          log_error "Could not find Skyrim Special Edition in any Steam library"
-          log_error "Make sure the game is installed and you've run it at least once"
+        # Use hardcoded paths for reliable reinstallation
+        local steam_library="$HOME/.local/share/Steam"
+        local game_installation="$steam_library/steamapps/common/$GAME_STEAM_SUBDIRECTORY"
+        
+        log_info "Using Steam library: $steam_library"
+        log_info "Game installation: $game_installation"
+        
+        # Verify game exists (check for main game executable)
+        if [ ! -d "$game_installation" ] || [ ! -f "$game_installation/SkyrimSE.exe" ]; then
+          log_error "Skyrim Special Edition not found at: $game_installation"
+          log_error "Make sure the game is installed through Steam"
           exit 1
         fi
-        
-        local game_installation="$steam_library/steamapps/common/$GAME_STEAM_SUBDIRECTORY"
-        log_info "Found game at: $game_installation"
         
         # Download files
         local downloaded_mo2="$CACHE_DIR/$(basename "$MO2_URL")"
@@ -304,6 +310,106 @@
         # Install winetricks
         cp "$downloaded_winetricks" "$SHARED_DIR/winetricks"
         chmod +x "$SHARED_DIR/winetricks"
+        
+        # Setup Steam Redirector
+        log_info "Setting up Steam redirector..."
+        
+        # No need to create modorganizer2 directory - path is hardcoded in redirector
+        
+        # Backup original game executable
+        local original_executable="$game_installation/_$GAME_EXECUTABLE"
+        local current_executable="$game_installation/$GAME_EXECUTABLE"
+        
+        if [ ! -f "$original_executable" ]; then
+          log_info "Backing up original game executable"
+          # Handle case where current executable is a symlink
+          if [ -L "$current_executable" ]; then
+            log_info "Current executable is a symlink, need to find original"
+            # Look for the actual original executable in common locations
+            local possible_originals=(
+              "$game_installation/SkyrimSE.exe"
+              "$(readlink "$current_executable")"
+            )
+            for orig in "''${possible_originals[@]}"; do
+              if [ -f "$orig" ] && [ ! -L "$orig" ]; then
+                log_info "Found original executable: $orig"
+                cp "$orig" "$original_executable"
+                break
+              fi
+            done
+          else
+            cp "$current_executable" "$original_executable"
+          fi
+        fi
+        
+        # Remove any existing symlink or file
+        if [ -e "$current_executable" ]; then
+          log_info "Removing existing executable/symlink"
+          rm -f "$current_executable"
+        fi
+        
+        # Create simplified C source for Windows redirector
+        log_info "Creating C redirector source"
+        cat > "$CACHE_DIR/redirector.c" << EOF
+#include <windows.h>
+#include <stdio.h>
+
+int main() {
+    // Hardcoded MO2 path
+    LPCWSTR mo2Path = L"Z:\\\\home\\\\$USER\\\\.local\\\\share\\\\Steam\\\\steamapps\\\\compatdata\\\\489830\\\\pfx\\\\drive_c\\\\Mod Organizer 2\\\\ModOrganizer.exe";
+    
+    // Create process information structures
+    STARTUPINFOW si;
+    PROCESS_INFORMATION pi;
+    
+    ZeroMemory(&si, sizeof(si));
+    si.cb = sizeof(si);
+    ZeroMemory(&pi, sizeof(pi));
+    
+    // Launch MO2
+    if (CreateProcessW(mo2Path, NULL, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
+        // Wait for MO2 to finish
+        WaitForSingleObject(pi.hProcess, INFINITE);
+        
+        // Clean up
+        CloseHandle(pi.hProcess);
+        CloseHandle(pi.hThread);
+        return 0;
+    } else {
+        printf("Failed to launch MO2: %lu\\n", GetLastError());
+        return 1;
+    }
+}
+EOF
+
+        # Build Windows executable using MinGW cross-compiler
+        log_info "Building Windows redirector executable"
+        
+        if ! command -v x86_64-w64-mingw32-gcc >/dev/null 2>&1; then
+          log_error "MinGW cross-compiler not found. Please install: nix-env -iA nixpkgs.pkgsCross.mingwW64.stdenv.cc"
+          exit 1
+        fi
+        
+        # Cross-compile to Windows (simple approach)
+        (cd "$CACHE_DIR" && x86_64-w64-mingw32-gcc -o redirector.exe redirector.c -s -O2 -mwindows)
+        
+        if [ ! -f "$CACHE_DIR/redirector.exe" ]; then
+          log_error "Failed to build C redirector"
+          exit 1
+        fi
+        
+        # Copy the compiled redirector to the game directory
+        log_info "Installing C redirector as game executable"
+        cp "$CACHE_DIR/redirector.exe" "$current_executable"
+        
+        # Create the log directory structure
+        mkdir -p "$HOME/.local/share/mod-organizer-2"
+        
+        # Register installation
+        log_info "Registering MO2 installation..."
+        mkdir -p "$HOME/.config/modorganizer2/instances"
+        rm -f "$HOME/.config/modorganizer2/instances/$GAME_NEXUSID"
+        ln -s "$mo2_install_dir" "$HOME/.config/modorganizer2/instances/$GAME_NEXUSID"
         
         # Run protontricks to install dependencies
         log_info "Installing Windows dependencies via protontricks..."

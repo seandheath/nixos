@@ -3,6 +3,7 @@
 {
   home.packages = with pkgs; [
     xorg.xrandr
+    edid-decode
   ];
 
   home.sessionPath = [
@@ -15,29 +16,85 @@
       #!/usr/bin/env bash
 
       # Monitor configuration script for docking setup
-      # Adjust the variables below to match your preferred layout
+      # Uses EDID information to identify monitors regardless of port changes
 
-      # Monitor identifiers (from xrandr)
-      LEFT_MONITOR="DP-11"
-      CENTER_MONITOR="DP-13"
-      RIGHT_MONITOR="DP-9"
+      # Detect monitors by their EDID information
+      detect_monitors() {
+          CENTER_MONITOR=""
+          LEFT_MONITOR=""
+          RIGHT_MONITOR=""
+          
+          # Find all connected outputs from xrandr
+          for output in $(xrandr | grep " connected" | cut -d' ' -f1); do
+              # Find corresponding DRM device
+              for drm_path in /sys/class/drm/card*-$output/edid; do
+                  if [ -s "$drm_path" ]; then
+                      # Get monitor info from EDID
+                      edid_info=$(cat "$drm_path" | edid-decode 2>/dev/null)
+                      
+                      # Check for Samsung QN90D (center 4K monitor)
+                      if echo "$edid_info" | grep -q "Display Product Name: 'QN90D'"; then
+                          CENTER_MONITOR=$output
+                      # Check for HP Z27x monitors (side 1440p displays)
+                      elif echo "$edid_info" | grep -q "Display Product Name: 'HP Z27x'"; then
+                          # Identify which HP monitor by serial number
+                          if echo "$edid_info" | grep -q "Display Product Serial Number: 'CNK6200PD8'"; then
+                              LEFT_MONITOR=$output  # Assign this serial to left
+                          elif echo "$edid_info" | grep -q "Display Product Serial Number: 'CNK71609WJ'"; then
+                              RIGHT_MONITOR=$output  # Assign this serial to right
+                          else
+                              # Unknown HP Z27x, assign to any empty slot
+                              if [ -z "$LEFT_MONITOR" ]; then
+                                  LEFT_MONITOR=$output
+                              elif [ -z "$RIGHT_MONITOR" ]; then
+                                  RIGHT_MONITOR=$output
+                              fi
+                          fi
+                      fi
+                  fi
+              done
+          done
+          
+          # Fallback to physical dimensions if EDID detection fails
+          if [ -z "$CENTER_MONITOR" ]; then
+              CENTER_MONITOR=$(xrandr | grep " connected" | grep "950mm x 540mm" | cut -d' ' -f1)
+          fi
+          
+          if [ -z "$LEFT_MONITOR" ] || [ -z "$RIGHT_MONITOR" ]; then
+              # Get remaining 1440p monitors by size
+              for mon in $(xrandr | grep " connected" | grep "600mm x 340mm" | cut -d' ' -f1); do
+                  if [ "$mon" != "$LEFT_MONITOR" ] && [ "$mon" != "$RIGHT_MONITOR" ]; then
+                      if [ -z "$LEFT_MONITOR" ]; then
+                          LEFT_MONITOR=$mon
+                      elif [ -z "$RIGHT_MONITOR" ]; then
+                          RIGHT_MONITOR=$mon
+                      fi
+                  fi
+              done
+          fi
+          
+          echo "Detected monitors:"
+          [ -n "$CENTER_MONITOR" ] && echo "  Center (Samsung QN90D): $CENTER_MONITOR"
+          [ -n "$LEFT_MONITOR" ] && echo "  Left (HP Z27x S/N: PD8): $LEFT_MONITOR"
+          [ -n "$RIGHT_MONITOR" ] && echo "  Right (HP Z27x S/N: 9WJ): $RIGHT_MONITOR"
+      }
 
       # Check if all monitors are connected
       check_monitors() {
           local missing=0
           
-          if ! xrandr | grep -q "$LEFT_MONITOR connected"; then
-              echo "Warning: $LEFT_MONITOR not connected"
+          if [ -z "$LEFT_MONITOR" ]; then
+              echo "Warning: Left monitor not detected"
               missing=1
           fi
           
-          if ! xrandr | grep -q "$CENTER_MONITOR connected"; then
-              echo "Warning: $CENTER_MONITOR not connected"
+          if [ -z "$CENTER_MONITOR" ]; then
+              echo "Warning: Center monitor not detected"
               missing=1
           fi
           
-          if ! xrandr | grep -q "$RIGHT_MONITOR connected"; then
-              echo "Warning: $RIGHT_MONITOR not connected"
+          if [ -z "$RIGHT_MONITOR" ]; then
+              echo "Warning: Right monitor not detected"
               missing=1
           fi
           
@@ -48,13 +105,26 @@
       configure_triple() {
           echo "Configuring triple monitor setup..."
           
-          # Left monitor: 2560x1440, rotated left (portrait)
+          # Left monitor: 2560x1440, rotated left (portrait) -> becomes 1440x2560
           # Center monitor: 3840x2160 at 120Hz, primary
-          # Right monitor: 2560x1440, rotated left (portrait)
+          # Right monitor: 2560x1440, rotated left (portrait) -> becomes 1440x2560
           
+          # Calculate positions:
+          # Left monitor at 0,0 (1440 wide when rotated)
+          # Center monitor at 1440,0 (3840 wide)
+          # Right monitor at 5280,0 (1440+3840)
+          
+          # Turn off all other outputs first to avoid conflicts
+          for output in $(xrandr | grep " connected" | cut -d' ' -f1); do
+              if [ "$output" != "$LEFT_MONITOR" ] && [ "$output" != "$CENTER_MONITOR" ] && [ "$output" != "$RIGHT_MONITOR" ]; then
+                  xrandr --output "$output" --off
+              fi
+          done
+          
+          # Configure all three monitors in a single command
           xrandr \
               --output "$LEFT_MONITOR" --mode 2560x1440 --rotate left --pos 0x0 \
-              --output "$CENTER_MONITOR" --mode 3840x2160 --rate 119.98 --primary --pos 1440x190 \
+              --output "$CENTER_MONITOR" --mode 3840x2160 --rate 119.98 --primary --pos 1440x0 \
               --output "$RIGHT_MONITOR" --mode 2560x1440 --rotate left --pos 5280x0
           
           echo "Triple monitor configuration applied!"
@@ -64,14 +134,19 @@
       configure_dual() {
           echo "Configuring dual monitor setup..."
           
-          if xrandr | grep -q "$LEFT_MONITOR connected" && xrandr | grep -q "$CENTER_MONITOR connected"; then
+          if [ -n "$LEFT_MONITOR" ] && [ -n "$CENTER_MONITOR" ]; then
               xrandr \
                   --output "$LEFT_MONITOR" --mode 2560x1440 --rotate left --pos 0x0 \
                   --output "$CENTER_MONITOR" --mode 3840x2160 --rate 119.98 --primary --pos 1440x190
-          elif xrandr | grep -q "$CENTER_MONITOR connected" && xrandr | grep -q "$RIGHT_MONITOR connected"; then
+          elif [ -n "$CENTER_MONITOR" ] && [ -n "$RIGHT_MONITOR" ]; then
               xrandr \
                   --output "$CENTER_MONITOR" --mode 3840x2160 --rate 119.98 --primary --pos 0x0 \
                   --output "$RIGHT_MONITOR" --mode 2560x1440 --rotate left --pos 3840x0
+          elif [ -n "$LEFT_MONITOR" ] && [ -n "$RIGHT_MONITOR" ]; then
+              # Both side monitors but no center
+              xrandr \
+                  --output "$LEFT_MONITOR" --mode 2560x1440 --rotate left --pos 0x0 \
+                  --output "$RIGHT_MONITOR" --mode 2560x1440 --rotate left --primary --pos 1440x0
           else
               echo "Unexpected dual monitor configuration"
           fi
@@ -83,8 +158,12 @@
       configure_single() {
           echo "Configuring single monitor setup..."
           
-          if xrandr | grep -q "$CENTER_MONITOR connected"; then
+          if [ -n "$CENTER_MONITOR" ]; then
               xrandr --output "$CENTER_MONITOR" --mode 3840x2160 --rate 119.98 --primary
+          elif [ -n "$LEFT_MONITOR" ]; then
+              xrandr --output "$LEFT_MONITOR" --mode 2560x1440 --primary
+          elif [ -n "$RIGHT_MONITOR" ]; then
+              xrandr --output "$RIGHT_MONITOR" --mode 2560x1440 --primary
           else
               # Just set the first connected monitor as primary
               local first_monitor=$(xrandr | grep " connected" | head -1 | cut -d' ' -f1)
@@ -98,17 +177,18 @@
       main() {
           echo "Detecting monitor configuration..."
           
-          # Count connected monitors
-          monitor_count=$(xrandr | grep -c " connected")
+          # Detect monitors by EDID first
+          detect_monitors
+          
+          # Count how many expected monitors we found
+          monitor_count=0
+          [ -n "$CENTER_MONITOR" ] && ((monitor_count++))
+          [ -n "$LEFT_MONITOR" ] && ((monitor_count++))
+          [ -n "$RIGHT_MONITOR" ] && ((monitor_count++))
           
           case $monitor_count in
               3)
-                  if check_monitors; then
-                      configure_triple
-                  else
-                      echo "Not all expected monitors found, falling back..."
-                      configure_dual
-                  fi
+                  configure_triple
                   ;;
               2)
                   configure_dual
@@ -117,11 +197,12 @@
                   configure_single
                   ;;
               0)
-                  echo "Error: No monitors detected!"
-                  exit 1
+                  echo "Error: No expected monitors detected!"
+                  echo "Falling back to auto-configuration..."
+                  xrandr --auto
                   ;;
               *)
-                  echo "Detected $monitor_count monitors, attempting auto-configuration..."
+                  echo "Unexpected monitor count: $monitor_count"
                   xrandr --auto
                   ;;
           esac
