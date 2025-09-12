@@ -110,7 +110,10 @@
         intelBusId = "PCI:0:2:0";
       };
     };
-    graphics.enable = true;
+    graphics = {
+      enable = true;
+      enable32Bit = true;
+    };
     system76.enableAll = true;
   };
   services.logind.settings.Login.HandleLidSwitchExternalPower = "ignore";

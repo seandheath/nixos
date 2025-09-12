@@ -47,20 +47,29 @@
     
     # Gaming
     blightmud
-    lutris
-    wine
-    wine-wayland
-    winetricks
-    protontricks 
-    wineWowPackages.waylandFull 
-    wineWowPackages.staging
+    (lutris.override {
+      extraLibraries = pkgs: [
+        libgudev
+        libvdpau
+        libtheora
+        speex
+      ];
+    })
     protonup
-    pcre
-    pcre2
-    bottles
-    mono
-    dotnet-sdk_8
-    cabextract
+    protontricks 
+    #wine
+    #wine64
+    wineWowPackages.waylandFull
+    winetricks
+    vulkan-loader
+    vulkan-tools
+    ffmpeg-full
+    gst_all_1.gstreamer
+    gst_all_1.gst-plugins-base
+    gst_all_1.gst-plugins-good  
+    gst_all_1.gst-plugins-bad
+    gst_all_1.gst-plugins-ugly
+    gst_all_1.gst-libav
     
     # Office suite
     libreoffice-fresh
@@ -74,7 +83,11 @@
   # Programs
   programs.gamescope.enable = true;
   programs.gamemode.enable = true;
-  programs.steam.enable = true;
+  programs.steam = {
+    enable = true;
+    fontPackages = with pkgs; [ freetype ];
+    protontricks.enable = true;
+  };
   programs.firefox.enable = true;
   
   # Services
@@ -85,4 +98,6 @@
   
   # Wayland support for Electron apps
   environment.sessionVariables.NIXOS_OZONE_WL = "1";
+  environment.sessionVariables.GST_PLUGIN_SYSTEM_PATH_1_0 = "/run/current-system/sw/lib/gstreamer-1.0";
+  environment.sessionVariables.LD_LIBRARY_PATH = "/run/current-system/sw/lib";
 }
