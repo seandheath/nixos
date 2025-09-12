@@ -1,9 +1,196 @@
 { config, pkgs, lib, ... }:
 
+let
+  pythonWithDbus = pkgs.python3.withPackages (ps: with ps; [
+    dbus-python
+  ]);
+
+  dock-monitors-script = pkgs.writeText "dock-monitors.py" ''
+import dbus
+import sys
+from dbus import SessionBus, Interface
+
+def get_display_config():
+    """Get the current display configuration from GNOME"""
+    bus = SessionBus()
+    display_config = bus.get_object(
+        'org.gnome.Mutter.DisplayConfig',
+        '/org/gnome/Mutter/DisplayConfig'
+    )
+    return Interface(display_config, 'org.gnome.Mutter.DisplayConfig')
+
+def find_monitors(resources):
+    """Find our specific monitors by serial number"""
+    serial, monitors, logical_monitors, props = resources
+    
+    samsung_monitor = None
+    hp_left_monitor = None  # CNK71609WJ
+    hp_right_monitor = None  # CNK6200PD8
+    
+    for monitor in monitors:
+        connector, vendor, product, serial = monitor[0]
+        modes = monitor[1]
+        props = monitor[2]
+        
+        print(f"Found monitor: {vendor} {product} ({serial}) on {connector}")
+        
+        if vendor == 'SAM' and product == 'QN90D':
+            samsung_monitor = (connector, monitor)
+        elif vendor == 'HWP' and product == 'HP Z27x':
+            if serial == 'CNK6200PD8':
+                hp_right_monitor = (connector, monitor)  # PD8 is actually on the right
+            elif serial == 'CNK71609WJ':
+                hp_left_monitor = (connector, monitor)   # 9WJ is actually on the left
+    
+    return samsung_monitor, hp_left_monitor, hp_right_monitor
+
+def find_best_mode(modes, width, height, refresh=None):
+    """Find the best matching mode for given resolution"""
+    best_mode = None
+    best_refresh = 0
+    
+    for i, mode in enumerate(modes):
+        mode_id, mode_width, mode_height, mode_refresh = mode[0], mode[1], mode[2], mode[3]
+        mode_props = mode[6] if len(mode) > 6 else {}
+        
+        if mode_width == width and mode_height == height:
+            # If specific refresh rate requested, try to match it
+            if refresh and abs(mode_refresh - refresh) < 1:
+                return i
+            # Otherwise get the highest refresh rate
+            if mode_refresh > best_refresh:
+                best_mode = i
+                best_refresh = mode_refresh
+    
+    return best_mode
+
+def configure_triple_monitors():
+    """Configure triple monitor setup with rotated side monitors"""
+    
+    display_config = get_display_config()
+    
+    # Get current state
+    result = display_config.GetCurrentState()
+    serial = result[0]
+    monitors = result[1]
+    logical_monitors = result[2]
+    properties = result[3]
+    resources = (serial, monitors, logical_monitors, properties)
+    
+    # Find our monitors
+    samsung, hp_left, hp_right = find_monitors(resources)
+    
+    if not all([samsung, hp_left, hp_right]):
+        print("Error: Could not find all three monitors!")
+        print(f"  Samsung QN90D: {'Found' if samsung else 'Not found'}")
+        print(f"  HP Z27x (9WJ - Left): {'Found' if hp_left else 'Not found'}")
+        print(f"  HP Z27x (PD8 - Right): {'Found' if hp_right else 'Not found'}")
+        return False
+    
+    # Build logical monitor configuration
+    logical_monitors = []
+    
+    # Calculate vertical centering
+    # Center monitor: 2160 pixels tall
+    # Side monitors when rotated: 2560 pixels tall  
+    # Difference: 2560 - 2160 = 400 pixels
+    # To center: side monitors at y=0, center at y=200
+    side_y = 0
+    center_y = 200
+    
+    # Left monitor (HP Z27x 9WJ) - rotated right at position 0,0
+    # When rotated, 2560x1440 becomes 1440x2560
+    left_connector, left_monitor = hp_left
+    left_modes = left_monitor[1]
+    left_mode_idx = find_best_mode(left_modes, 2560, 1440, 60)
+    if left_mode_idx is not None:
+        mode = left_modes[left_mode_idx]
+        mode_id = mode[0]
+        logical_monitors.append((
+            0,      # x position
+            side_y, # y position
+            1.0,    # scale
+            1,      # transform (1 = rotate right/90°)
+            False,  # primary
+            [(left_connector, mode_id, {})],  # (connector, mode_id, properties)
+        ))
+        print(f"Configured left monitor: {left_connector} at 0,{side_y} (rotated) - mode: {mode_id}")
+    
+    # Center monitor (Samsung QN90D) - primary at position 1440,200 (vertically centered)
+    center_connector, center_monitor = samsung
+    center_modes = center_monitor[1]
+    # Try for 120Hz first, fall back to 60Hz
+    center_mode_idx = find_best_mode(center_modes, 3840, 2160, 120)
+    if center_mode_idx is None:
+        center_mode_idx = find_best_mode(center_modes, 3840, 2160, 60)
+    
+    if center_mode_idx is not None:
+        mode = center_modes[center_mode_idx]
+        mode_id = mode[0]
+        logical_monitors.append((
+            1440,     # x position
+            center_y, # y position (pushed down to center)
+            1.0,      # scale
+            0,        # transform (0 = normal)
+            True,     # primary
+            [(center_connector, mode_id, {})],  # (connector, mode_id, properties)
+        ))
+        print(f"Configured center monitor: {center_connector} at 1440,{center_y} (primary, centered) - mode: {mode_id}")
+    
+    # Right monitor (HP Z27x PD8) - rotated right at position 5280,0
+    right_connector, right_monitor = hp_right
+    right_modes = right_monitor[1]
+    right_mode_idx = find_best_mode(right_modes, 2560, 1440, 60)
+    if right_mode_idx is not None:
+        mode = right_modes[right_mode_idx]
+        mode_id = mode[0]
+        logical_monitors.append((
+            5280,   # x position (1440 + 3840)
+            side_y, # y position
+            1.0,    # scale
+            1,      # transform (1 = rotate right/90°)
+            False,  # primary
+            [(right_connector, mode_id, {})],  # (connector, mode_id, properties)
+        ))
+        print(f"Configured right monitor: {right_connector} at 5280,{side_y} (rotated) - mode: {mode_id}")
+    
+    # Apply configuration
+    print("\nApplying monitor configuration...")
+    try:
+        # Method signature: (serial, method, logical_monitors, properties)
+        # method: 1 = verify, 2 = temporary, 3 = persistent
+        display_config.ApplyMonitorsConfig(
+            serial,
+            3,  # persistent
+            logical_monitors,
+            {}  # empty properties, let GNOME use defaults
+        )
+        print("Configuration applied successfully!")
+        return True
+    except Exception as e:
+        print(f"Error applying configuration: {e}")
+        return False
+
+def main():
+    """Main entry point"""
+    permanent = '--permanent' in sys.argv
+    
+    print("GNOME Wayland Monitor Configuration")
+    print("=" * 40)
+    
+    if configure_triple_monitors():
+        print("\nMonitor configuration completed successfully!")
+    else:
+        print("\nFailed to configure monitors")
+        sys.exit(1)
+
+if __name__ == '__main__':
+    main()
+  '';
+in
 {
   home.packages = with pkgs; [
-    xorg.xrandr
-    edid-decode
+    pythonWithDbus
   ];
 
   home.sessionPath = [
@@ -13,207 +200,8 @@
   home.file.".local/bin/dock-monitors" = {
     executable = true;
     text = ''
-      #!/usr/bin/env bash
-
-      # Monitor configuration script for docking setup
-      # Uses EDID information to identify monitors regardless of port changes
-
-      # Detect monitors by their EDID information
-      detect_monitors() {
-          CENTER_MONITOR=""
-          LEFT_MONITOR=""
-          RIGHT_MONITOR=""
-          
-          # Find all connected outputs from xrandr
-          for output in $(xrandr | grep " connected" | cut -d' ' -f1); do
-              # Find corresponding DRM device
-              for drm_path in /sys/class/drm/card*-$output/edid; do
-                  if [ -s "$drm_path" ]; then
-                      # Get monitor info from EDID
-                      edid_info=$(cat "$drm_path" | edid-decode 2>/dev/null)
-                      
-                      # Check for Samsung QN90D (center 4K monitor)
-                      if echo "$edid_info" | grep -q "Display Product Name: 'QN90D'"; then
-                          CENTER_MONITOR=$output
-                      # Check for HP Z27x monitors (side 1440p displays)
-                      elif echo "$edid_info" | grep -q "Display Product Name: 'HP Z27x'"; then
-                          # Identify which HP monitor by serial number
-                          if echo "$edid_info" | grep -q "Display Product Serial Number: 'CNK6200PD8'"; then
-                              LEFT_MONITOR=$output  # Assign this serial to left
-                          elif echo "$edid_info" | grep -q "Display Product Serial Number: 'CNK71609WJ'"; then
-                              RIGHT_MONITOR=$output  # Assign this serial to right
-                          else
-                              # Unknown HP Z27x, assign to any empty slot
-                              if [ -z "$LEFT_MONITOR" ]; then
-                                  LEFT_MONITOR=$output
-                              elif [ -z "$RIGHT_MONITOR" ]; then
-                                  RIGHT_MONITOR=$output
-                              fi
-                          fi
-                      fi
-                  fi
-              done
-          done
-          
-          # Fallback to physical dimensions if EDID detection fails
-          if [ -z "$CENTER_MONITOR" ]; then
-              CENTER_MONITOR=$(xrandr | grep " connected" | grep "950mm x 540mm" | cut -d' ' -f1)
-          fi
-          
-          if [ -z "$LEFT_MONITOR" ] || [ -z "$RIGHT_MONITOR" ]; then
-              # Get remaining 1440p monitors by size
-              for mon in $(xrandr | grep " connected" | grep "600mm x 340mm" | cut -d' ' -f1); do
-                  if [ "$mon" != "$LEFT_MONITOR" ] && [ "$mon" != "$RIGHT_MONITOR" ]; then
-                      if [ -z "$LEFT_MONITOR" ]; then
-                          LEFT_MONITOR=$mon
-                      elif [ -z "$RIGHT_MONITOR" ]; then
-                          RIGHT_MONITOR=$mon
-                      fi
-                  fi
-              done
-          fi
-          
-          echo "Detected monitors:"
-          [ -n "$CENTER_MONITOR" ] && echo "  Center (Samsung QN90D): $CENTER_MONITOR"
-          [ -n "$LEFT_MONITOR" ] && echo "  Left (HP Z27x S/N: PD8): $LEFT_MONITOR"
-          [ -n "$RIGHT_MONITOR" ] && echo "  Right (HP Z27x S/N: 9WJ): $RIGHT_MONITOR"
-      }
-
-      # Check if all monitors are connected
-      check_monitors() {
-          local missing=0
-          
-          if [ -z "$LEFT_MONITOR" ]; then
-              echo "Warning: Left monitor not detected"
-              missing=1
-          fi
-          
-          if [ -z "$CENTER_MONITOR" ]; then
-              echo "Warning: Center monitor not detected"
-              missing=1
-          fi
-          
-          if [ -z "$RIGHT_MONITOR" ]; then
-              echo "Warning: Right monitor not detected"
-              missing=1
-          fi
-          
-          return $missing
-      }
-
-      # Configure triple monitor setup
-      configure_triple() {
-          echo "Configuring triple monitor setup..."
-          
-          # Left monitor: 2560x1440, rotated left (portrait) -> becomes 1440x2560
-          # Center monitor: 3840x2160 at 120Hz, primary
-          # Right monitor: 2560x1440, rotated left (portrait) -> becomes 1440x2560
-          
-          # Calculate positions:
-          # Left monitor at 0,0 (1440 wide when rotated)
-          # Center monitor at 1440,0 (3840 wide)
-          # Right monitor at 5280,0 (1440+3840)
-          
-          # Turn off all other outputs first to avoid conflicts
-          for output in $(xrandr | grep " connected" | cut -d' ' -f1); do
-              if [ "$output" != "$LEFT_MONITOR" ] && [ "$output" != "$CENTER_MONITOR" ] && [ "$output" != "$RIGHT_MONITOR" ]; then
-                  xrandr --output "$output" --off
-              fi
-          done
-          
-          # Configure all three monitors in a single command
-          xrandr \
-              --output "$LEFT_MONITOR" --mode 2560x1440 --rotate left --pos 0x0 \
-              --output "$CENTER_MONITOR" --mode 3840x2160 --rate 119.98 --primary --pos 1440x0 \
-              --output "$RIGHT_MONITOR" --mode 2560x1440 --rotate left --pos 5280x0
-          
-          echo "Triple monitor configuration applied!"
-      }
-
-      # Configure dual monitor setup (if one side monitor is missing)
-      configure_dual() {
-          echo "Configuring dual monitor setup..."
-          
-          if [ -n "$LEFT_MONITOR" ] && [ -n "$CENTER_MONITOR" ]; then
-              xrandr \
-                  --output "$LEFT_MONITOR" --mode 2560x1440 --rotate left --pos 0x0 \
-                  --output "$CENTER_MONITOR" --mode 3840x2160 --rate 119.98 --primary --pos 1440x190
-          elif [ -n "$CENTER_MONITOR" ] && [ -n "$RIGHT_MONITOR" ]; then
-              xrandr \
-                  --output "$CENTER_MONITOR" --mode 3840x2160 --rate 119.98 --primary --pos 0x0 \
-                  --output "$RIGHT_MONITOR" --mode 2560x1440 --rotate left --pos 3840x0
-          elif [ -n "$LEFT_MONITOR" ] && [ -n "$RIGHT_MONITOR" ]; then
-              # Both side monitors but no center
-              xrandr \
-                  --output "$LEFT_MONITOR" --mode 2560x1440 --rotate left --pos 0x0 \
-                  --output "$RIGHT_MONITOR" --mode 2560x1440 --rotate left --primary --pos 1440x0
-          else
-              echo "Unexpected dual monitor configuration"
-          fi
-          
-          echo "Dual monitor configuration applied!"
-      }
-
-      # Configure single monitor (fallback)
-      configure_single() {
-          echo "Configuring single monitor setup..."
-          
-          if [ -n "$CENTER_MONITOR" ]; then
-              xrandr --output "$CENTER_MONITOR" --mode 3840x2160 --rate 119.98 --primary
-          elif [ -n "$LEFT_MONITOR" ]; then
-              xrandr --output "$LEFT_MONITOR" --mode 2560x1440 --primary
-          elif [ -n "$RIGHT_MONITOR" ]; then
-              xrandr --output "$RIGHT_MONITOR" --mode 2560x1440 --primary
-          else
-              # Just set the first connected monitor as primary
-              local first_monitor=$(xrandr | grep " connected" | head -1 | cut -d' ' -f1)
-              xrandr --output "$first_monitor" --auto --primary
-          fi
-          
-          echo "Single monitor configuration applied!"
-      }
-
-      # Main logic
-      main() {
-          echo "Detecting monitor configuration..."
-          
-          # Detect monitors by EDID first
-          detect_monitors
-          
-          # Count how many expected monitors we found
-          monitor_count=0
-          [ -n "$CENTER_MONITOR" ] && ((monitor_count++))
-          [ -n "$LEFT_MONITOR" ] && ((monitor_count++))
-          [ -n "$RIGHT_MONITOR" ] && ((monitor_count++))
-          
-          case $monitor_count in
-              3)
-                  configure_triple
-                  ;;
-              2)
-                  configure_dual
-                  ;;
-              1)
-                  configure_single
-                  ;;
-              0)
-                  echo "Error: No expected monitors detected!"
-                  echo "Falling back to auto-configuration..."
-                  xrandr --auto
-                  ;;
-              *)
-                  echo "Unexpected monitor count: $monitor_count"
-                  xrandr --auto
-                  ;;
-          esac
-          
-          # Optional: restart compositor or panel if needed
-          # killall polybar 2>/dev/null && polybar &
-          # nitrogen --restore &  # Restore wallpaper if using nitrogen
-      }
-
-      # Run main function
-      main
+      #!${pkgs.bash}/bin/bash
+      exec ${pythonWithDbus}/bin/python3 ${dock-monitors-script} "$@"
     '';
   };
 }
