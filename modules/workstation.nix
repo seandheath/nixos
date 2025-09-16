@@ -44,6 +44,7 @@
     p7zip
     sops
     age
+    srm
     
     # Gaming
     blightmud
