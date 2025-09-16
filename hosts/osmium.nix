@@ -7,6 +7,8 @@
 {
   imports = [
     ../modules/gnome.nix
+    ../modules/steam.nix
+    ../modules/sops.nix
     ../modules/dconf.nix
     ../modules/workstation.nix
     ../modules/virtualisation.nix
@@ -60,16 +62,6 @@
     variant = "";
   };
 
-  # Sound
-  services.pulseaudio.enable = false;
-  security.rtkit.enable = true;
-  services.pipewire = {
-    enable = true;
-    alsa.enable = true;
-    alsa.support32Bit = true;
-    pulse.enable = true;
-  };
-
   # Display
   services.xserver = {
   	enable = true;
@@ -83,17 +75,13 @@
   networking.networkmanager.enable = true;
   networking.useDHCP = lib.mkDefault true;
 
-
   # Programs
   nixpkgs.config.allowUnfree = true;
   nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
   environment.systemPackages = with pkgs; [
-    (heroic.override { extraPkgs = pkgs: [ pkgs.gamescope ]; })
     system76-firmware
     system76-keyboard-configurator
     displaylink
-    alacritty
-    gnomeExtensions.display-configuration-switcher
     zlib
   ];
   hardware = {
@@ -116,12 +104,8 @@
     };
     system76.enableAll = true;
   };
+
   services.logind.settings.Login.HandleLidSwitchExternalPower = "ignore";
-
-
-  sops.defaultSopsFile = ../secrets/secrets.yaml;
-  sops.age.keyFile = "/home/sheath/.config/sops/age/keys.txt";
-  sops.age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
 
   system.stateVersion = "25.05";
 }

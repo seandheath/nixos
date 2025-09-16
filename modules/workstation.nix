@@ -82,13 +82,6 @@
   ];
 
   # Programs
-  programs.gamescope.enable = true;
-  programs.gamemode.enable = true;
-  programs.steam = {
-    enable = true;
-    fontPackages = with pkgs; [ freetype ];
-    protontricks.enable = true;
-  };
   programs.firefox.enable = true;
   
   # Services
@@ -96,6 +89,14 @@
   services.mullvad-vpn.package = pkgs.mullvad-vpn;
   services.printing.enable = true;
   services.flatpak.enable = true;
+  services.pulseaudio.enable = false;
+  security.rtkit.enable = true;
+  services.pipewire = {
+    enable = true;
+    alsa.enable = true;
+    alsa.support32Bit = true;
+    pulse.enable = true;
+  };
   
   # Wayland support for Electron apps
   environment.sessionVariables.NIXOS_OZONE_WL = "1";

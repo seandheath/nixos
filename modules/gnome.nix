@@ -2,6 +2,7 @@
   environment.systemPackages = with pkgs; [
     # GNOME-specific packages not in workstation.nix
     gnomeExtensions.appindicator
+    gnomeExtensions.display-configuration-switcher
     gnomeExtensions.gtile
     gnomeExtensions.bluetooth-quick-connect
     gnomeExtensions.vitals
