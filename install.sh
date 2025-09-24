@@ -2,26 +2,75 @@
 
 set -euo pipefail
 
-# --- Verification ---
-echo "Verifying installation prerequisites..."
+# --- WARNING ---
+echo -e "\n\n\e[1;31m!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+echo "!!! DANGER: THIS SCRIPT WILL ERASE ALL DATA ON A DISK !!!"
+echo -e "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\e[0m\n"
+echo "This script will automate the entire NixOS installation, including partitioning."
+echo "Please back up any important data before proceeding."
+echo
+read -p "Press Enter to continue if you understand the risk..."
 
-if ! mountpoint -q /mnt; then
-  echo "Error: /mnt is not a mountpoint. Please partition and mount your drives first."
-  exit 1
+# --- Device Selection ---
+echo
+echo "Available storage devices:"
+lsblk -d -o NAME,SIZE,MODEL
+echo
+read -p "Enter the name of the device to install on (e.g., sda, nvme0n1): " DEVICE_NAME
+DEVICE="/${DEVICE_NAME}"
+
+if [[ ! -b "$DEVICE" ]]; then
+    echo "Error: Device $DEVICE does not exist."
+    exit 1
 fi
 
-if ! mountpoint -q /mnt/boot; then
-  echo "Error: /mnt/boot is not a mountpoint. Please mount your boot partition."
-  exit 1
+# --- Final Confirmation ---
+echo
+echo -e "\e[1;31mYou have selected \e[5m${DEVICE}\e[25m\e[1;31m for installation."
+echo "ALL DATA ON THIS DEVICE WILL BE PERMANENTLY DESTROYED."
+echo -e "This is your final chance to back out.\e[0m"
+read -p "To confirm, type 'ERASE' in all caps and press Enter: " CONFIRMATION
+
+if [[ "$CONFIRMATION" != "ERASE" ]]; then
+    echo "Confirmation failed. Aborting."
+    exit 1
 fi
 
-if [[ ! -f /mnt/etc/nixos/hardware-configuration.nix ]]; then
-  echo "Error: /mnt/etc/nixos/hardware-configuration.nix not found."
-  echo "Please run 'nixos-generate-config --root /mnt' first."
-  exit 1
+# --- Partitioning and Formatting ---
+echo "Wiping and partitioning ${DEVICE}..."
+sudo sgdisk --zap-all "${DEVICE}"
+sudo sgdisk -n 1:0:+512M -t 1:ef00 -c 1:boot "${DEVICE}"
+sudo sgdisk -n 2:0:0 -t 2:8300 -c 2:root "${DEVICE}"
+
+# Wait a moment for the kernel to recognize the new partitions
+sleep 2
+
+# Determine partition naming scheme (e.g., sda1 vs nvme0n1p1)
+if [[ "$DEVICE_NAME" =~ "nvme" || "$DEVICE_NAME" =~ "mmcblk" ]]; then
+    PART_PREFIX="p"
+else
+    PART_PREFIX=""
 fi
 
-echo "Prerequisites verified."
+BOOT_PART="${DEVICE}${PART_PREFIX}1"
+ROOT_PART="${DEVICE}${PART_PREFIX}2"
+
+echo "Formatting partitions..."
+sudo mkfs.vfat -F 32 -n BOOT "${BOOT_PART}"
+sudo mkfs.ext4 -F -L root "${ROOT_PART}"
+
+# --- Mounting ---
+echo "Mounting filesystems..."
+sudo mount "${ROOT_PART}" /mnt
+sudo mkdir -p /mnt/boot
+sudo mount "${BOOT_PART}" /mnt/boot
+
+# --- Generate NixOS Config (for hardware-configuration.nix) ---
+echo "Generating initial NixOS configuration..."
+sudo nixos-generate-config --root /mnt
+
+echo "Device setup complete. Proceeding with custom installation..."
+echo
 
 # --- Host Selection ---
 echo "Available hosts:"
