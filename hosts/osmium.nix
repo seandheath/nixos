@@ -6,6 +6,7 @@
 
 {
   imports = [
+    ../../hardware/osmium.nix
     ../modules/gnome.nix
     ../modules/steam.nix
     ../modules/sops.nix
@@ -19,26 +20,9 @@
   # Boot
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
-  boot.initrd.availableKernelModules = [ "xhci_pci" "thunderbolt" "nvme" "uas" "sd_mod" "sdhci_pci" ];
-  boot.initrd.kernelModules = [ ];
-  boot.kernelModules = [ "kvm-intel" "evdi" ];
+  boot.kernelModules = [ "evdi" ];
   boot.extraModulePackages = [ config.boot.kernelPackages.evdi ];
-  boot.initrd.luks.devices."luks-a6ea78d6-7a09-4994-b09c-48863e41e765".device = "/dev/disk/by-uuid/a6ea78d6-7a09-4994-b09c-48863e41e765";
   boot.initrd.luks.devices."luks-b1189935-07c6-416d-9201-b555aa272104".device = "/dev/disk/by-uuid/b1189935-07c6-416d-9201-b555aa272104";
-
-  # Filesystem
-  fileSystems."/" =
-    { device = "/dev/disk/by-uuid/2ba22a8f-7299-45c8-a4ca-6fd1a087c629";
-      fsType = "ext4";
-    };
-  fileSystems."/boot" =
-    { device = "/dev/disk/by-uuid/96EB-2493";
-      fsType = "vfat";
-      options = [ "fmask=0077" "dmask=0077" ];
-    };
-  swapDevices =
-    [ { device = "/dev/disk/by-uuid/14158464-b3bd-4eb2-bcf0-2fbee84f782c"; }
-    ];
 
   # Kernel
   boot.kernelPackages = pkgs.linuxPackages_latest;
@@ -73,11 +57,9 @@
   # Networking
   networking.hostName = "osmium"; # Define your hostname.
   networking.networkmanager.enable = true;
-  networking.useDHCP = lib.mkDefault true;
 
   # Programs
   nixpkgs.config.allowUnfree = true;
-  nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
   environment.systemPackages = with pkgs; [
     system76-firmware
     system76-keyboard-configurator
@@ -86,7 +68,6 @@
   ];
   hardware = {
     enableRedistributableFirmware = true;
-    cpu.intel.updateMicrocode = true;
     nvidia = {
       open = false;
       nvidiaSettings = false;

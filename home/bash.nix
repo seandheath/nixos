@@ -15,12 +15,33 @@
       
       # ALIASES
       alias ns="nix search nixpkgs"
-      alias dmesg="dmesg --color=always"
-      alias nr="sudo nixos-rebuild switch --flake /home/sheath/nixos#$HOSTNAME"
-      alias nb="sudo nixos-rebuild boot --flake /home/sheath/nixos#$HOSTNAME"
-
-      bind 'set show-all-if-ambiguous on'
-      bind 'TAB:menu-complete'
+            alias dmesg="dmesg --color=always"
+      
+            nr() {
+              local target_host
+              if [[ "$HOSTNAME" == "nixos" ]]; then
+                target_host=$(ls -1 /home/sheath/nixos/hosts | sed 's/\.nix$//' | fzf)
+              else
+                target_host=$HOSTNAME
+              fi
+              if [[ -n "$target_host" ]]; then
+                sudo nixos-rebuild switch --flake /home/sheath/nixos#"$target_host"
+              fi
+            }
+      
+            nb() {
+              local target_host
+              if [[ "$HOSTNAME" == "nixos" ]]; then
+                target_host=$(ls -1 /home/sheath/nixos/hosts | sed 's/\.nix$//' | fzf)
+              else
+                target_host=$HOSTNAME
+              fi
+              if [[ -n "$target_host" ]]; then
+                sudo nixos-rebuild boot --flake /home/sheath/nixos#"$target_host"
+              fi
+            }
+      
+            bind 'set show-all-if-ambiguous on'       bind 'TAB:menu-complete'
       bind 'set menu-complete-display-prefix on'
 
       export XZ_DEFAULTS='-T0 -9'
