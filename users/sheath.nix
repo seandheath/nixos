@@ -1,19 +1,9 @@
-{ config, pkgs, inputs, ... }:
 {
-  imports = [
-    ../home/bash.nix
-    ../home/alacritty.nix
-    ../home/git.nix
-    ../home/go.nix
-    ../home/neovim.nix
-    ../home/monitors.nix
-    inputs.sops-nix.homeManagerModules.sops
+  isNormalUser = true;
+  description = "sheath";
+  extraGroups = [ "wheel" "networkmanager" "video" "libvirtd" "podman" ];
+  openssh.authorizedKeys.keys = [
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGLhPOBx9dR2X3oYz5RS2eAGZA7YSeHPcnrQauHSmuk1"
   ];
-  sops.defaultSopsFile = ../secrets/secrets.yaml;
-  sops.age.keyFile = "/home/sheath/.config/sops/age/keys.txt";
-  sops.secrets.gemini-api-key = {};
-  sops.secrets.gitlab-token = {};
-  sops.secrets.gitlab-username = {};
-  programs.home-manager.enable = true;
-  home.stateVersion = "25.05";
+  group = "sheath";
 }

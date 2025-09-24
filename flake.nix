@@ -30,17 +30,9 @@
           {
             home-manager.useGlobalPkgs = true;
             home-manager.useUserPackages = true;
-            home-manager.users.sheath = import ./users/sheath.nix;
+            home-manager.users.sheath = import ./home/sheath.nix;
             home-manager.extraSpecialArgs = { inherit inputs; };
-            users.users.sheath = {
-              isNormalUser = true;
-              description = "sheath";
-              extraGroups = [ "wheel" "networkmanager" "video" "libvirtd" "podman" ];
-              openssh.authorizedKeys.keys = [
-                "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGLhPOBx9dR2X3oYz5RS2eAGZA7YSeHPcnrQauHSmuk1"
-              ];
-              group = "sheath";
-            };
+            users.users.sheath = import ./users/sheath.nix;
             users.groups.sheath = {};
             nix.settings.download-buffer-size = 1073741824;
             nix.settings.experimental-features = [ "nix-command" "flakes" ];

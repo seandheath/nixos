@@ -75,7 +75,7 @@
         "org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0" =
           {
             binding = "<Alt>Return";
-            command = "/run/current-system/sw/bin/alacritty";
+            command = "/etc/profiles/per-user/sheath/bin/kitty";
             name = "open-terminal";
           };
         "org/gnome/germinal/legacy".theme-variant = "dark";

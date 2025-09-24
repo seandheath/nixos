@@ -4,7 +4,7 @@
     ./git.nix
     ./gnome.nix
     ./bash.nix
-    ./alacritty.nix
+    ./kitty.nix
     ./go.nix
   ];
 
