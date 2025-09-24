@@ -68,4 +68,9 @@ echo "Hardware configuration copied to $HARDWARE_DEST"
 echo "Running nixos-install..."
 sudo nixos-install --root /mnt --flake "/mnt/home/sheath/nixos#${hostname}"
 
-echo "Installation complete! You can now reboot."
+echo "Installation finished. You will now be dropped into a shell in the new system."
+echo ">>> Please run 'passwd sheath' to set your user password, then type 'exit' to continue. <<<
+
+sudo nixos-enter --root /mnt
+
+echo "Configuration complete! You can now reboot."
