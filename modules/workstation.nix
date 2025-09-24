@@ -1,4 +1,5 @@
 { config, pkgs, lib, ... }: {
+  nixpkgs.config.allowUnfree = true;
   # Common workstation applications that work with any desktop environment
   environment.systemPackages = with pkgs; [
     # Document creation and processing

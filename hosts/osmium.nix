@@ -59,7 +59,6 @@
   networking.networkmanager.enable = true;
 
   # Programs
-  nixpkgs.config.allowUnfree = true;
   environment.systemPackages = with pkgs; [
     system76-firmware
     system76-keyboard-configurator
