@@ -18,26 +18,33 @@
     };
   };
 
-  outputs = { self, nixpkgs, home-manager, sops-nix, agenix, ... }@inputs: {
+  outputs = { self, nixpkgs, home-manager, sops-nix, agenix, ... }@inputs:
+    let
+      commonModules = [
+        home-manager.nixosModules.home-manager
+        sops-nix.nixosModules.sops
+        {
+          home-manager.useGlobalPkgs = true;
+          home-manager.useUserPackages = true;
+          home-manager.users.sheath = import ./home/sheath.nix;
+          home-manager.extraSpecialArgs = { inherit inputs; };
+          users.users.sheath = import ./users/sheath.nix;
+          users.groups.sheath = {};
+          nix.settings.download-buffer-size = 1073741824;
+          nix.settings.experimental-features = [ "nix-command" "flakes" ];
+        }
+      ];
+    in {
     nixosConfigurations = {
       osmium = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
         specialArgs = { inherit inputs; lib = nixpkgs.lib; };
-        modules = [
-          ./hosts/osmium.nix
-          home-manager.nixosModules.home-manager
-          sops-nix.nixosModules.sops
-          {
-            home-manager.useGlobalPkgs = true;
-            home-manager.useUserPackages = true;
-            home-manager.users.sheath = import ./home/sheath.nix;
-            home-manager.extraSpecialArgs = { inherit inputs; };
-            users.users.sheath = import ./users/sheath.nix;
-            users.groups.sheath = {};
-            nix.settings.download-buffer-size = 1073741824;
-            nix.settings.experimental-features = [ "nix-command" "flakes" ];
-          }
-        ];
+        modules = [ ./hosts/osmium.nix ] ++ commonModules;
+      };
+      pentest-vm = nixpkgs.lib.nixosSystem {
+        system = "x86_64-linux";
+        specialArgs = { inherit inputs; lib = nixpkgs.lib; };
+        modules = [ ./hosts/pentest-vm.nix ] ++ commonModules;
       };
     };
   };
