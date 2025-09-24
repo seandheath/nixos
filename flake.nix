@@ -26,11 +26,13 @@
         {
           home-manager.useGlobalPkgs = true;
           home-manager.useUserPackages = true;
-          home-manager.users.sheath = import ./home/sheath.nix;
-          home-manager.extraSpecialArgs = { inherit inputs; };
-          users.users.sheath = import ./users/sheath.nix;
-          users.groups.sheath = {};
-          nix.settings.download-buffer-size = 1073741824;
+                      home-manager.users.sheath = import ./home/sheath.nix;
+                      home-manager.extraSpecialArgs = { inherit inputs; };
+                      users.users.sheath = (import ./users/sheath.nix) // {
+                        hashedPasswordFile = config.sops.secrets.sheath_password_hash.path;
+                      };
+                      sops.secrets.sheath_password_hash = {};
+                      users.groups.sheath = {};          nix.settings.download-buffer-size = 1073741824;
           nix.settings.experimental-features = [ "nix-command" "flakes" ];
         }
       ];
