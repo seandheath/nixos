@@ -13,16 +13,27 @@ read -p "Press Enter to continue if you understand the risk..."
 
 # --- Device Selection ---
 echo
-echo "Available storage devices:"
-lsblk -d -o NAME,SIZE,MODEL
-echo
-read -p "Enter the name of the device to install on (e.g., sda, nvme0n1): " DEVICE_NAME
-DEVICE="/${DEVICE_NAME}"
+echo "Please select the device to install on."
+# Get devices, filter out loop devices and cd/dvd drives, output only the NAME
+DEVICES=($(lsblk -d -n -o NAME,TYPE | awk '$2=="disk" {print $1}'))
 
-if [[ ! -b "$DEVICE" ]]; then
-    echo "Error: Device $DEVICE does not exist."
+# Check if any devices were found
+if [ ${#DEVICES[@]} -eq 0 ]; then
+    echo "No suitable disk devices found. Aborting."
     exit 1
 fi
+
+PS3="Enter the number of the device: "
+select DEVICE_NAME in "${DEVICES[@]}"; do
+    if [[ -n "$DEVICE_NAME" ]]; then
+        echo "You selected ${DEVICE_NAME}."
+        break
+    else
+        echo "Invalid selection. Please try again."
+    fi
+done
+
+DEVICE="/dev/${DEVICE_NAME}"
 
 # --- Final Confirmation ---
 echo
