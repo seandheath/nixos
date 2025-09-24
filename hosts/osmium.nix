@@ -7,14 +7,9 @@
 {
   imports = [
     ../hardware/osmium.nix
-    ../modules/gnome.nix
     ../modules/steam.nix
-    ../modules/sops.nix
-    ../modules/dconf.nix
     ../modules/workstation.nix
     ../modules/virtualisation.nix
-    ../modules/syncthing.nix
-    ../modules/auto-update.nix
   ];
 
   # Boot

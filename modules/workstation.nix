@@ -1,4 +1,11 @@
 { config, pkgs, lib, ... }: {
+  imports = [ 
+    ../modules/gnome.nix
+    ../modules/sops.nix
+    ../modules/dconf.nix
+    ../modules/syncthing.nix
+    ../modules/auto-update.nix
+  ];
   nixpkgs.config.allowUnfree = true;
   # Common workstation applications that work with any desktop environment
   environment.systemPackages = with pkgs; [
