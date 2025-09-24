@@ -52,13 +52,14 @@ echo "Selected host: $hostname"
 # --- Copy Configuration ---
 echo "Copying configuration to /mnt/home/sheath/nixos..."
 sudo mkdir -p /mnt/home/sheath
-# Assuming the script is run from the repo's root directory
-# `.` is the current directory (the repo)
+# This assumes the script is run from the root of the git repo.
+# We need to copy the whole repo, including the .git directory.
 sudo cp -r . /mnt/home/sheath/nixos
 
-# --- Copy Hardware Configuration ---
+# --- Copy/Overwrite Hardware Configuration ---
 echo "Copying hardware configuration..."
 HARDWARE_DEST="/mnt/home/sheath/nixos/hardware/${hostname}.nix"
+# The hardware directory should exist in the repo, but let's be safe.
 sudo mkdir -p "$(dirname "$HARDWARE_DEST")"
 sudo cp /mnt/etc/nixos/hardware-configuration.nix "$HARDWARE_DEST"
 
@@ -69,7 +70,7 @@ echo "Running nixos-install..."
 sudo nixos-install --root /mnt --flake "/mnt/home/sheath/nixos#${hostname}"
 
 echo "Installation finished. You will now be dropped into a shell in the new system."
-echo ">>> Please run 'passwd sheath' to set your user password, then type 'exit' to continue. <<<
+echo ">>> Please run 'passwd sheath' to set your user password, then type 'exit' to continue. <<<"
 
 sudo nixos-enter --root /mnt
 
