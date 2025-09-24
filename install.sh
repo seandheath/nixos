@@ -51,16 +51,16 @@ echo "Selected host: $hostname"
 
 # --- Copy Configuration ---
 echo "Copying configuration to /mnt/home/sheath/nixos..."
-mkdir -p /mnt/home/sheath
+sudo mkdir -p /mnt/home/sheath
 # Assuming the script is run from the repo's root directory
 # `.` is the current directory (the repo)
-cp -r . /mnt/home/sheath/nixos
+sudo cp -r . /mnt/home/sheath/nixos
 
 # --- Copy Hardware Configuration ---
 echo "Copying hardware configuration..."
 HARDWARE_DEST="/mnt/home/sheath/nixos/hardware/${hostname}.nix"
-mkdir -p "$(dirname "$HARDWARE_DEST")"
-cp /mnt/etc/nixos/hardware-configuration.nix "$HARDWARE_DEST"
+sudo mkdir -p "$(dirname "$HARDWARE_DEST")"
+sudo cp /mnt/etc/nixos/hardware-configuration.nix "$HARDWARE_DEST"
 
 echo "Hardware configuration copied to $HARDWARE_DEST"
 
