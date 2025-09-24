@@ -6,7 +6,7 @@
 
 {
   imports = [
-    ../hardware/osmium.nix
+    /etc/nixos/hardware-configuration.nix
     ../modules/gnome.nix
     ../modules/steam.nix
     ../modules/sops.nix
