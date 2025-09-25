@@ -41,8 +41,9 @@
               fi
             }
       
-            bind 'set show-all-if-ambiguous on'       bind 'TAB:menu-complete'
-      bind 'set menu-complete-display-prefix on'
+            bind 'set show-all-if-ambiguous on'
+            bind 'TAB:menu-complete'
+            bind 'set menu-complete-display-prefix on'
 
       export XZ_DEFAULTS='-T0 -9'
       export EDITOR=nvim
