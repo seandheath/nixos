@@ -3,6 +3,6 @@
     enable = true;
     font.package = pkgs.b612;
     font.name = "Inconsolata";
-    font.size = 14;
+    font.size = 11;
   };
 }
