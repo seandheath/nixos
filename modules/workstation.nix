@@ -26,6 +26,7 @@
     git
     python3
     vscode
+    aider-chat
     
     # 3D printing and CAD
     prusa-slicer
@@ -38,6 +39,7 @@
     # Multimedia
     vlc
     pavucontrol
+    freetube
     
     # System utilities
     keepassxc

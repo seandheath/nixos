@@ -12,6 +12,8 @@
   boot.initrd.kernelModules = [ ];
   boot.kernelModules = [ "kvm-intel" ];
   boot.extraModulePackages = [ ];
+  boot.blacklistedKernelModules = [ "spd5118" ];
+  boot.kernelParams = [ "nvme_core.default_ps_max_latency_us=0" ];
 
   fileSystems."/" =
     { device = "/dev/disk/by-uuid/2ba22a8f-7299-45c8-a4ca-6fd1a087c629";

@@ -66,7 +66,7 @@
       open = false;
       nvidiaSettings = false;
       modesetting.enable = true;
-      powerManagement.enable = true;
+      powerManagement.enable = false;
       prime = {
         offload.enable = true;
         nvidiaBusId = "PCI:1:0:0";

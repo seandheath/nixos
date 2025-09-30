@@ -27,7 +27,7 @@
       sleep 5
       
       # Check if the upgrade service succeeded
-      if systemctl is-active --quiet nixos-upgrade.service || systemctl show -p ExecMainStatus nixos-upgrade.service | grep -q "ExecMainStatus=0"; then
+      if systemctl show -p Result --value nixos-upgrade.service | grep -q "success"; then
         # Upgrade succeeded, check if reboot is needed
         
         # Check if kernel was updated (main reason for reboot)
@@ -118,6 +118,7 @@ You may need to run updates manually."
     timerConfig = {
       OnCalendar = "04:05";  # Run 5 minutes after the upgrade
       Persistent = true;
+      RandomizedDelaySec = "15min";  # Randomize by up to 15 minutes
     };
   };
   
