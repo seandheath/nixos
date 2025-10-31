@@ -27,6 +27,8 @@
     python3
     vscode
     aider-chat
+    gnumake
+    nodejs
     
     # 3D printing and CAD
     prusa-slicer
@@ -40,7 +42,8 @@
     vlc
     pavucontrol
     freetube
-    
+    qbittorrent
+  
     # System utilities
     keepassxc
     appimage-run
