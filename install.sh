@@ -2,6 +2,55 @@
 
 set -euo pipefail
 
+# --- Resume Functionality ---
+RESUME_FILE="/tmp/nixos-install-resume"
+
+if [[ "${1:-}" == "--resume" ]]; then
+    if [[ ! -f "$RESUME_FILE" ]]; then
+        echo "No resume state found. Run the script normally to start fresh."
+        exit 1
+    fi
+
+    echo "Resuming previous installation..."
+    source "$RESUME_FILE"
+
+    # Check if partitions are still mounted
+    if ! mountpoint -q /mnt; then
+        echo "Mounting filesystems..."
+        sudo mount "$root_part" /mnt
+        sudo mount "$boot_part" /mnt/boot
+    fi
+
+    case "$stage" in
+        "install")
+            echo "Resuming nixos-install..."
+            if sudo nixos-install --root /mnt --flake "/mnt/home/sheath/nixos#${hostname}"; then
+                echo "stage=passwd" >> "$RESUME_FILE"
+                echo "Installation finished. You will now be dropped into a shell in the new system."
+                echo ">>> Please run 'passwd sheath' to set your user password, then type 'exit' to continue. <<<"
+                sudo nixos-enter --root /mnt
+                rm -f "$RESUME_FILE"
+                echo "Configuration complete! You can now reboot."
+            else
+                echo "Installation failed again. Check the logs and try again."
+                exit 1
+            fi
+            ;;
+        "passwd")
+            echo "Installation was successful. Entering system to set password..."
+            echo ">>> Please run 'passwd sheath' to set your user password, then type 'exit' to continue. <<<"
+            sudo nixos-enter --root /mnt
+            rm -f "$RESUME_FILE"
+            echo "Configuration complete! You can now reboot."
+            ;;
+        *)
+            echo "Unknown resume stage: $stage"
+            exit 1
+            ;;
+    esac
+    exit 0
+fi
+
 # --- WARNING ---
 echo -e "\n\n\e[1;31m!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
 echo "!!! DANGER: THIS SCRIPT WILL ERASE ALL DATA ON A DISK !!!"
@@ -125,13 +174,31 @@ sudo cp /mnt/etc/nixos/hardware-configuration.nix "$HARDWARE_DEST"
 
 echo "Hardware configuration copied to $HARDWARE_DEST"
 
+# --- Create Resume State File ---
+RESUME_FILE="/tmp/nixos-install-resume"
+echo "device=${DEVICE}" > "$RESUME_FILE"
+echo "hostname=${hostname}" >> "$RESUME_FILE"
+echo "boot_part=${BOOT_PART}" >> "$RESUME_FILE"
+echo "root_part=${ROOT_PART}" >> "$RESUME_FILE"
+echo "stage=install" >> "$RESUME_FILE"
+
 # --- Run Installation ---
 echo "Running nixos-install..."
-sudo nixos-install --root /mnt --flake "/mnt/home/sheath/nixos#${hostname}"
+if sudo nixos-install --root /mnt --flake "/mnt/home/sheath/nixos#${hostname}"; then
+    echo "stage=passwd" >> "$RESUME_FILE"
+    echo "Installation finished. You will now be dropped into a shell in the new system."
+    echo ">>> Please run 'passwd sheath' to set your user password, then type 'exit' to continue. <<<"
 
-echo "Installation finished. You will now be dropped into a shell in the new system."
-echo ">>> Please run 'passwd sheath' to set your user password, then type 'exit' to continue. <<<"
+    sudo nixos-enter --root /mnt
 
-sudo nixos-enter --root /mnt
-
-echo "Configuration complete! You can now reboot."
+    # Clean up resume file on successful completion
+    rm -f "$RESUME_FILE"
+    echo "Configuration complete! You can now reboot."
+else
+    echo
+    echo -e "\e[1;31mNixOS installation failed!\e[0m"
+    echo "Resume state saved to $RESUME_FILE"
+    echo "You can resume the installation by running:"
+    echo "  $0 --resume"
+    exit 1
+fi
