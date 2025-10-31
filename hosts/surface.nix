@@ -34,12 +34,9 @@
 
   boot.initrd.systemd.enable = true;
 
-  # Surface hardware support
-  microsoft-surface = {
-    kernelVersion = "stable";
-    ipts.enable = true;        # Touch and stylus support
-    surface-control.enable = true;  # Performance modes
-  };
+  # Surface hardware support from nixos-hardware
+  # The microsoft-surface-common module provides Surface-specific kernel and firmware
+  # but may not include all options like ipts - check nixos-hardware documentation
 
   # Uncomment for Surface Go 1 WiFi firmware fix
   # hardware.microsoft-surface.firmware.surface-go-ath10k.replace = true;

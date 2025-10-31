@@ -22,7 +22,7 @@
   programs.dconf.enable = true;
 
   # Touch input and gesture support
-  services.xserver.libinput = {
+  services.libinput = {
     enable = true;
     touchpad = {
       tapping = true;
@@ -44,6 +44,9 @@
 
   # Surface Pen (stylus) support
   services.xserver.wacom.enable = true;
+
+  # Disable power-profiles-daemon to avoid conflict with TLP
+  services.power-profiles-daemon.enable = false;
 
   # Power management optimized for tablets
   services.tlp = {
@@ -125,15 +128,15 @@
     epiphany             # GNOME Web browser, scales well
 
     # Terminal and basic apps
-    gnome.gnome-terminal
-    gnome.gnome-calculator
+    gnome-terminal
+    gnome-calculator
     gnome-text-editor      # Replaces gedit
 
     # File management
-    gnome.nautilus
+    nautilus
 
     # Communication and contacts
-    gnome.gnome-contacts
+    gnome-contacts
 
     # Note-taking and PDF apps
     rnote                 # Handwriting and note-taking
@@ -144,8 +147,8 @@
     drawing              # Simple drawing app
 
     # System utilities
-    gnome.gnome-weather
-    gnome.gnome-maps
+    gnome-weather
+    gnome-maps
 
     # Touch input debugging tools
     libinput             # libinput debug-events, list-devices
@@ -153,12 +156,11 @@
     iio-sensor-proxy    # Provides monitor-sensor utility
 
     # Wacom/stylus tools
-    xorg.xf86inputwacom
     libwacom
 
     # GTK themes for better integration
     adwaita-icon-theme
-    gnome.gnome-themes-extra
+    gnome-themes-extra
   ];
 
   # Squeekboard on-screen keyboard service
@@ -187,8 +189,8 @@
   '';
 
   # Disable resource-intensive services for low-RAM systems
-  services.gnome.tracker.enable = false;        # File indexing
-  services.gnome.tracker-miners.enable = false;  # Content extraction
+  services.gnome.tinysparql.enable = false;        # File indexing
+  services.gnome.localsearch.enable = false;  # Content extraction
 
   # Udev rules for touch devices and Surface Pen
   services.udev.extraRules = ''
