@@ -34,7 +34,7 @@ def find_monitors(resources):
         
         print(f"Found monitor: {vendor} {product} ({serial}) on {connector}")
         
-        if vendor == 'SAM' and product == 'QN90D':
+        if vendor == 'SAM' and product == 'LC34G55T':
             samsung_monitor = (connector, monitor)
         elif vendor == 'HWP' and product == 'HP Z27x':
             if serial == 'CNK6200PD8':
@@ -91,16 +91,15 @@ def configure_triple_monitors():
     logical_monitors = []
     
     # Calculate vertical centering
-    # Center monitor: 2160 pixels tall
-    # Side monitors when rotated: 2560 pixels tall  
-    # Difference: 2560 - 2160 = 400 pixels
-    # To center: side monitors at y=0, center at y=200
+    # Center monitor: 1440 pixels tall
+    # Side monitors when rotated: 2560 pixels tall
+    # Manually aligned to Y=759 for perfect centering
     side_y = 0
-    center_y = 200
+    center_y = 759
     
-    # Left monitor (HP Z27x 9WJ) - rotated right at position 0,0
+    # Left monitor (HP Z27x CNK6200PD8) - rotated right at position 0,0
     # When rotated, 2560x1440 becomes 1440x2560
-    left_connector, left_monitor = hp_left
+    left_connector, left_monitor = hp_right  # CNK6200PD8 is actually on the left
     left_modes = left_monitor[1]
     left_mode_idx = find_best_mode(left_modes, 2560, 1440, 60)
     if left_mode_idx is not None:
@@ -114,15 +113,15 @@ def configure_triple_monitors():
             False,  # primary
             [(left_connector, mode_id, {})],  # (connector, mode_id, properties)
         ))
-        print(f"Configured left monitor: {left_connector} at 0,{side_y} (rotated) - mode: {mode_id}")
+        print(f"Configured left monitor: {left_connector} at 0,{side_y} (rotated right) - mode: {mode_id}")
     
-    # Center monitor (Samsung QN90D) - primary at position 1440,200 (vertically centered)
+    # Center monitor (Samsung LC34G55T) - primary at position 1440,759 (vertically centered)
     center_connector, center_monitor = samsung
     center_modes = center_monitor[1]
-    # Try for 120Hz first, fall back to 60Hz
-    center_mode_idx = find_best_mode(center_modes, 3840, 2160, 120)
+    # Try for 100Hz first, fall back to 60Hz
+    center_mode_idx = find_best_mode(center_modes, 3440, 1440, 100)
     if center_mode_idx is None:
-        center_mode_idx = find_best_mode(center_modes, 3840, 2160, 60)
+        center_mode_idx = find_best_mode(center_modes, 3440, 1440, 60)
     
     if center_mode_idx is not None:
         mode = center_modes[center_mode_idx]
@@ -135,24 +134,24 @@ def configure_triple_monitors():
             True,     # primary
             [(center_connector, mode_id, {})],  # (connector, mode_id, properties)
         ))
-        print(f"Configured center monitor: {center_connector} at 1440,{center_y} (primary, centered) - mode: {mode_id}")
+        print(f"Configured center monitor: {center_connector} at 1440,{center_y} (primary, perfectly centered) - mode: {mode_id}")
     
-    # Right monitor (HP Z27x PD8) - rotated right at position 5280,0
-    right_connector, right_monitor = hp_right
+    # Right monitor (HP Z27x CNK71609WJ) - rotated right at position 4880,0
+    right_connector, right_monitor = hp_left  # CNK71609WJ is actually on the right
     right_modes = right_monitor[1]
     right_mode_idx = find_best_mode(right_modes, 2560, 1440, 60)
     if right_mode_idx is not None:
         mode = right_modes[right_mode_idx]
         mode_id = mode[0]
         logical_monitors.append((
-            5280,   # x position (1440 + 3840)
+            4880,   # x position (1440 + 3440)
             side_y, # y position
             1.0,    # scale
             1,      # transform (1 = rotate right/90°)
             False,  # primary
             [(right_connector, mode_id, {})],  # (connector, mode_id, properties)
         ))
-        print(f"Configured right monitor: {right_connector} at 5280,{side_y} (rotated) - mode: {mode_id}")
+        print(f"Configured right monitor: {right_connector} at 4880,{side_y} (rotated right) - mode: {mode_id}")
     
     # Apply configuration
     print("\nApplying monitor configuration...")

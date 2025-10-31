@@ -29,6 +29,7 @@
     aider-chat
     gnumake
     nodejs
+    gcc
     
     # 3D printing and CAD
     prusa-slicer
