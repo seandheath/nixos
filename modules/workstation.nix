@@ -70,7 +70,7 @@
         speex
       ];
     })
-    protonup
+    protonup-ng
     protontricks 
     #wine
     #wine64
@@ -114,6 +114,5 @@
   
   # Wayland support for Electron apps
   environment.sessionVariables.NIXOS_OZONE_WL = "1";
-  environment.sessionVariables.GST_PLUGIN_SYSTEM_PATH_1_0 = "/run/current-system/sw/lib/gstreamer-1.0";
-  environment.sessionVariables.LD_LIBRARY_PATH = "/run/current-system/sw/lib";
+  #environment.sessionVariables.GST_PLUGIN_SYSTEM_PATH_1_0 = "/run/current-system/sw/lib/gstreamer-1.0";
 }

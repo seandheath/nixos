@@ -44,10 +44,10 @@
   # Display
   services.xserver = {
   	enable = true;
-	videoDrivers = [ "nvidia" "displaylink" "modesetting" ];
+	videoDrivers = [ "nvidia" "modesetting" ];
   };
-  # DisplayLink
-  systemd.services.dlm.wantedBy = [ "multi-user.target" ];
+  # DisplayLink - temporarily disabled due to build issues
+  # systemd.services.dlm.wantedBy = [ "multi-user.target" ];
 
   # Networking
   networking.hostName = "osmium"; # Define your hostname.
@@ -57,7 +57,7 @@
   environment.systemPackages = with pkgs; [
     system76-firmware
     system76-keyboard-configurator
-    displaylink
+    # displaylink
     zlib
   ];
   hardware = {
