@@ -52,7 +52,7 @@
         specialArgs = { inherit inputs; lib = nixpkgs.lib; };
         modules = [
           ./hosts/surface.nix
-          nixos-hardware.nixosModules.microsoft-surface-common
+          nixos-hardware.nixosModules.microsoft-surface-go
         ] ++ commonModules;
       };
     };
