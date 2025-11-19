@@ -41,7 +41,8 @@
     enable = true;
     package = pkgs.iio-sensor-proxy;
   };
-  hardware.microsoft-surface.kernelVersion = "stable";
+  #hardware.microsoft-surface.kernelVersion = "stable";
+  boot.kernelPackages = lib.mkForce pkgs.linuxPackages_latest;
 
   # Surface Pen (stylus) support
   services.xserver.wacom.enable = true;
