@@ -45,7 +45,7 @@
     extraPortals = [ pkgs.xdg-desktop-portal-gtk ];
   };
 
-  home-manager.users.${config.users.users.sheath.name} = { pkgs, ... }: {
+  home-manager.users.sheath = { pkgs, ... }: {
     
     # Sway configuration
     wayland.windowManager.sway = {
