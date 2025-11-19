@@ -46,39 +46,7 @@
   services.xserver.wacom.enable = true;
 
   # Disable power-profiles-daemon to avoid conflict with TLP
-  services.power-profiles-daemon.enable = false;
-
-  # Power management optimized for tablets
-  services.tlp = {
-    enable = true;
-    settings = {
-      CPU_SCALING_GOVERNOR_ON_AC = "performance";
-      CPU_SCALING_GOVERNOR_ON_BAT = "powersave";
-
-      CPU_ENERGY_PERF_POLICY_ON_BAT = "power";
-      CPU_ENERGY_PERF_POLICY_ON_AC = "performance";
-
-      CPU_MIN_PERF_ON_BAT = 0;
-      CPU_MAX_PERF_ON_BAT = 30;  # Limit to 30% on battery
-      CPU_BOOST_ON_BAT = 0;      # Disable turbo boost
-      CPU_BOOST_ON_AC = 1;
-
-      START_CHARGE_THRESH_BAT0 = 40;  # Battery longevity
-      STOP_CHARGE_THRESH_BAT0 = 80;
-
-      PLATFORM_PROFILE_ON_AC = "performance";
-      PLATFORM_PROFILE_ON_BAT = "low-power";
-
-      WIFI_PWR_ON_AC = "off";
-      WIFI_PWR_ON_BAT = "on";
-
-      USB_AUTOSUSPEND = 1;
-      USB_EXCLUDE_PHONE = 1;
-    };
-  };
-
-  # Intel thermal management
-  services.thermald.enable = true;
+  services.power-profiles-daemon.enable = true;
 
   # Memory optimization for 4GB RAM systems
   zramSwap = {
@@ -90,11 +58,11 @@
   };
 
   # Disk swap as fallback
-  swapDevices = [{
-    device = "/var/lib/swapfile";
-    size = 4 * 1024;  # 4GB
-    priority = 5;     # Lower than zram
-  }];
+  #swapDevices = [{
+    #device = "/var/lib/swapfile";
+    #size = 4 * 1024;  # 4GB
+    #priority = 5;     # Lower than zram
+  #}];
 
   # Kernel memory management for low-RAM systems
   boot.kernel.sysctl = {
