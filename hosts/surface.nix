@@ -1,4 +1,4 @@
-# Surface tablet configuration with Phosh mobile desktop environment
+# Surface tablet configuration with Sway
 { lib, pkgs, config, ... }:
 
 {
@@ -21,6 +21,19 @@
   # Networking
   networking.hostName = "surface";
   networking.networkmanager.enable = true;
+
+  # Disable Phosh and enable Sway
+  services.xserver.desktopManager.phosh.enable = false;
+  services.greetd = {
+    enable = true;
+    wayland.enable = true;
+    settings = {
+      default_session = {
+        command = "${pkgs.sway}/bin/sway";
+        user = "sheath";
+      };
+    };
+  };
 
   system.stateVersion = "25.05";
 }
