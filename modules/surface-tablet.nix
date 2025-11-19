@@ -92,7 +92,7 @@
     squeekboard           # On-screen keyboard
 
     # Browsers optimized for mobile
-    firefox-wayland
+    firefox
     epiphany             # GNOME Web browser, scales well
 
     # Terminal and basic apps
