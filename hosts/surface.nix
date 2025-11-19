@@ -5,6 +5,7 @@
   imports = [
     ../hardware/surface.nix
     ../modules/surface-tablet.nix
+    ../modules/surface-sway.nix
   ];
 
   # Boot configuration for Surface hardware
