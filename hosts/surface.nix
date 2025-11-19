@@ -22,11 +22,9 @@
   networking.hostName = "surface";
   networking.networkmanager.enable = true;
 
-  # Disable Phosh and enable Sway
-  services.xserver.desktopManager.phosh.enable = false;
+  # Enable Sway
   services.greetd = {
     enable = true;
-    wayland.enable = true;
     settings = {
       default_session = {
         command = "${pkgs.sway}/bin/sway";

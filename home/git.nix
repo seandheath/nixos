@@ -1,9 +1,9 @@
 { config, pkgs, ... }: {
   programs.git = {
     enable = true;
-    userName = "Sean Heath";
-    userEmail = "seanheath87@gmail.com";
-    extraConfig = {
+    settings = {
+      user.name = "Sean Heath";
+      user.email = "seanheath87@gmail.com";
       pull.rebase = false;
     };
   };

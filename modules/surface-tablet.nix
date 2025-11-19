@@ -1,23 +1,7 @@
-# Surface tablet module with Phosh mobile desktop environment
+# Surface tablet module
 { config, lib, pkgs, ... }:
 
 {
-  # Phosh desktop environment for mobile interface
-  services.xserver.desktopManager.phosh = {
-    enable = true;
-    user = "sheath";
-    group = "users";
-    phocConfig = {
-      xwayland = "immediate";  # Enable X11 app compatibility
-    };
-  };
-
-  # Required services for Phosh
-  services.gnome = {
-    gnome-keyring.enable = true;
-    evolution-data-server.enable = true;
-  };
-
   services.upower.enable = true;
   programs.dconf.enable = true;
 
@@ -88,10 +72,6 @@
 
   # Essential tablet applications
   environment.systemPackages = with pkgs; [
-    # Mobile interface essentials
-    phosh-mobile-settings  # Essential settings app
-    squeekboard           # On-screen keyboard
-
     # Browsers optimized for mobile
     firefox
     epiphany             # GNOME Web browser, scales well
@@ -132,17 +112,6 @@
     gnome-themes-extra
   ];
 
-  # Squeekboard on-screen keyboard service
-  systemd.user.services.squeekboard = {
-    description = "Squeekboard virtual keyboard";
-    wantedBy = [ "graphical-session.target" ];
-    serviceConfig = {
-      ExecStart = "${pkgs.squeekboard}/bin/squeekboard";
-      Restart = "on-failure";
-      RestartSec = "5s";
-    };
-  };
-
   # Power management commands for suspend/resume
   powerManagement.powerDownCommands = ''
     # Disable wake sources that drain battery
@@ -156,10 +125,6 @@
   powerManagement.resumeCommands = ''
     systemctl start bluetooth.service || true
   '';
-
-  # Disable resource-intensive services for low-RAM systems
-  services.gnome.tinysparql.enable = false;        # File indexing
-  services.gnome.localsearch.enable = false;  # Content extraction
 
   # Udev rules for touch devices and Surface Pen
   services.udev.extraRules = ''
