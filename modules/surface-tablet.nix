@@ -45,6 +45,7 @@
   boot.initrd.kernelModules = [ "surface_aggregator" ];
 
   # Enable all firmware (required for Surface hardware)
+  nixpkgs.config.allowUnfree = true;
   hardware.enableRedistributableFirmware = true;
   hardware.enableAllFirmware = true;
 
