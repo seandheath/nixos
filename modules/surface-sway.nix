@@ -148,6 +148,7 @@ in
             drag = "enabled";
             drag_lock = "enabled";
             tap = "enabled";
+            events = "enabled";
           };
           
           "type:keyboard" = {

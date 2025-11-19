@@ -19,11 +19,20 @@
       scrollMethod = "twofinger";
       disableWhileTyping = true;
       clickMethod = "clickfinger";
+      sendEventsMode = "enabled";
     };
     mouse = {
       accelProfile = "flat";  # Disable acceleration for touch
     };
   };
+
+  # Enable touchscreen gesture support
+  environment.etc."libinput/local-overrides.quirks".text = ''
+    [Touchscreen]
+    MatchUdevType=touchscreen
+    AttrTouchSizeRange=10:8
+    AttrPalmSizeThreshold=800
+  '';
 
   # Screen rotation with IIO sensors
   hardware.sensor.iio = {
@@ -120,10 +129,11 @@
     gnome-weather
     gnome-maps
 
-    # Touch input debugging tools
+    # Touch input debugging and gesture tools
     libinput             # libinput debug-events, list-devices
     evemu               # evemu-describe for device info
     iio-sensor-proxy    # Provides monitor-sensor utility
+    libinput-gestures   # Gesture recognition daemon
 
     # Wacom/stylus tools
     libwacom
