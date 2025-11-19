@@ -5,6 +5,11 @@
   services.upower.enable = true;
   programs.dconf.enable = true;
 
+  # Surface touchscreen daemon (REQUIRED for touchscreen to work)
+  services.iptsd = {
+    enable = true;
+  };
+
   # Touch input and gesture support
   services.libinput = {
     enable = true;
@@ -128,8 +133,10 @@
 
   # Udev rules for touch devices and Surface Pen
   services.udev.extraRules = ''
-    # Surface Pen detection
+    # Surface touchscreen and pen access
+    SUBSYSTEM=="input", ATTRS{name}=="*IPTS*", MODE="0660", TAG+="uaccess"
     SUBSYSTEM=="input", ATTRS{name}=="*Pen*", MODE="0660", TAG+="uaccess"
+    SUBSYSTEM=="input", KERNEL=="event*", ATTRS{name}=="*Touch*", MODE="0660", TAG+="uaccess"
   '';
 
   # Example hwdb entry for touch calibration (adjust for your device)

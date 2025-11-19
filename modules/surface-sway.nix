@@ -253,7 +253,6 @@ in
         
         # Fixed opacity rules
         for_window [app_id=".*"] opacity 0.95
-        for_window [con_focused=true] opacity 1.0
       '';
     };
     
