@@ -33,6 +33,21 @@
   #hardware.microsoft-surface.kernelVersion = "stable";
   boot.kernelPackages = lib.mkForce pkgs.linuxPackages_latest;
 
+  # Surface Type Cover (keyboard) support
+  boot.kernelModules = [
+    "surface_aggregator"
+    "surface_aggregator_registry"
+    "surface_hid_core"
+    "surface_hid"
+  ];
+
+  # Ensure modules load early
+  boot.initrd.kernelModules = [ "surface_aggregator" ];
+
+  # Enable all firmware (required for Surface hardware)
+  hardware.enableRedistributableFirmware = true;
+  hardware.enableAllFirmware = true;
+
   # Surface Pen (stylus) support
   services.xserver.wacom.enable = true;
 
@@ -137,6 +152,10 @@
     SUBSYSTEM=="input", ATTRS{name}=="*IPTS*", MODE="0660", TAG+="uaccess"
     SUBSYSTEM=="input", ATTRS{name}=="*Pen*", MODE="0660", TAG+="uaccess"
     SUBSYSTEM=="input", KERNEL=="event*", ATTRS{name}=="*Touch*", MODE="0660", TAG+="uaccess"
+
+    # Surface Type Cover keyboard detection
+    SUBSYSTEM=="input", ATTRS{name}=="*Surface*", MODE="0660", TAG+="uaccess"
+    ACTION=="add", SUBSYSTEM=="hid", DRIVER=="surface_hid", RUN+="${pkgs.systemd}/bin/systemctl restart display-manager.service"
   '';
 
   # Example hwdb entry for touch calibration (adjust for your device)

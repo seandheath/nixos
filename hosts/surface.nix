@@ -22,6 +22,18 @@
   networking.hostName = "surface";
   networking.networkmanager.enable = true;
 
+  # SSH server
+  services.openssh = {
+    enable = true;
+    settings = {
+      PermitRootLogin = "no";
+      PasswordAuthentication = true;
+    };
+  };
+
+  # Open SSH port in firewall
+  networking.firewall.allowedTCPPorts = [ 22 ];
+
   # Enable Sway
   services.greetd = {
     enable = true;
