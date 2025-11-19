@@ -41,6 +41,7 @@
     enable = true;
     package = pkgs.iio-sensor-proxy;
   };
+  hardware.microsoft-surface.kernelVersion = "stable";
 
   # Surface Pen (stylus) support
   services.xserver.wacom.enable = true;
