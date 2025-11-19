@@ -440,7 +440,6 @@
   programs.light.enable = true;
   
   # Sound for touch feedback
-  sound.enable = true;
   hardware.pulseaudio.enable = false;
   services.pipewire = {
     enable = true;
