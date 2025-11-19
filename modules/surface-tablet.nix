@@ -58,11 +58,10 @@
   };
 
   # Disk swap as fallback
-  #swapDevices = [{
-    #device = "/var/lib/swapfile";
-    #size = 4 * 1024;  # 4GB
-    #priority = 5;     # Lower than zram
-  #}];
+  swapDevices = [{
+    device = "/dev/nvme0n1p3";
+    priority = 5;     # Lower than zram
+  }];
 
   # Kernel memory management for low-RAM systems
   boot.kernel.sysctl = {
