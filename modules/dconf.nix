@@ -32,6 +32,7 @@
           font-hinting = "slight";
           font-antialiasing = "grayscale";
           gtk-theme = "Adwaita-dark";
+          text-scaling-factor = mkDouble 1.0;
         };
         "org/gnome/desktop/sound" = {
           allow-volume-above-100-percent = true;
@@ -52,6 +53,9 @@
         "org/gnome/desktop/peripherals/touchpad" = {
           tap-to-click = true;
           natural-scroll = true;
+        };
+        "org/gnome/desktop/a11y/applications" = {
+          screen-keyboard-enabled = true;
         };
         "org/gnome/desktop/wm/keybindings" = {
           move-to-workspace-left = [ "<Primary><Shift><Alt>Left" ];

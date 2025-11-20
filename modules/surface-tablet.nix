@@ -107,7 +107,6 @@
   environment.systemPackages = with pkgs; [
     # Browsers optimized for mobile
     firefox
-    epiphany             # GNOME Web browser, scales well
 
     # Terminal and basic apps
     gnome-terminal
@@ -123,7 +122,6 @@
     # Note-taking and PDF apps
     rnote                 # Handwriting and note-taking
     xournalpp            # PDF annotation with stylus support
-    koreader             # E-book reader
 
     # Drawing and creative apps
     drawing              # Simple drawing app
@@ -150,16 +148,14 @@
     wtype              # Wayland xdotool alternative
     ydotool            # Generic input automation
 
-    # Screenshot tools
-    grim
-    slurp
-    swappy             # Screenshot editor
-
     # Waydroid
     waydroid
 
     # Touch gestures
     touchegg
+
+    # On-screen keyboard
+    onboard
   ];
 
   # Power management commands for suspend/resume
@@ -187,18 +183,6 @@
     SUBSYSTEM=="input", ATTRS{name}=="*Surface*", MODE="0660", TAG+="uaccess"
     ACTION=="add", SUBSYSTEM=="hid", DRIVER=="surface_hid", RUN+="${pkgs.systemd}/bin/systemctl restart display-manager.service"
   '';
-
-  # Example hwdb entry for touch calibration (adjust for your device)
-  # services.udev.extraHwdb = ''
-  #   evdev:input:b0003v045Ep*
-  #    LIBINPUT_CALIBRATION_MATRIX=1.0 0.0 0.0 0.0 1.0 0.0
-  # '';
-
-  # Example orientation matrix for auto-rotation (adjust for your Surface model)
-  # services.udev.extraHwdb = ''
-  #   sensor:modalias:acpi:INVN6500*:dmi:*svnMicrosoft*Corporation*:*pnSurface*Pro*
-  #    ACCEL_MOUNT_MATRIX=0, 1, 0; -1, 0, 0; 0, 0, 1
-  # '';
 
   # Waydroid - Android container for running Android apps on tablet
   virtualisation.waydroid.enable = true;
@@ -326,6 +310,17 @@
         </gesture>
       </application>
     </touchégg>
+  '';
+
+  # Auto-start Onboard keyboard
+  environment.etc."xdg/autostart/onboard-autostart.desktop".text = ''
+    [Desktop Entry]
+    Type=Application
+    Name=Onboard
+    Comment=On-screen keyboard
+    Exec=onboard --startup-delay=2
+    X-GNOME-Autostart-enabled=true
+    NoDisplay=true
   '';
 
   # Bluetooth support for tablet peripherals
