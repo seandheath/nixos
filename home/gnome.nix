@@ -31,6 +31,7 @@
     };
     "org/gnome/shell" = {
       disable-user-extensions = false;
+      disable-extension-version-validation = true;
       enabled-extensions = [
         "appindicatorsupport@rgcjonas.gmail.com"
         "gTile@vibou"
