@@ -318,9 +318,38 @@
     Type=Application
     Name=Onboard
     Comment=On-screen keyboard
-    Exec=onboard --startup-delay=2
+    Exec=onboard --startup-delay=2 --size=1000x300 --dock-expand
     X-GNOME-Autostart-enabled=true
     NoDisplay=true
+  '';
+
+  # Onboard keyboard configuration - dock at bottom
+  environment.etc."xdg/onboard/onboard-defaults.conf".text = ''
+    [main]
+    layout=Compact
+    theme=Nightshade
+    key-label-font=Ubuntu
+    key-label-overrides=
+
+    [window]
+    docking-enabled=True
+    docking-edge=bottom
+    docking-shrink-workarea=True
+    window-state-sticky=True
+    window-decoration=False
+    force-to-top=True
+    keep-aspect-ratio=False
+    transparency=0
+
+    [window.landscape]
+    x=0
+    y=768
+    width=1024
+    height=300
+
+    [auto-show]
+    enabled=True
+    hide-on-key-press=True
   '';
 
   # Bluetooth support for tablet peripherals
