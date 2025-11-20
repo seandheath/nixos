@@ -187,7 +187,6 @@ in
       dash-to-dock         # Touch-friendly dock
       appindicator         # Tray icons
       gsconnect            # Phone integration
-      gesture-improvements # Better touch gestures
     ] ++ (with pkgs; [
       # Additional touch-friendly applications
       gnome-tweaks
