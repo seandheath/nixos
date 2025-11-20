@@ -35,16 +35,5 @@
   # Open SSH port in firewall
   networking.firewall.allowedTCPPorts = [ 22 ];
 
-  # Enable Sway
-  services.greetd = {
-    enable = true;
-    settings = {
-      default_session = {
-        command = "${pkgs.sway}/bin/sway";
-        user = "sheath";
-      };
-    };
-  };
-
   system.stateVersion = "25.05";
 }
