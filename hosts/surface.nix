@@ -7,6 +7,7 @@
     ../modules/surface-tablet.nix
     ../modules/surface-gnome.nix
     ../modules/auto-update.nix
+    ../modules/dconf.nix
     ../home/core.nix
   ];
 
