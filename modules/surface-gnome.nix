@@ -217,6 +217,9 @@ in
 
       # Browser
       firefox
+
+      # Waydroid GUI
+      waydroid
     ]);
 
     # GTK configuration
@@ -341,4 +344,21 @@ in
 
   # Sushi for file previews
   services.gnome.sushi.enable = true;
+
+  # Waydroid - Android container for running Android apps
+  virtualisation.waydroid.enable = true;
+
+  # Kernel modules required for Waydroid
+  boot.kernelModules = [ "binder_linux" "ashmem_linux" ];
+
+  # Add binder devices for Waydroid
+  boot.extraModprobeConfig = ''
+    options binder_linux devices="binder,hwbinder,vndbinder"
+  '';
+
+  # LXC for Waydroid container support
+  virtualisation.lxc.enable = true;
+
+  # Networking for Waydroid
+  networking.firewall.trustedInterfaces = [ "waydroid0" ];
 }
