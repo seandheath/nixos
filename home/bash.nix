@@ -15,31 +15,31 @@
       
       # ALIASES
       alias ns="nix search nixpkgs"
-            alias dmesg="dmesg --color=always"
+      alias dmesg="dmesg --color=always"
       
-            nr() {
-              local target_host
-              if [[ "$HOSTNAME" == "nixos" ]]; then
-                target_host=$(ls -1 /home/sheath/nixos/hosts | sed 's/\.nix$//' | fzf)
-              else
-                target_host=$HOSTNAME
-              fi
-              if [[ -n "$target_host" ]]; then
-                sudo nixos-rebuild switch --flake /home/sheath/nixos#"$target_host"
-              fi
-            }
+      nr() {
+        local target_host
+        if [[ "$HOSTNAME" == "nixos" ]]; then
+          target_host=$(ls -1 /home/sheath/nixos/hosts | sed 's/\.nix$//' | fzf)
+        else
+          target_host=$HOSTNAME
+        fi
+        if [[ -n "$target_host" ]]; then
+          sudo nixos-rebuild switch --flake --no-write-lock-file /home/sheath/nixos#"$target_host"
+        fi
+      }
       
-            nb() {
-              local target_host
-              if [[ "$HOSTNAME" == "nixos" ]]; then
-                target_host=$(ls -1 /home/sheath/nixos/hosts | sed 's/\.nix$//' | fzf)
-              else
-                target_host=$HOSTNAME
-              fi
-              if [[ -n "$target_host" ]]; then
-                sudo nixos-rebuild boot --flake /home/sheath/nixos#"$target_host"
-              fi
-            }
+      nb() {
+        local target_host
+        if [[ "$HOSTNAME" == "nixos" ]]; then
+          target_host=$(ls -1 /home/sheath/nixos/hosts | sed 's/\.nix$//' | fzf)
+        else
+          target_host=$HOSTNAME
+        fi
+        if [[ -n "$target_host" ]]; then
+          sudo nixos-rebuild boot --flake --no-write-lock-file /home/sheath/nixos#"$target_host"
+        fi
+      }
       
             bind 'set show-all-if-ambiguous on'
             bind 'TAB:menu-complete'
