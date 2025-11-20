@@ -55,7 +55,7 @@
           natural-scroll = true;
         };
         "org/gnome/desktop/a11y/applications" = {
-          screen-keyboard-enabled = true;
+          screen-keyboard-enabled = false;
         };
         "org/gnome/desktop/wm/keybindings" = {
           move-to-workspace-left = [ "<Primary><Shift><Alt>Left" ];
