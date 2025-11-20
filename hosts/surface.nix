@@ -1,14 +1,11 @@
-# Surface tablet configuration with Sway
+# Surface tablet configuration with GNOME
 { lib, pkgs, config, ... }:
 
 {
   imports = [
     ../hardware/surface.nix
     ../modules/surface-tablet.nix
-    ../modules/surface-gnome.nix
-    ../modules/auto-update.nix
-    ../modules/dconf.nix
-    ../home/core.nix
+    ../modules/workstation.nix
   ];
 
   # Boot configuration for Surface hardware

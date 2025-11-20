@@ -48,6 +48,9 @@
     "surface_aggregator_registry"
     "surface_hid_core"
     "surface_hid"
+    # Waydroid kernel modules
+    "binder_linux"
+    "ashmem_linux"
   ];
 
   # Ensure modules load early
@@ -97,6 +100,7 @@
   environment.variables = {
     QT_QPA_PLATFORM = "wayland";
     MOZ_ENABLE_WAYLAND = "1";
+    GDK_BACKEND = "wayland";
   };
 
   # Essential tablet applications
@@ -140,6 +144,22 @@
     # GTK themes for better integration
     adwaita-icon-theme
     gnome-themes-extra
+
+    # Wayland utilities
+    wl-clipboard
+    wtype              # Wayland xdotool alternative
+    ydotool            # Generic input automation
+
+    # Screenshot tools
+    grim
+    slurp
+    swappy             # Screenshot editor
+
+    # Waydroid
+    waydroid
+
+    # Touch gestures
+    touchegg
   ];
 
   # Power management commands for suspend/resume
@@ -179,4 +199,31 @@
   #   sensor:modalias:acpi:INVN6500*:dmi:*svnMicrosoft*Corporation*:*pnSurface*Pro*
   #    ACCEL_MOUNT_MATRIX=0, 1, 0; -1, 0, 0; 0, 0, 1
   # '';
+
+  # Waydroid - Android container for running Android apps on tablet
+  virtualisation.waydroid.enable = true;
+  virtualisation.lxc.enable = true;
+
+  # Kernel modules required for Waydroid
+  boot.extraModprobeConfig = ''
+    options binder_linux devices="binder,hwbinder,vndbinder"
+  '';
+
+  # Networking for Waydroid
+  networking.firewall.trustedInterfaces = [ "waydroid0" ];
+
+  # Enable touchegg service for advanced touch gestures
+  services.touchegg.enable = true;
+
+  # Bluetooth support for tablet peripherals
+  hardware.bluetooth = {
+    enable = true;
+    powerOnBoot = true;
+    settings = {
+      General = {
+        Enable = "Source,Sink,Media,Socket";
+        Experimental = true;
+      };
+    };
+  };
 }
