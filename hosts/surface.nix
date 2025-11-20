@@ -7,6 +7,7 @@
     ../modules/surface-tablet.nix
     ../modules/surface-gnome.nix
     ../modules/auto-update.nix
+    ../home/core.nix
   ];
 
   # Boot configuration for Surface hardware
