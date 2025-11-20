@@ -96,7 +96,6 @@
   # Wayland environment variables
   environment.variables = {
     QT_QPA_PLATFORM = "wayland";
-    GDK_BACKEND = "wayland";
     MOZ_ENABLE_WAYLAND = "1";
   };
 
