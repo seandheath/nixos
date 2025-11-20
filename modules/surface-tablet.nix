@@ -215,6 +215,119 @@
   # Enable touchegg service for advanced touch gestures
   services.touchegg.enable = true;
 
+  # Touchegg configuration for custom gestures
+  environment.etc."touchegg/touchegg.conf".text = ''
+    <touchégg>
+      <settings>
+        <property name="animation_delay">150</property>
+        <property name="action_execute_threshold">20</property>
+        <property name="color">auto</property>
+        <property name="borderColor">auto</property>
+      </settings>
+
+      <application name="All">
+        <!-- 2-finger swipe for window tiling -->
+        <gesture type="SWIPE" fingers="2" direction="LEFT">
+          <action type="SEND_KEYS">
+            <repeat>false</repeat>
+            <modifiers>Super_L</modifiers>
+            <keys>Left</keys>
+            <on>begin</on>
+          </action>
+        </gesture>
+
+        <gesture type="SWIPE" fingers="2" direction="RIGHT">
+          <action type="SEND_KEYS">
+            <repeat>false</repeat>
+            <modifiers>Super_L</modifiers>
+            <keys>Right</keys>
+            <on>begin</on>
+          </action>
+        </gesture>
+
+        <!-- 3-finger swipe gestures -->
+        <gesture type="SWIPE" fingers="3" direction="UP">
+          <action type="MAXIMIZE_RESTORE_WINDOW">
+            <animate>true</animate>
+          </action>
+        </gesture>
+
+        <gesture type="SWIPE" fingers="3" direction="DOWN">
+          <action type="MINIMIZE_WINDOW">
+            <animate>true</animate>
+          </action>
+        </gesture>
+
+        <gesture type="SWIPE" fingers="3" direction="LEFT">
+          <action type="CHANGE_DESKTOP">
+            <direction>next</direction>
+            <animate>true</animate>
+            <animationPosition>right</animationPosition>
+          </action>
+        </gesture>
+
+        <gesture type="SWIPE" fingers="3" direction="RIGHT">
+          <action type="CHANGE_DESKTOP">
+            <direction>previous</direction>
+            <animate>true</animate>
+            <animationPosition>left</animationPosition>
+          </action>
+        </gesture>
+
+        <!-- 4-finger swipe gestures -->
+        <gesture type="SWIPE" fingers="4" direction="UP">
+          <action type="SEND_KEYS">
+            <repeat>false</repeat>
+            <modifiers>Super_L</modifiers>
+            <keys>s</keys>
+            <on>begin</on>
+          </action>
+        </gesture>
+
+        <gesture type="SWIPE" fingers="4" direction="DOWN">
+          <action type="SHOW_DESKTOP">
+            <animate>true</animate>
+          </action>
+        </gesture>
+
+        <!-- 4-finger pinch gestures -->
+        <gesture type="PINCH" fingers="4" direction="IN">
+          <action type="CLOSE_WINDOW">
+            <animate>true</animate>
+            <color>F38BA8</color>
+            <borderColor>F38BA8</borderColor>
+          </action>
+        </gesture>
+
+        <gesture type="PINCH" fingers="4" direction="OUT">
+          <action type="SEND_KEYS">
+            <repeat>false</repeat>
+            <modifiers>Super_L</modifiers>
+            <keys>space</keys>
+            <on>begin</on>
+          </action>
+        </gesture>
+
+        <!-- 5-finger swipe for custom actions -->
+        <gesture type="SWIPE" fingers="5" direction="UP">
+          <action type="RUN_COMMAND">
+            <repeat>false</repeat>
+            <command>gnome-terminal</command>
+            <on>begin</on>
+          </action>
+        </gesture>
+
+        <gesture type="SWIPE" fingers="5" direction="DOWN">
+          <action type="RUN_COMMAND">
+            <repeat>false</repeat>
+            <command>gnome-control-center</command>
+            <on>begin</on>
+          </action>
+        </gesture>
+      </application>
+    </touchégg>
+  '';
+
   # Bluetooth support for tablet peripherals
   hardware.bluetooth = {
     enable = true;
