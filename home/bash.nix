@@ -25,46 +25,28 @@
           target_host=$HOSTNAME
         fi
         if [[ -n "$target_host" ]]; then
-          sudo nixos-rebuild switch --flake --no-write-lock-file /home/sheath/nixos#"$target_host"
+          sudo nixos-rebuild switch --no-write-lock-file --flake /home/sheath/nixos#"$target_host"
         fi
       }
       
       nb() {
         local target_host
         if [[ "$HOSTNAME" == "nixos" ]]; then
-          target_host=$(ls -1 /home/sheath/nixos/hosts | sed 's/\.nix$//' | fzf)
+        target_host=$(ls -1 /home/sheath/nixos/hosts | sed 's/\.nix$//' | fzf)
         else
-          target_host=$HOSTNAME
+        target_host=$HOSTNAME
         fi
         if [[ -n "$target_host" ]]; then
-          sudo nixos-rebuild boot --flake --no-write-lock-file /home/sheath/nixos#"$target_host"
+        sudo nixos-rebuild boot --no-write-lock-file --flake /home/sheath/nixos#"$target_host"
         fi
       }
       
-            bind 'set show-all-if-ambiguous on'
-            bind 'TAB:menu-complete'
-            bind 'set menu-complete-display-prefix on'
+      bind 'set show-all-if-ambiguous on'
+      bind 'TAB:menu-complete'
+      bind 'set menu-complete-display-prefix on'
 
       export XZ_DEFAULTS='-T0 -9'
       export EDITOR=nvim
-      #export PATH=$PATH:$HOME/go/bin/:$HOME/.cargo/bin:$HOME/.local/bin
-
-      function direnvinit {
-        if [ ! -e ./.envrc ]; then
-          echo "use nix" > .envrc
-          direnv allow
-        fi
-        if [[ ! -e shell.nix ]] && [[ ! -e default.nix ]]; then
-      cat > default.nix <<'EOF'
-      with import <nixpkgs> {};
-      mkShell {
-        nativeBuildInputs = [
-          bashInteractive
-        ];
-      }
-      EOF
-        fi
-      }
 
       # FZF
       if command -v fzf-share >/dev/null; then
