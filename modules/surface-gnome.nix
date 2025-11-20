@@ -313,7 +313,7 @@ in
     cantarell-fonts
     dejavu_fonts
     noto-fonts
-    noto-fonts-emoji
+    noto-fonts-color-emoji
     source-code-pro
     liberation_ttf
   ];
