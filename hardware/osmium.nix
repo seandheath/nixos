@@ -13,19 +13,37 @@
   boot.kernelModules = [ "kvm-intel" ];
   boot.extraModulePackages = [ ];
   boot.blacklistedKernelModules = [ "spd5118" ];
-  boot.kernelParams = [ "nvme_core.default_ps_max_latency_us=0" ];
+  boot.kernelParams = [
+    "nvme_core.default_ps_max_latency_us=0"
+    "scsi_mod.use_blk_mq=1"
+    "mitigations=off"
+    # Fix i915 GPU hangs with Nautilus and other applications
+    #"i915.enable_psr=0"       # Disable Panel Self Refresh (common cause of hangs)
+    #"i915.enable_fbc=0"       # Disable framebuffer compression
+    #"i915.enable_guc=0"
+  ];
+
+  # Optimize I/O scheduler for NVMe
+  services.udev.extraRules = ''
+    ACTION=="add|change", KERNEL=="nvme[0-9]n[0-9]", ATTR{queue/scheduler}="none"
+  '';
 
   fileSystems."/" =
     { device = "/dev/disk/by-uuid/2ba22a8f-7299-45c8-a4ca-6fd1a087c629";
       fsType = "ext4";
+      options = [ "noatime" "commit=60" ];
     };
 
-  boot.initrd.luks.devices."luks-a6ea78d6-7a09-4994-b09c-48863e41e765".device = "/dev/disk/by-uuid/a6ea78d6-7a09-4994-b09c-48863e41e765";
+  boot.initrd.luks.devices."luks-a6ea78d6-7a09-4994-b09c-48863e41e765" = {
+    device = "/dev/disk/by-uuid/a6ea78d6-7a09-4994-b09c-48863e41e765";
+    bypassWorkqueues = true;  # Better performance on modern CPUs with AES-NI
+    allowDiscards = true;     # Enable TRIM for SSD longevity
+  };
 
   fileSystems."/boot" =
     { device = "/dev/disk/by-uuid/96EB-2493";
       fsType = "vfat";
-      options = [ "fmask=0077" "dmask=0077" ];
+      options = [ "fmask=0077" "dmask=0077" "noatime" ];
     };
 
   swapDevices =

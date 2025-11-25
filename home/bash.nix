@@ -16,6 +16,38 @@
       # ALIASES
       alias ns="nix search nixpkgs"
       alias dmesg="dmesg --color=always"
+
+      # FUNCTIONS
+      srmd() {
+          local dir="$1"
+          
+          if [[ -z "$dir" ]]; then
+              echo "Usage: srm_dir <directory>"
+              return 1
+          fi
+          
+          if [[ ! -d "$dir" ]]; then
+              echo "Error: $dir is not a directory"
+              return 1
+          fi
+          
+          # Confirmation prompt
+          read -p "Recursively deleting all files in $dir - are you sure? [y/N]: " -n 1 -r
+          echo
+          if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+              echo "Aborted."
+              return 0
+          fi
+          
+          echo "Securely deleting all files in $dir..."
+          
+          # Securely delete all files in parallel (auto-detect cores)
+          find "$dir" -type f -print0 | parallel -0 --bar srm {}
+          
+          # Remove empty directories bottom-up, then the parent
+          echo "Removing directory structure..."
+          srm -rf "$dir"
+      }
       
       nr() {
         local target_host

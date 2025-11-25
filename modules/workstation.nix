@@ -30,6 +30,7 @@
     gnumake
     nodejs
     gcc
+    parallel
     
     # 3D printing and CAD
     prusa-slicer
@@ -110,6 +111,15 @@
     alsa.enable = true;
     alsa.support32Bit = true;
     pulse.enable = true;
+    # Low-latency configuration for gaming
+    extraConfig.pipewire."10-low-latency" = {
+      "context.properties" = {
+        "default.clock.rate" = 48000;
+        "default.clock.quantum" = 256;
+        "default.clock.min-quantum" = 256;
+        "default.clock.max-quantum" = 512;
+      };
+    };
   };
   
   # Wayland support for Electron apps

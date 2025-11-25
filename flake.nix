@@ -17,9 +17,10 @@
       url = "github:ryantm/agenix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    chaotic.url = "github:chaotic-cx/nyx/nyxpkgs-unstable";
   };
 
-  outputs = { self, nixpkgs, nixos-hardware, home-manager, sops-nix, agenix, ... }@inputs:
+  outputs = { self, nixpkgs, nixos-hardware, home-manager, sops-nix, agenix, chaotic, ... }@inputs:
     let
       commonModules = [
         home-manager.nixosModules.home-manager
@@ -40,7 +41,10 @@
       osmium = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
         specialArgs = { inherit inputs; lib = nixpkgs.lib; };
-        modules = [ ./hosts/osmium.nix ] ++ commonModules;
+        modules = [
+          ./hosts/osmium.nix
+          chaotic.nixosModules.default
+        ] ++ commonModules;
       };
       pentest-vm = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";

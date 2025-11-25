@@ -20,7 +20,7 @@
   boot.initrd.luks.devices."luks-b1189935-07c6-416d-9201-b555aa272104".device = "/dev/disk/by-uuid/b1189935-07c6-416d-9201-b555aa272104";
 
   # Kernel
-  boot.kernelPackages = pkgs.linuxPackages_latest;
+  boot.kernelPackages = pkgs.linuxPackages_zen;
 
   # Configuration
   time.timeZone = "America/New_York";
@@ -52,6 +52,7 @@
   # Networking
   networking.hostName = "osmium"; # Define your hostname.
   networking.networkmanager.enable = true;
+  networking.networkmanager.wifi.powersave = false;  # Disable for better gaming/streaming performance
 
   # Programs
   environment.systemPackages = with pkgs; [
@@ -63,10 +64,11 @@
   hardware = {
     enableRedistributableFirmware = true;
     nvidia = {
+      package = config.boot.kernelPackages.nvidiaPackages.beta;
       open = false;
       nvidiaSettings = false;
       modesetting.enable = true;
-      powerManagement.enable = false;
+      powerManagement.enable = true;  # Enable for better stability and battery life
       prime = {
         offload.enable = true;
         nvidiaBusId = "PCI:1:0:0";
@@ -76,11 +78,47 @@
     graphics = {
       enable = true;
       enable32Bit = true;
+      extraPackages = with pkgs; [
+        intel-media-driver  # VAAPI for Intel (newer)
+        intel-vaapi-driver  # VAAPI for Intel (older - renamed from vaapiIntel)
+        libva-vdpau-driver  # VDPAU backend for VAAPI
+        libvdpau-va-gl
+        nvidia-vaapi-driver  # VAAPI for NVIDIA
+      ];
     };
     system76.enableAll = true;
   };
 
+  # Force NVIDIA for all Vulkan operations (avoid Intel Vulkan driver hangs)
+  environment.sessionVariables = {
+    VK_ICD_FILENAMES = "/run/opengl-driver/share/vulkan/icd.d/nvidia_icd.x86_64.json";
+  };
+
+  # Services
+  services.system76-scheduler.enable = true;  # Optimized process scheduling for System76 hardware
+  services.fstrim = {
+    enable = true;
+    interval = "weekly";  # Maintain SSD performance
+  };
+
   services.logind.settings.Login.HandleLidSwitchExternalPower = "ignore";
+
+  # GameMode configuration
+  programs.gamemode = {
+    settings = {
+      general = {
+        renice = 10;
+      };
+      gpu = {
+        apply_gpu_optimisations = "accept-responsibility";
+        gpu_device = 0;
+      };
+      custom = {
+        start = "${pkgs.libnotify}/bin/notify-send 'GameMode started'";
+        end = "${pkgs.libnotify}/bin/notify-send 'GameMode ended'";
+      };
+    };
+  };
 
   system.stateVersion = "25.05";
 }
