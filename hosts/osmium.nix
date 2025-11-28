@@ -66,7 +66,7 @@
     nvidia = {
       package = config.boot.kernelPackages.nvidiaPackages.beta;
       open = false;
-      nvidiaSettings = false;
+      nvidiaSettings = true;
       modesetting.enable = true;
       powerManagement.enable = true;  # Enable for better stability and battery life
       prime = {
