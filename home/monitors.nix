@@ -3,6 +3,7 @@
 let
   pythonWithDbus = pkgs.python3.withPackages (ps: with ps; [
     dbus-python
+    pygobject3
   ]);
 
   dock-monitors-script = pkgs.writeText "dock-monitors.py" ''
@@ -22,18 +23,18 @@ def get_display_config():
 def find_monitors(resources):
     """Find our specific monitors by serial number"""
     serial, monitors, logical_monitors, props = resources
-    
+
     samsung_monitor = None
     hp_left_monitor = None  # CNK71609WJ
     hp_right_monitor = None  # CNK6200PD8
-    
+
     for monitor in monitors:
         connector, vendor, product, serial = monitor[0]
         modes = monitor[1]
         props = monitor[2]
-        
+
         print(f"Found monitor: {vendor} {product} ({serial}) on {connector}")
-        
+
         if vendor == 'SAM' and product == 'LC34G55T':
             samsung_monitor = (connector, monitor)
         elif vendor == 'HWP' and product == 'HP Z27x':
@@ -41,18 +42,18 @@ def find_monitors(resources):
                 hp_right_monitor = (connector, monitor)  # PD8 is actually on the right
             elif serial == 'CNK71609WJ':
                 hp_left_monitor = (connector, monitor)   # 9WJ is actually on the left
-    
+
     return samsung_monitor, hp_left_monitor, hp_right_monitor
 
 def find_best_mode(modes, width, height, refresh=None):
     """Find the best matching mode for given resolution"""
     best_mode = None
     best_refresh = 0
-    
+
     for i, mode in enumerate(modes):
         mode_id, mode_width, mode_height, mode_refresh = mode[0], mode[1], mode[2], mode[3]
         mode_props = mode[6] if len(mode) > 6 else {}
-        
+
         if mode_width == width and mode_height == height:
             # If specific refresh rate requested, try to match it
             if refresh and abs(mode_refresh - refresh) < 1:
@@ -61,14 +62,14 @@ def find_best_mode(modes, width, height, refresh=None):
             if mode_refresh > best_refresh:
                 best_mode = i
                 best_refresh = mode_refresh
-    
+
     return best_mode
 
 def configure_triple_monitors():
     """Configure triple monitor setup with rotated side monitors"""
-    
+
     display_config = get_display_config()
-    
+
     # Get current state
     result = display_config.GetCurrentState()
     serial = result[0]
@@ -76,27 +77,27 @@ def configure_triple_monitors():
     logical_monitors = result[2]
     properties = result[3]
     resources = (serial, monitors, logical_monitors, properties)
-    
+
     # Find our monitors
     samsung, hp_left, hp_right = find_monitors(resources)
-    
+
     if not all([samsung, hp_left, hp_right]):
         print("Error: Could not find all three monitors!")
         print(f"  Samsung QN90D: {'Found' if samsung else 'Not found'}")
         print(f"  HP Z27x (9WJ - Left): {'Found' if hp_left else 'Not found'}")
         print(f"  HP Z27x (PD8 - Right): {'Found' if hp_right else 'Not found'}")
         return False
-    
+
     # Build logical monitor configuration
     logical_monitors = []
-    
+
     # Calculate vertical centering
     # Center monitor: 1440 pixels tall
     # Side monitors when rotated: 2560 pixels tall
     # Manually aligned to Y=759 for perfect centering
     side_y = 0
     center_y = 759
-    
+
     # Left monitor (HP Z27x CNK6200PD8) - rotated right at position 0,0
     # When rotated, 2560x1440 becomes 1440x2560
     left_connector, left_monitor = hp_right  # CNK6200PD8 is actually on the left
@@ -114,15 +115,15 @@ def configure_triple_monitors():
             [(left_connector, mode_id, {})],  # (connector, mode_id, properties)
         ))
         print(f"Configured left monitor: {left_connector} at 0,{side_y} (rotated right) - mode: {mode_id}")
-    
+
     # Center monitor (Samsung LC34G55T) - primary at position 1440,759 (vertically centered)
     center_connector, center_monitor = samsung
     center_modes = center_monitor[1]
-    # Try for 100Hz first, fall back to 60Hz
-    center_mode_idx = find_best_mode(center_modes, 3440, 1440, 100)
+    # Try for 165Hz first, fall back to 60Hz
+    center_mode_idx = find_best_mode(center_modes, 3440, 1440, 165)
     if center_mode_idx is None:
         center_mode_idx = find_best_mode(center_modes, 3440, 1440, 60)
-    
+
     if center_mode_idx is not None:
         mode = center_modes[center_mode_idx]
         mode_id = mode[0]
@@ -135,7 +136,7 @@ def configure_triple_monitors():
             [(center_connector, mode_id, {})],  # (connector, mode_id, properties)
         ))
         print(f"Configured center monitor: {center_connector} at 1440,{center_y} (primary, perfectly centered) - mode: {mode_id}")
-    
+
     # Right monitor (HP Z27x CNK71609WJ) - rotated right at position 4880,0
     right_connector, right_monitor = hp_left  # CNK71609WJ is actually on the right
     right_modes = right_monitor[1]
@@ -152,7 +153,7 @@ def configure_triple_monitors():
             [(right_connector, mode_id, {})],  # (connector, mode_id, properties)
         ))
         print(f"Configured right monitor: {right_connector} at 4880,{side_y} (rotated right) - mode: {mode_id}")
-    
+
     # Apply configuration
     print("\nApplying monitor configuration...")
     try:
@@ -173,10 +174,10 @@ def configure_triple_monitors():
 def main():
     """Main entry point"""
     permanent = '--permanent' in sys.argv
-    
+
     print("GNOME Wayland Monitor Configuration")
     print("=" * 40)
-    
+
     if configure_triple_monitors():
         print("\nMonitor configuration completed successfully!")
     else:
@@ -186,6 +187,7 @@ def main():
 if __name__ == '__main__':
     main()
   '';
+
 in
 {
   home.packages = with pkgs; [
@@ -196,6 +198,7 @@ in
     "$HOME/.local/bin"
   ];
 
+  # Manual dock-monitors command available if needed
   home.file.".local/bin/dock-monitors" = {
     executable = true;
     text = ''

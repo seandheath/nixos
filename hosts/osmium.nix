@@ -20,7 +20,7 @@
   boot.initrd.luks.devices."luks-b1189935-07c6-416d-9201-b555aa272104".device = "/dev/disk/by-uuid/b1189935-07c6-416d-9201-b555aa272104";
 
   # Kernel
-  boot.kernelPackages = pkgs.linuxPackages_zen;
+  #boot.kernelPackages = pkgs.linuxPackages_zen;
 
   # Configuration
   time.timeZone = "America/New_York";
@@ -64,7 +64,7 @@
   hardware = {
     enableRedistributableFirmware = true;
     nvidia = {
-      package = config.boot.kernelPackages.nvidiaPackages.beta;
+      #package = config.boot.kernelPackages.nvidiaPackages.beta;
       open = false;
       nvidiaSettings = true;
       modesetting.enable = true;
@@ -105,6 +105,7 @@
 
   # GameMode configuration
   programs.gamemode = {
+    enable = true;
     settings = {
       general = {
         renice = 10;
