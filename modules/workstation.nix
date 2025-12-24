@@ -103,6 +103,14 @@
   services.mullvad-vpn.enable = true;
   services.mullvad-vpn.package = pkgs.mullvad-vpn;
   services.printing.enable = true;
+  services.printing.drivers = [ pkgs.epson-escpr2 ];
+
+  # Avahi for network printer discovery (.local hostname resolution)
+  services.avahi = {
+    enable = true;
+    nssmdns4 = true;
+    openFirewall = true;
+  };
   services.flatpak.enable = true;
   services.pulseaudio.enable = false;
   security.rtkit.enable = true;

@@ -71,9 +71,11 @@
       powerManagement.enable = true;  # Enable for better stability and battery life
       prime = {
         offload.enable = true;
+        offload.enableOffloadCmd = true;
         nvidiaBusId = "PCI:1:0:0";
         intelBusId = "PCI:0:2:0";
       };
+      powerManagement.finegrained = false;  # Disabled - causes GPU disconnection issues
     };
     graphics = {
       enable = true;
