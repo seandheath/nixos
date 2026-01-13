@@ -89,10 +89,9 @@
       prime = {
         offload.enable = true;
         offload.enableOffloadCmd = true;
-        # Bus IDs will be populated after hardware detection
-        # Run: lspci | grep -E 'VGA|3D'
-        nvidiaBusId = "PCI:1:0:0";  # Adjust after installation
-        amdgpuBusId = "PCI:0:2:0";  # Zephyrus 2025 uses AMD iGPU
+        # Bus IDs from lspci output
+        nvidiaBusId = "PCI:1:0:0";
+        intelBusId = "PCI:0:2:0";
       };
     };
     graphics = {
@@ -101,6 +100,17 @@
       extraPackages = with pkgs; [
         nvidia-vaapi-driver
       ];
+    };
+  };
+
+  # Remap Copilot key to Right Ctrl
+  services.keyd = {
+    enable = true;
+    keyboards.default = {
+      ids = [ "*" ];
+      settings.main = {
+        f23 = "clearm(shift) clearm(meta) rightcontrol";
+      };
     };
   };
 
@@ -142,5 +152,5 @@
     };
   };
 
-  system.stateVersion = "25.05";
+  system.stateVersion = "25.11";
 }
