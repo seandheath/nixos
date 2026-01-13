@@ -15,9 +15,13 @@
   # Boot
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
-  boot.kernelModules = [ "evdi" ];
-  boot.extraModulePackages = [ config.boot.kernelPackages.evdi ];
+  # DisplayLink evdi module - disabled due to framebuffer conflicts
+  # boot.kernelModules = [ "evdi" ];
+  # boot.extraModulePackages = [ config.boot.kernelPackages.evdi ];
   boot.initrd.luks.devices."luks-b1189935-07c6-416d-9201-b555aa272104".device = "/dev/disk/by-uuid/b1189935-07c6-416d-9201-b555aa272104";
+  boot.extraModprobeConfig = ''
+    options nvidia NVreg_PreserveVideoMemoryAllocations=1
+  '';
 
   # Kernel
   #boot.kernelPackages = pkgs.linuxPackages_zen;
@@ -69,6 +73,7 @@
       nvidiaSettings = true;
       modesetting.enable = true;
       powerManagement.enable = true;  # Enable for better stability and battery life
+      nvidiaPersistenced = true;  # Keep GPU initialized to prevent falling off bus
       prime = {
         offload.enable = true;
         offload.enableOffloadCmd = true;
@@ -103,7 +108,17 @@
     interval = "weekly";  # Maintain SSD performance
   };
 
-  services.logind.settings.Login.HandleLidSwitchExternalPower = "ignore";
+  # Prevent suspend when on AC power (docked)
+  services.logind = {
+    lidSwitch = "suspend";                    # Default when on battery
+    lidSwitchExternalPower = "ignore";        # Ignore lid when on AC
+    lidSwitchDocked = "ignore";               # Ignore lid when docked
+    settings.Login = {
+      HandlePowerKey = "suspend";
+      HandleSuspendKey = "suspend";
+      IdleAction = "ignore";
+    };
+  };
 
   # GameMode configuration
   programs.gamemode = {

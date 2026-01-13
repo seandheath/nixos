@@ -12,15 +12,21 @@
   boot.initrd.kernelModules = [ ];
   boot.kernelModules = [ "kvm-intel" ];
   boot.extraModulePackages = [ ];
-  boot.blacklistedKernelModules = [ "spd5118" ];
+  boot.blacklistedKernelModules = [ "spd5118" "framebuffer_coreboot" ];
   boot.kernelParams = [
     "nvme_core.default_ps_max_latency_us=0"
     "scsi_mod.use_blk_mq=1"
     "mitigations=off"
+    "pcie_aspm=off"  # Prevent NVIDIA GPU falling off bus (Xid 79)
     # Fix i915 GPU hangs with Nautilus and other applications
     #"i915.enable_psr=0"       # Disable Panel Self Refresh (common cause of hangs)
     #"i915.enable_fbc=0"       # Disable framebuffer compression
     #"i915.enable_guc=0"
+    # WiFi stability improvements
+    "iwlwifi.power_save=0"       # Disable WiFi power saving
+    "iwlwifi.uapsd_disable=1"    # Disable U-APSD (causes missed beacons)
+    # USB xHCI resume fix
+    "usbcore.autosuspend=-1"     # Disable USB autosuspend (fixes resume issues)
   ];
 
   # Optimize I/O scheduler for NVMe

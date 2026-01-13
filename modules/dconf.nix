@@ -70,6 +70,7 @@
         };
         "org/gnome/settings-daemon/plugins/power" = {
           sleep-inactive-ac-type = "nothing";
+          sleep-inactive-battery-type = "nothing";
         };
         "org/gnome/settings-daemon/plugins/media-keys" = {
           custom-keybindings = [

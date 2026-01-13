@@ -12,6 +12,8 @@
     # Document creation and processing
     tectonic
     pandoc
+    recoll
+    evince
     
     # Communication and collaboration
     element-desktop
@@ -21,7 +23,7 @@
     
     # Development tools
     hexo-cli
-    gemini-cli 
+    # gemini-cli  # temporarily disabled - broken npm cache in nixpkgs
     claude-code 
     git
     python3
@@ -62,7 +64,7 @@
     srm
     
     # Gaming
-    blightmud
+    # blightmud  # temporarily disabled - build failure with gcc 15
     (lutris.override {
       extraLibraries = pkgs: [
         libgudev
