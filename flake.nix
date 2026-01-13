@@ -17,10 +17,15 @@
       url = "github:ryantm/agenix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    impermanence.url = "github:nix-community/impermanence";
+    disko = {
+      url = "github:nix-community/disko";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     chaotic.url = "github:chaotic-cx/nyx/nyxpkgs-unstable";
   };
 
-  outputs = { self, nixpkgs, nixos-hardware, home-manager, sops-nix, agenix, chaotic, ... }@inputs:
+  outputs = { self, nixpkgs, nixos-hardware, home-manager, sops-nix, agenix, impermanence, disko, chaotic, ... }@inputs:
     let
       commonModules = [
         home-manager.nixosModules.home-manager
@@ -57,6 +62,16 @@
         modules = [
           ./hosts/surface.nix
           nixos-hardware.nixosModules.microsoft-surface-go
+        ] ++ commonModules;
+      };
+      sulphur = nixpkgs.lib.nixosSystem {
+        system = "x86_64-linux";
+        specialArgs = { inherit inputs; lib = nixpkgs.lib; };
+        modules = [
+          ./hosts/sulphur.nix
+          nixos-hardware.nixosModules.asus-zephyrus-gu605my
+          impermanence.nixosModules.impermanence
+          chaotic.nixosModules.default
         ] ++ commonModules;
       };
     };
