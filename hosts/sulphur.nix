@@ -88,30 +88,52 @@
     };
   };
 
-  # Remap Copilot key to Right Ctrl
+  # Remap Copilot key (sends shift+meta+f23 simultaneously) to Ctrl layer
+  # The combo activates a control layer instead of outputting a key directly
   services.keyd = {
     enable = true;
     keyboards.default = {
       ids = [ "*" ];
       settings.main = {
-        f23 = "clearm(shift) clearm(meta) rightcontrol";
+        "leftshift+leftmeta" = "layer(control)";
       };
     };
   };
+
+  # Touchpad configuration with palm rejection
+  services.libinput = {
+    enable = true;
+    touchpad = {
+      tapping = true;
+      naturalScrolling = true;
+      disableWhileTyping = true;
+    };
+  };
+
+  # Quirks for ASUS touchpad palm detection
+  # Lower thresholds = more aggressive palm rejection
+  # Debug with: sudo libinput record /dev/input/event5 | head -200
+  environment.etc."libinput/local-overrides.quirks".text = ''
+    [ASUS Touchpad]
+    MatchUdevType=touchpad
+    MatchName=*ASUF1209*
+    AttrPalmSizeThreshold=50
+    AttrPalmPressureThreshold=70
+    AttrThumbSizeThreshold=40
+    AttrThumbPressureThreshold=60
+  '';
 
   # Services
   services.fwupd.enable = true;
 
   # Prevent suspend when on AC power (docked)
-  services.logind = {
-    lidSwitch = "suspend";
-    lidSwitchExternalPower = "ignore";
-    lidSwitchDocked = "ignore";
-    settings.Login = {
-      HandlePowerKey = "suspend";
-      HandleSuspendKey = "suspend";
-      IdleAction = "ignore";
-    };
+  services.logind.settings.Login = {
+    HandleLidSwitch = "suspend";
+    HandleLidSwitchExternalPower = "ignore";
+    HandleLidSwitchDocked = "ignore";
+    HandlePowerKey = "suspend";
+    HandleSuspendKey = "suspend";
+    IdleAction = "ignore";
   };
 
   # GameMode configuration

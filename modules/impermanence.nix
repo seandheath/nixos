@@ -82,12 +82,6 @@
   users.users.sheath.hashedPasswordFile = "/persist/secrets/sheath-password";
   users.users.root.hashedPasswordFile = "/persist/secrets/root-password";
 
-  # SSH host keys from persist
-  services.openssh.hostKeys = [
-    { path = "/persist/etc/ssh/ssh_host_ed25519_key"; type = "ed25519"; }
-    { path = "/persist/etc/ssh/ssh_host_rsa_key"; type = "rsa"; bits = 4096; }
-  ];
-
   # Btrfs maintenance
   services.btrfs.autoScrub = {
     enable = true;

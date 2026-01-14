@@ -62,6 +62,9 @@
     sops
     age
     srm
+    keyd
+    evtest
+    libinput
     
     # Gaming
     # blightmud  # temporarily disabled - build failure with gcc 15
