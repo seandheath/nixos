@@ -105,6 +105,7 @@
   
   # Services
   services.mullvad-vpn.enable = true;
+  services.mullvad-vpn.package = pkgs.mullvad-vpn;
   services.printing.enable = true;
   services.printing.drivers = [ pkgs.epson-escpr2 ];
 

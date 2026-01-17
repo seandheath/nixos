@@ -110,9 +110,9 @@
     };
   };
 
-  # Quirks for ASUS touchpad palm detection
+  # Quirks for ASUS touchpad palm detection and keyd integration
   # Lower thresholds = more aggressive palm rejection
-  # Debug with: sudo libinput record /dev/input/event5 | head -200
+  # keyd virtual keyboard must be marked as internal for DWT to work
   environment.etc."libinput/local-overrides.quirks".text = ''
     [ASUS Touchpad]
     MatchUdevType=touchpad
@@ -121,6 +121,11 @@
     AttrPalmPressureThreshold=70
     AttrThumbSizeThreshold=40
     AttrThumbPressureThreshold=60
+
+    [Keyd Virtual Keyboard]
+    MatchUdevType=keyboard
+    MatchName=keyd virtual keyboard
+    AttrKeyboardIntegration=internal
   '';
 
   # Services
