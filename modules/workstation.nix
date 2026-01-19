@@ -65,6 +65,7 @@
     keyd
     evtest
     libinput
+    mullvad-vpn
     
     # Gaming
     # blightmud  # temporarily disabled - build failure with gcc 15
@@ -105,7 +106,6 @@
   
   # Services
   services.mullvad-vpn.enable = true;
-  services.mullvad-vpn.package = pkgs.mullvad-vpn;
   services.printing.enable = true;
   services.printing.drivers = [ pkgs.epson-escpr2 ];
 
