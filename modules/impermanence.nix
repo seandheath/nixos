@@ -51,6 +51,7 @@
       "/var/lib/power-profiles-daemon"          # Power profile state
       "/var/lib/flatpak"                        # Flatpak applications
       "/var/lib/mullvad-vpn"                    # Mullvad VPN state
+      "/etc/mullvad-vpn"                        # Mullvad VPN account/settings
 
       # ASUS-specific
       "/etc/asusd"                              # asusctl configuration
