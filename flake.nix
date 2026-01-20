@@ -23,9 +23,13 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     chaotic.url = "github:chaotic-cx/nyx/nyxpkgs-unstable";
+    nix-gaming = {
+      url = "github:fufexan/nix-gaming";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { self, nixpkgs, nixos-hardware, home-manager, sops-nix, agenix, impermanence, disko, chaotic, ... }@inputs:
+  outputs = { self, nixpkgs, nixos-hardware, home-manager, sops-nix, agenix, impermanence, disko, chaotic, nix-gaming, ... }@inputs:
     let
       commonModules = [
         home-manager.nixosModules.home-manager

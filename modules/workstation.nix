@@ -56,7 +56,6 @@
     btop-cuda
     wget
     neovim
-    toybox # utilities like strings
     zenity # terminal notifications
     p7zip
     sops
@@ -118,6 +117,17 @@
   services.flatpak.enable = true;
   services.pulseaudio.enable = false;
   security.rtkit.enable = true;
+
+  # Bluetooth
+  hardware.bluetooth = {
+    enable = true;
+    powerOnBoot = true;
+    settings = {
+      General = {
+        Enable = "Source,Sink,Media,Socket";
+      };
+    };
+  };
   services.pipewire = {
     enable = true;
     alsa.enable = true;

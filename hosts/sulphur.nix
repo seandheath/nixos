@@ -4,6 +4,7 @@
   imports = [
     ../hardware/sulphur.nix
     ../modules/steam.nix
+    ../modules/mo2.nix
     ../modules/workstation.nix
     ../modules/virtualisation.nix
     ../modules/impermanence.nix
