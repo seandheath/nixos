@@ -38,9 +38,9 @@
       nerdtree
       tagbar
       vim-airline
-      ctrlp
-      easymotion
-      rainbow_parentheses
+      ctrlp-vim
+      vim-easymotion
+      rainbow_parentheses-vim
       surround-nvim
       nvim-treesitter.withAllGrammars
     ];

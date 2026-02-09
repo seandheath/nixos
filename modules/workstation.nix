@@ -33,6 +33,7 @@
     nodejs
     gcc
     parallel
+    zstd
     
     # 3D printing and CAD
     prusa-slicer
@@ -50,7 +51,9 @@
   
     # System utilities
     keepassxc
-    appimage-run
+    (appimage-run.override {
+      extraPkgs = pkgs: [ pkgs.zstd ];
+    })
     brasero
     ripgrep
     btop-cuda
@@ -102,6 +105,27 @@
 
   # Programs
   programs.firefox.enable = true;
+
+  # nix-ld for running dynamically linked executables (AppImages, etc.)
+  programs.nix-ld = {
+    enable = true;
+    libraries = with pkgs; [
+      zstd
+      stdenv.cc.cc.lib
+      zlib
+      glib
+      libGL
+      libx11
+      libxcursor
+      libxrandr
+      libxi
+      libxkbcommon
+      wayland
+      fontconfig
+      freetype
+      dbus
+    ];
+  };
   
   # Services
   services.mullvad-vpn.enable = true;
@@ -125,6 +149,7 @@
     settings = {
       General = {
         Enable = "Source,Sink,Media,Socket";
+        Experimental = true;  # Needed for battery reporting and better codec support
       };
     };
   };
@@ -140,6 +165,21 @@
         "default.clock.quantum" = 256;
         "default.clock.min-quantum" = 256;
         "default.clock.max-quantum" = 512;
+      };
+    };
+    # Bluetooth configuration for stable profile switching
+    wireplumber.extraConfig."10-bluez" = {
+      "monitor.bluez.properties" = {
+        "bluez5.enable-sbc-xq" = true;
+        "bluez5.enable-msbc" = true;
+        "bluez5.enable-hw-volume" = true;
+        "bluez5.roles" = [ "a2dp_sink" "a2dp_source" "bap_sink" "bap_source" "hsp_hs" "hsp_ag" "hfp_hf" "hfp_ag" ];
+      };
+    };
+    # Disable auto-switching which can cause instability
+    wireplumber.extraConfig."11-bluetooth-policy" = {
+      "wireplumber.settings" = {
+        "bluetooth.autoswitch-to-headset-profile" = false;
       };
     };
   };

@@ -57,6 +57,7 @@
           target_host=$HOSTNAME
         fi
         if [[ -n "$target_host" ]]; then
+          nix flake update --flake /home/sheath/nixos && \
           sudo nixos-rebuild switch --no-write-lock-file --flake /home/sheath/nixos#"$target_host"
         fi
       }
@@ -64,12 +65,13 @@
       nb() {
         local target_host
         if [[ "$HOSTNAME" == "nixos" ]]; then
-        target_host=$(ls -1 /home/sheath/nixos/hosts | sed 's/\.nix$//' | fzf)
+          target_host=$(ls -1 /home/sheath/nixos/hosts | sed 's/\.nix$//' | fzf)
         else
-        target_host=$HOSTNAME
+          target_host=$HOSTNAME
         fi
         if [[ -n "$target_host" ]]; then
-        sudo nixos-rebuild boot --no-write-lock-file --flake /home/sheath/nixos#"$target_host"
+          nix flake update --flake /home/sheath/nixos && \
+          sudo nixos-rebuild boot --no-write-lock-file --flake /home/sheath/nixos#"$target_host"
         fi
       }
       
