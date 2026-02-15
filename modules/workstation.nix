@@ -44,6 +44,7 @@
     xournalpp
     
     # Multimedia
+    mpv
     vlc
     pavucontrol
     freetube
@@ -83,7 +84,7 @@
     protontricks 
     #wine
     #wine64
-    wineWowPackages.waylandFull
+    wineWow64Packages.waylandFull
     winetricks
     vulkan-loader
     vulkan-tools
@@ -139,6 +140,8 @@
     openFirewall = true;
   };
   services.flatpak.enable = true;
+
+
   services.pulseaudio.enable = false;
   security.rtkit.enable = true;
 
