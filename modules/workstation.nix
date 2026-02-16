@@ -25,6 +25,7 @@
     hexo-cli
     # gemini-cli  # temporarily disabled - broken npm cache in nixpkgs
     claude-code 
+    gemini-cli
     git
     python3
     vscode

@@ -31,6 +31,7 @@
     runtime = [ "${pkgs.xrizer}/lib/xrizer" ];
     version = 1;
   };
+  home-manager.users.sheath.xdg.configFile."openvr/openvrpaths.vrpath".force = true;
 
   # WiVRn server configuration
   #
@@ -50,11 +51,12 @@
     use-steamvr-lh = false;
     encoders = [
       {
-        encoder = "x264";
-        codec = "h264";
+        encoder = "nvenc";
+        codec = "h265";
         width = 1.0;
         height = 1.0;
       }
     ];
   };
+  home-manager.users.sheath.xdg.configFile."wivrn/config.json".force = true;
 }
