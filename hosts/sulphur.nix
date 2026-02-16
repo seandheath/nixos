@@ -8,6 +8,7 @@
     ../modules/workstation.nix
     ../modules/virtualisation.nix
     ../modules/impermanence.nix
+    ../modules/wivrn.nix
   ];
 
   # Boot
@@ -15,8 +16,8 @@
   boot.loader.systemd-boot.configurationLimit = 20;
   boot.loader.efi.canTouchEfiVariables = true;
 
-  # Use latest kernel for best hardware support on new ASUS hardware
-  boot.kernelPackages = pkgs.linuxPackages_latest;
+  # Pin to 6.18 until nvidia-open supports kernel 6.19
+  boot.kernelPackages = pkgs.linuxPackages_6_18;
 
   # NVIDIA settings for RTX 50 series
   boot.extraModprobeConfig = ''
@@ -48,6 +49,7 @@
     usbutils
     lshw
     btrfs-progs
+    (callPackage ../packages/jackify.nix {})
   ];
 
   # ASUS ROG services
@@ -141,6 +143,19 @@
     HandleSuspendKey = "suspend";
     IdleAction = "ignore";
   };
+
+  # Reapply monitor configuration after resume from sleep
+  # Fixes GNOME losing rotation settings on external monitors when resuming while docked
+  powerManagement.resumeCommands = ''
+    # Give the display subsystem time to reinitialize
+    sleep 2
+    # Run dock-monitors as the logged-in user
+    if [ -x /home/sheath/.local/bin/dock-monitors ]; then
+      ${pkgs.sudo}/bin/sudo -u sheath \
+        DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$(id -u sheath)/bus" \
+        /home/sheath/.local/bin/dock-monitors || true
+    fi
+  '';
 
   # GameMode configuration
   programs.gamemode = {

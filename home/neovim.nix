@@ -33,7 +33,6 @@
     '';
     plugins = with pkgs.vimPlugins; [
       vim-nix
-      coc-go
       coc-rust-analyzer
       nerdtree
       tagbar

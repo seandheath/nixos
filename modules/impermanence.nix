@@ -73,6 +73,13 @@
     "d /persist/secrets 0700 root root -"
   ];
 
+  # User home directory persistence
+  environment.persistence."/persist".users.sheath = {
+    directories = [
+      ".config/wivrn"                              # WiVRn VR streaming settings
+    ];
+  };
+
   # Required for impermanence to work with users
   programs.fuse.userAllowOther = true;
 

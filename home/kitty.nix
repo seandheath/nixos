@@ -4,5 +4,8 @@
     font.package = pkgs.b612;
     font.name = "Inconsolata";
     font.size = 11;
+    settings = {
+      shell = "bash --login";
+    };
   };
 }

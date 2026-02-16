@@ -188,22 +188,36 @@ if __name__ == '__main__':
     main()
   '';
 
+  dock-monitors = pkgs.writeShellScriptBin "dock-monitors" ''
+    exec ${pythonWithDbus}/bin/python3 ${dock-monitors-script} "$@"
+  '';
+
 in
 {
-  home.packages = with pkgs; [
+  home.packages = [
     pythonWithDbus
+    dock-monitors
   ];
 
-  home.sessionPath = [
-    "$HOME/.local/bin"
-  ];
-
-  # Manual dock-monitors command available if needed
-  home.file.".local/bin/dock-monitors" = {
-    executable = true;
-    text = ''
-      #!${pkgs.bash}/bin/bash
-      exec ${pythonWithDbus}/bin/python3 ${dock-monitors-script} "$@"
-    '';
+  # Automatically reapply monitor configuration after resume from sleep
+  # This fixes GNOME losing rotation settings when resuming while docked
+  systemd.user.services.dock-monitors-resume = {
+    Unit = {
+      Description = "Reapply monitor configuration after resume";
+      After = [ "suspend.target" "hibernate.target" "hybrid-sleep.target" ];
+    };
+    Service = {
+      Type = "oneshot";
+      # Wait for GNOME/Mutter to stabilize after resume before reconfiguring
+      ExecStartPre = "${pkgs.coreutils}/bin/sleep 3";
+      ExecStart = "${pythonWithDbus}/bin/python3 ${dock-monitors-script}";
+      Environment = [
+        "DISPLAY=:0"
+        "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/%U/bus"
+      ];
+    };
+    Install = {
+      WantedBy = [ "suspend.target" "hibernate.target" "hybrid-sleep.target" ];
+    };
   };
 }

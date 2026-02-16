@@ -6,6 +6,7 @@
     gnomeExtensions.gtile
     gnomeExtensions.bluetooth-quick-connect
     gnomeExtensions.vitals
+    gnomeExtensions.caffeine
     gnome-tweaks
     gnome-terminal
   ];

@@ -27,13 +27,15 @@
       url = "github:fufexan/nix-gaming";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    nix-flatpak.url = "github:gmodena/nix-flatpak/?ref=v0.7.0";
   };
 
-  outputs = { self, nixpkgs, nixos-hardware, home-manager, sops-nix, agenix, impermanence, disko, chaotic, nix-gaming, ... }@inputs:
+  outputs = { self, nixpkgs, nixos-hardware, home-manager, sops-nix, agenix, impermanence, disko, chaotic, nix-gaming, nix-flatpak, ... }@inputs:
     let
       commonModules = [
         home-manager.nixosModules.home-manager
         sops-nix.nixosModules.sops
+        nix-flatpak.nixosModules.nix-flatpak
         {
           home-manager.useGlobalPkgs = true;
           home-manager.useUserPackages = true;

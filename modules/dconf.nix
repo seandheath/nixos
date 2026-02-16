@@ -32,7 +32,7 @@
           font-hinting = "slight";
           font-antialiasing = "grayscale";
           gtk-theme = "Adwaita-dark";
-          text-scaling-factor = mkDouble 1.0;
+          text-scaling-factor = mkDouble 1.25;
         };
         "org/gnome/desktop/sound" = {
           allow-volume-above-100-percent = true;
@@ -45,10 +45,11 @@
             "bluetooth-quick-connect@bjarosze.gmail.com"
 	    "Vitals@CoreCoding.com"
 	    "display-configuration-switcher@knokelmaat.gitlab.com"
+	    "caffeine@patapon.info"
           ];
         };
         "org/gnome/shell/extensions/gtile" = {
-          grid-sizes = [ "4x2,3x2,1x3,1x2" ];
+          grid-sizes = [ "3x2,4x4,2x1,1x2" ];
         };
         "org/gnome/desktop/peripherals/touchpad" = {
           tap-to-click = true;
