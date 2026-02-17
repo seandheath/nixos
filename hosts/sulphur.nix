@@ -1,5 +1,8 @@
 { lib, pkgs, config, ... }:
 
+let
+  dock-monitors = import ../packages/dock-monitors.nix { inherit pkgs; };
+in
 {
   imports = [
     ../hardware/sulphur.nix
@@ -144,18 +147,28 @@
     IdleAction = "ignore";
   };
 
-  # Reapply monitor configuration after resume from sleep
-  # Fixes GNOME losing rotation settings on external monitors when resuming while docked
-  powerManagement.resumeCommands = ''
-    # Give the display subsystem time to reinitialize
-    sleep 2
-    # Run dock-monitors as the logged-in user
-    if [ -x /home/sheath/.local/bin/dock-monitors ]; then
-      ${pkgs.sudo}/bin/sudo -u sheath \
-        DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$(id -u sheath)/bus" \
-        /home/sheath/.local/bin/dock-monitors || true
-    fi
+  # Reconfigure monitors on display hotplug (e.g. docking station reconnect)
+  # Watches for DRM connector change events from the kernel
+  services.udev.extraRules = lib.mkAfter ''
+    ACTION=="change", SUBSYSTEM=="drm", RUN+="${pkgs.systemd}/bin/systemctl start --no-block dock-monitors-hotplug.service"
   '';
+
+  # System service that runs dock-monitors as the logged-in user on hotplug
+  systemd.services.dock-monitors-hotplug = {
+    description = "Reapply monitor configuration on display hotplug";
+    after = [ "graphical.target" ];
+    serviceConfig = {
+      Type = "oneshot";
+      # Wait for Mutter to detect and enumerate new displays
+      ExecStartPre = "${pkgs.coreutils}/bin/sleep 5";
+      ExecStart = "${dock-monitors.pythonWithDbus}/bin/python3 ${dock-monitors.script}";
+      User = "sheath";
+      Environment = "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus";
+    };
+    # Debounce: DRM fires multiple events per dock connect, only run once per 30s
+    startLimitIntervalSec = 30;
+    startLimitBurst = 1;
+  };
 
   # GameMode configuration
   programs.gamemode = {
