@@ -3,10 +3,10 @@
   description = "A NixOS configuration";
 
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-25.11";
     nixos-hardware.url = "github:NixOS/nixos-hardware/master";
     home-manager = {
-      url = "github:nix-community/home-manager/master";  # master tracks unstable
+      url = "github:nix-community/home-manager/release-25.11";
       inputs.nixpkgs.follows = "nixpkgs";
     };
     sops-nix = {
@@ -25,7 +25,8 @@
     chaotic.url = "github:chaotic-cx/nyx/nyxpkgs-unstable";
     nix-gaming = {
       url = "github:fufexan/nix-gaming";
-      inputs.nixpkgs.follows = "nixpkgs";
+      # Don't follow nixpkgs — nix-gaming pins its own nixpkgs
+      # compatible with its Wine builds (supportFlags removal broke it)
     };
     nix-flatpak.url = "github:gmodena/nix-flatpak/?ref=v0.7.0";
   };
