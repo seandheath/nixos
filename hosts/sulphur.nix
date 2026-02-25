@@ -96,12 +96,14 @@ in
 
   # Remap Copilot key (sends shift+meta+f23 simultaneously) to Ctrl layer
   # The combo activates a control layer instead of outputting a key directly
+  # Remap M4 button (KEY_PROG1) to Print Screen for screenshots
   services.keyd = {
     enable = true;
     keyboards.default = {
       ids = [ "*" ];
       settings.main = {
         "leftshift+leftmeta" = "layer(control)";
+        "prog1" = "sysrq";
       };
     };
   };
