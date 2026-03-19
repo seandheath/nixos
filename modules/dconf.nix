@@ -49,7 +49,7 @@
           ];
         };
         "org/gnome/shell/extensions/gtile" = {
-          grid-sizes = [ "3x2,4x4,2x1,1x2" ];
+          grid-sizes = [ "2x3,3x2,4x4" ];
         };
         "org/gnome/desktop/peripherals/touchpad" = {
           tap-to-click = true;
