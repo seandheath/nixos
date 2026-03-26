@@ -21,14 +21,6 @@
       alias dmesg="dmesg --color=always"
 
       # FUNCTIONS
-      new-project() {
-        local name="''${1:?usage: new-project <project-name>}"
-        mkdir -p "$name" && cd "$name" && nix flake init -t github:seandheath/llm-devcontainer --refresh
-        sed -i "s/projectName = \"my-project\"/projectName = \"$name\"/" flake.nix
-        nix run github:seandheath/llm-devcontainer#build --refresh
-        nix build .#shell .#claude --no-link
-      }
-
       srmd() {
           local dir="$1"
           
@@ -60,50 +52,6 @@
           srm -rf "$dir"
       }
       
-      claude-container() {
-        local image="claude-sandbox:latest"
-        local project="$(basename "$(pwd)")"
-
-        # Build image if missing
-        if ! podman image inspect "$image" &>/dev/null; then
-          claude-container-update
-        fi
-
-        podman run --rm -it \
-          --userns=keep-id \
-          -e HOME=/home/developer \
-          -e TERM=xterm-256color \
-          -e COLORTERM=truecolor \
-          --network=host \
-          --cap-drop=ALL \
-          --security-opt=no-new-privileges \
-          -w "/''${project}" \
-          -v "$(pwd):/''${project}:rw" \
-          -v "claude-nix-''${project}:/nix:rw" \
-          -v "claude-home-''${project}:/home/developer:rw" \
-          --tmpfs=/tmp:rw,exec,size=2g \
-          "$image" \
-          bash -c '. /home/developer/.nix-profile/etc/profile.d/nix.sh && nix develop -L --command claude --dangerously-skip-permissions "$@"' _ "$@"
-      }
-
-      claude-container-update() {
-        local image="claude-sandbox:latest"
-        podman rmi -f "$image" 2>/dev/null
-        podman build --no-cache -t "$image" -f - . <<'CONTAINERFILE'
-FROM debian:bookworm-slim
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl ca-certificates git xz-utils ncurses-term && \
-    rm -rf /var/lib/apt/lists/*
-RUN useradd -m -s /bin/bash -u 1000 developer
-RUN mkdir -m 0755 /nix && chown developer /nix
-USER developer
-RUN curl -L https://nixos.org/nix/install | sh -s -- --no-daemon
-RUN mkdir -p ~/.config/nix && printf 'sandbox = false\nexperimental-features = nix-command flakes\n' > ~/.config/nix/nix.conf
-RUN curl -fsSL https://claude.ai/install.sh | bash
-ENV PATH="/home/developer/.local/bin:/home/developer/.nix-profile/bin:$PATH"
-CONTAINERFILE
-      }
-
       nr() {
         local target_host
         if [[ "$HOSTNAME" == "nixos" ]]; then
