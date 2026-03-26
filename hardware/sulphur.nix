@@ -21,11 +21,11 @@
     bypassWorkqueues = true;
   };
 
-  # Btrfs mount options
+  # Ephemeral root on tmpfs
   fileSystems."/" = {
-    device = "/dev/mapper/cryptroot";
-    fsType = "btrfs";
-    options = [ "subvol=@root" "compress=zstd" "noatime" "discard=async" ];
+    device = "none";
+    fsType = "tmpfs";
+    options = [ "defaults" "size=6G" "mode=755" ];
   };
 
   fileSystems."/nix" = {

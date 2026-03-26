@@ -1,38 +1,8 @@
 { config, lib, pkgs, ... }:
 
 {
-  # Enable systemd in initrd (required for rollback service)
+  # Enable systemd in initrd (required for LUKS unlock)
   boot.initrd.systemd.enable = true;
-
-  # Rollback service - wipes root on every boot
-  boot.initrd.systemd.services.rollback = {
-    description = "Rollback Btrfs root subvolume to pristine state";
-    wantedBy = [ "initrd.target" ];
-    after = [ "systemd-cryptsetup@cryptroot.service" ];
-    before = [ "sysroot.mount" ];
-    unitConfig.DefaultDependencies = "no";
-    serviceConfig.Type = "oneshot";
-    script = ''
-      mkdir -p /mnt
-      mount -o subvol=/ /dev/mapper/cryptroot /mnt
-
-      # Delete all subvolumes under @root (handles nested subvolumes)
-      btrfs subvolume list -o /mnt/@root | cut -f9 -d' ' | while read subvolume; do
-        echo "Deleting nested subvolume: /$subvolume"
-        btrfs subvolume delete "/mnt/$subvolume"
-      done
-
-      # Delete the root subvolume
-      echo "Deleting @root subvolume"
-      btrfs subvolume delete /mnt/@root
-
-      # Restore from blank snapshot
-      echo "Restoring @root from @root-blank snapshot"
-      btrfs subvolume snapshot /mnt/@root-blank /mnt/@root
-
-      umount /mnt
-    '';
-  };
 
   # Impermanence configuration
   environment.persistence."/persist" = {
@@ -55,6 +25,16 @@
 
       # ASUS-specific
       "/etc/asusd"                              # asusctl configuration
+
+      # Hardware/system state
+      "/var/lib/systemd/backlight"              # Laptop backlight level
+      "/var/lib/systemd/rfkill"                 # WiFi/BT kill switch state
+      "/var/lib/NetworkManager"                 # NM internal state (leases, secret_key)
+      "/var/db/sudo/lectured"                   # Suppress sudo lecture
+      "/var/lib/cups"                           # CUPS printer config/jobs
+      "/var/lib/libvirt"                        # VM disk images, configs
+      "/var/lib/containers"                     # Podman images/layers
+      { directory = "/var/lib/colord"; user = "colord"; group = "colord"; mode = "u=rwx,g=rx,o="; }
     ];
 
     # System files to persist
@@ -94,6 +74,6 @@
   services.btrfs.autoScrub = {
     enable = true;
     interval = "monthly";
-    fileSystems = [ "/" ];
+    fileSystems = [ "/persist" ];
   };
 }

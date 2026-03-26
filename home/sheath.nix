@@ -14,6 +14,13 @@
   sops.secrets.gemini-api-key = {};
   sops.secrets.gitlab-token = {};
   sops.secrets.gitlab-username = {};
+  home.packages = [
+    inputs.cclaude.packages.x86_64-linux.default
+    inputs.cclaude.packages.x86_64-linux.cclaude-build
+    inputs.cclaude.packages.x86_64-linux.cclaude-update
+    inputs.cclaude.packages.x86_64-linux.cclaude-shell
+    inputs.cclaude.packages.x86_64-linux.cclaude-setup
+  ];
   programs.home-manager.enable = true;
   home.stateVersion = "25.05";
 }

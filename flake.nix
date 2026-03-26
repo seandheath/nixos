@@ -29,9 +29,13 @@
       # compatible with its Wine builds (supportFlags removal broke it)
     };
     nix-flatpak.url = "github:gmodena/nix-flatpak/?ref=v0.7.0";
+    cclaude = {
+      url = "github:seandheath/cclaude";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { self, nixpkgs, nixos-hardware, home-manager, sops-nix, agenix, impermanence, disko, chaotic, nix-gaming, nix-flatpak, ... }@inputs:
+  outputs = { self, nixpkgs, nixos-hardware, home-manager, sops-nix, agenix, impermanence, disko, chaotic, nix-gaming, nix-flatpak, cclaude, ... }@inputs:
     let
       commonModules = [
         home-manager.nixosModules.home-manager
