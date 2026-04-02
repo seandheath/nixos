@@ -14,6 +14,13 @@
   sops.secrets.gemini-api-key = {};
   sops.secrets.gitlab-token = {};
   sops.secrets.gitlab-username = {};
+  sops.templates."secrets.env" = {
+    content = ''
+      GEMINI_API_KEY=${config.sops.placeholder.gemini-api-key}
+      GITLAB_TOKEN=${config.sops.placeholder.gitlab-token}
+      GITLAB_USERNAME=${config.sops.placeholder.gitlab-username}
+    '';
+  };
   home.packages = [
     inputs.cclaude.packages.x86_64-linux.default
     inputs.cclaude.packages.x86_64-linux.cclaude-build

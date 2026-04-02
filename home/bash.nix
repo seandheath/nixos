@@ -11,10 +11,9 @@
       # PATH
       export PATH="$HOME/.local/bin:$PATH"
 
-      # Environment Variables
-      export GEMINI_API_KEY="$(cat ${config.sops.secrets.gemini-api-key.path})"
-      export GITLAB_TOKEN="$(cat ${config.sops.secrets.gitlab-token.path})"
-      export GITLAB_USERNAME="$(cat ${config.sops.secrets.gitlab-username.path})"
+      # Environment Variables (secrets rendered by sops-nix)
+      source ${config.sops.templates."secrets.env".path}
+      export GEMINI_API_KEY GITLAB_TOKEN GITLAB_USERNAME
       
       # ALIASES
       alias ns="nix search nixpkgs"
