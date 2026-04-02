@@ -31,5 +31,4 @@
     nixpkgs-fmt
     niv
   ];
-  nixpkgs.config.allowUnfree = true;
 }

@@ -50,6 +50,7 @@
           users.groups.sheath = {};
           nix.settings.download-buffer-size = 1073741824;
           nix.settings.experimental-features = [ "nix-command" "flakes" ];
+          nixpkgs.config.allowUnfree = true;
         }
       ];
     in {

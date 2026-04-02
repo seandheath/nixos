@@ -6,7 +6,6 @@
     ../modules/syncthing.nix
     ../modules/auto-update.nix
   ];
-  nixpkgs.config.allowUnfree = true;
   # Common workstation applications that work with any desktop environment
   environment.systemPackages = with pkgs; [
     # Document creation and processing
