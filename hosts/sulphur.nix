@@ -190,5 +190,5 @@ in
     };
   };
 
-  system.stateVersion = "26.11";
+  system.stateVersion = "25.11";
 }
