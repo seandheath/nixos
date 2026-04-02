@@ -96,11 +96,6 @@
     system76.enableAll = true;
   };
 
-  # Force NVIDIA for all Vulkan operations (avoid Intel Vulkan driver hangs)
-  environment.sessionVariables = {
-    VK_ICD_FILENAMES = "/run/opengl-driver/share/vulkan/icd.d/nvidia_icd.x86_64.json";
-  };
-
   # Services
   services.system76-scheduler.enable = true;  # Optimized process scheduling for System76 hardware
   services.fstrim = {
