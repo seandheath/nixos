@@ -207,9 +207,10 @@
 
     ## Development Philosophy
 
-    1. **Functionality first.** Get working code, then iterate on error handling and security.
-    2. **Security second.** Follow industry best practices (OWASP, CERT C, etc.) but never let security concerns block forward progress. Log security considerations for later review.
-    3. **Test critical paths only.** Use language-appropriate frameworks (`pytest`, `#[test]`, `go test`, etc.). No test bloat.
+    1. **ALWAYS PLAN.** ANY time you need to change code ensure you are working from a plan developed in plan mode. If there is not a plan that addresses the current problem ask the user if they want to enter /plan mode.
+    2. **Functionality first.** Get working code, then iterate on error handling and security.
+    3. **Security second.** Follow industry best practices (OWASP, CERT C, etc.) but never let security concerns block forward progress. Log security considerations for later review.
+    4. **Test critical paths only.** Use language-appropriate frameworks (`pytest`, `#[test]`, `go test`, etc.). No test bloat.
 
     ## Documentation
 
@@ -257,6 +258,7 @@
       2. Wait for my explicit approval before merging.
     - **Commit messages:** Short, technical, imperative mood (e.g., `add MODBUS parser for holding registers`). No fluff.
     - **Never include "co-authored by Claude", "AI-generated", or similar strings in commits.**
+    - **Commit, Push, Plan.** Whenever you finish implementing a plan, commit the changes, push the changes, and re-enter plan mode.
 
     ## Communication Rules
 
