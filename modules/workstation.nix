@@ -23,7 +23,6 @@
     
     # Development tools
     hexo-cli
-    # gemini-cli  # temporarily disabled - broken npm cache in nixpkgs
     gemini-cli
     git
     python3
