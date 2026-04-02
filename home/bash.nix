@@ -171,8 +171,6 @@
 
       export PS1="\n\[$GREEN\]\u\[$RED\]|\[$WHITE\]\h\[$RED\]|\[$GREEN\]\w\[$PURPLE\]\$(parse_git_branch)\[$RED\]\$(nonzero_return)\[$WHITE\]> "
 
-      # Direnv
-      #eval "$(direnv hook bash)"
     '';
   };
 }

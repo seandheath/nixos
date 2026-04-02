@@ -76,6 +76,4 @@
     "org/gnome/germinal/legacy".theme-variant = "dark";
   };
 
-  programs.direnv.enable = true;
-  programs.direnv.nix-direnv.enable = true;
 }
