@@ -8,6 +8,7 @@ in
     ../hardware/sulphur.nix
     ../modules/steam.nix
     ../modules/mo2.nix
+    ../modules/cemu.nix
     ../modules/workstation.nix
     ../modules/virtualisation.nix
     ../modules/impermanence.nix
