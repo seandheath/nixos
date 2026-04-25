@@ -267,4 +267,5 @@
     - **File structure changes:** Do not reorganize or rename files/directories without permission.
     - **Feedback requests:** Always include a recommended course of action when asking for my input.
   '';
+  home-manager.users.sheath.home.file.".claude/CLAUDE.md".force = true;
 }
