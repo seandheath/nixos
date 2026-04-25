@@ -4,7 +4,6 @@
   services.wivrn = {
     enable = true;
     openFirewall = true;       # TCP+UDP port 9757
-    defaultRuntime = true;     # Set as system-wide default OpenXR runtime
     highPriority = true;       # CAP_SYS_NICE for async reprojection
     autoStart = true;
 
