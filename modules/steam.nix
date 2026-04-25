@@ -1,4 +1,10 @@
 { config, pkgs, ... }:{
+  # Proper Bluetooth HID profile for Xbox One/Series/Elite controllers.
+  # Stock hid_microsoft exposes BT pads as pointer devices, causing the left
+  # stick to move the cursor in games. xpadneo replaces it with a gamepad-only
+  # profile and adds rumble/trigger fixes.
+  hardware.xpadneo.enable = true;
+
   programs.gamescope.enable = true;
   programs.gamemode.enable = true;
   programs.steam = {
