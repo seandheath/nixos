@@ -5,6 +5,14 @@
   # profile and adds rumble/trigger fixes.
   hardware.xpadneo.enable = true;
 
+  # xpadneo consumes Xbox HID reports at the kernel level and re-emits them
+  # via evdev/joystick only. SDL2's hidapi Xbox backend still grabs the raw
+  # /dev/hidrawN node and waits for native Xbox protocol that never arrives,
+  # so SDL apps (Cemu, etc.) enumerate the pad but receive no button events.
+  # Disable just the Xbox hidapi backend so SDL falls back to evdev; PS4/PS5/
+  # Switch hidapi support is left intact.
+  environment.sessionVariables.SDL_JOYSTICK_HIDAPI_XBOX = "0";
+
   programs.gamescope.enable = true;
   programs.gamemode.enable = true;
   programs.steam = {
