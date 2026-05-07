@@ -13,6 +13,9 @@
     pandoc
     recoll
     evince
+    poppler_utils
+    img2pdf
+    exiftool
     
     # Communication and collaboration
     element-desktop
