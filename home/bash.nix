@@ -76,6 +76,100 @@
           sudo nixos-rebuild boot --no-write-lock-file --flake /home/sheath/nixos#"$target_host"
         fi
       }
+
+      pdfrasterize() (
+        local input="$1"
+        local output="$2"
+        local dpi="''${3:-300}"
+
+        if [[ -z "$input" || ! -f "$input" ]]; then
+          echo "Usage: pdfrasterize <input.pdf> [output.pdf] [dpi]" >&2
+          return 1
+        fi
+
+        if [[ -z "$output" ]]; then
+          local dir base
+          dir=$(dirname -- "$input")
+          base=$(basename -- "$input")
+          output="$dir/redacted-$base"
+        fi
+
+        for cmd in pdftoppm img2pdf exiftool pdftotext; do
+          command -v "$cmd" >/dev/null || { echo "missing: $cmd" >&2; return 1; }
+        done
+
+        local tmpdir
+        tmpdir=$(mktemp -d --tmpdir=/tmp pdfrasterize.XXXXXX) || return 1
+        trap 'rm -rf "$tmpdir"' EXIT
+
+        echo ">> Rasterizing at ''${dpi} DPI..."
+        pdftoppm -r "$dpi" -png "$input" "$tmpdir/page" || return 1
+
+        echo ">> Reassembling..."
+        local pages=("$tmpdir"/page-*.png)
+        img2pdf "''${pages[@]}" -o "$output" || return 1
+
+        echo ">> Stripping metadata..."
+        exiftool -all= -overwrite_original "$output" >/dev/null || return 1
+
+        echo ">> Verifying..."
+        if pdftotext "$output" - 2>/dev/null | grep -q '[^[:space:]]'; then
+          echo "WARNING: extractable text remains in $output" >&2
+          return 2
+        fi
+
+        echo ">> Done: $output"
+      )
+
+      pdfredact() (
+        local input="$1"
+        local dpi="''${2:-300}"
+
+        if [[ -z "$input" || ! -f "$input" ]]; then
+          echo "Usage: pdfredact <document.pdf> [dpi]" >&2
+          return 1
+        fi
+
+        command -v xournalpp >/dev/null || { echo "missing: xournalpp" >&2; return 1; }
+
+        local origpath origdir base stem final_output
+        origpath=$(realpath -- "$input") || return 1
+        origdir=$(dirname -- "$origpath")
+        base=$(basename -- "$origpath")
+        stem="''${base%.pdf}"
+        final_output="$origdir/redacted-$base"
+
+        if [[ -e "$final_output" ]]; then
+          echo "Refusing: $final_output already exists." >&2
+          return 1
+        fi
+
+        local workdir
+        workdir=$(mktemp -d --tmpdir=/tmp pdfredact.XXXXXX) || return 1
+        trap 'rm -rf "$workdir"' EXIT
+
+        local work_input="$workdir/$base"
+        local annotated="$workdir/''${stem}_annotated.pdf"
+        local work_output="$workdir/redacted-$base"
+
+        cp -- "$origpath" "$work_input" || return 1
+        mkdir -p "$workdir/cache"
+
+        echo ">> Working in $workdir"
+        echo ">> Opening Xournal++. When done:"
+        echo "   1. Draw filled black rectangles over content"
+        echo "   2. File → Export As PDF (Ctrl+E), accept default filename"
+        echo "   3. Close Xournal++ to continue"
+
+        XDG_CACHE_HOME="$workdir/cache" xournalpp "$work_input"
+
+        [[ -f "$annotated" ]] || { echo "No annotated PDF at $annotated" >&2; return 1; }
+
+        pdfrasterize "$annotated" "$work_output" "$dpi" || return $?
+
+        mv -- "$work_output" "$final_output" || return 1
+        echo ">> Final: $final_output"
+      )
       
       bind 'set show-all-if-ambiguous on'
       bind 'TAB:menu-complete'

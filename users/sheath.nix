@@ -1,7 +1,7 @@
 {
   isNormalUser = true;
   description = "sheath";
-  extraGroups = [ "wheel" "networkmanager" "video" "libvirtd" "podman"];
+  extraGroups = [ "wheel" "networkmanager" "video" "libvirtd" "podman" "scanner" "lp" ];
   openssh.authorizedKeys.keys = [
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGLhPOBx9dR2X3oYz5RS2eAGZA7YSeHPcnrQauHSmuk1"
   ];
