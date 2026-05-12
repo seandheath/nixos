@@ -50,6 +50,8 @@
           users.groups.sheath = {};
           nix.settings.download-buffer-size = 1073741824;
           nix.settings.experimental-features = [ "nix-command" "flakes" ];
+          nix.settings.substituters = [ "https://pebble.cachix.org" ];
+          nix.settings.trusted-public-keys = [ "pebble.cachix.org-1:aTqwT2hR6lGggw/rPISRcHZctDv2iF7ewsVxf3Hq6ow=" ];
           nixpkgs.config.allowUnfree = true;
         }
       ];
