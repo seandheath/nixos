@@ -3,9 +3,13 @@
   system.autoUpgrade = {
     enable = true;
     flake = "path:${config.users.users.sheath.home}/nixos/#${config.networking.hostName}";
+    # --override-input resolves nixpkgs against the upstream ref at build time
+    # without touching flake.lock, replacing the deprecated --update-input form.
+    # Keep this branch in sync with the nixpkgs.url in flake.nix.
     flags = [
-      "--update-input"
+      "--override-input"
       "nixpkgs"
+      "github:nixos/nixpkgs/nixos-25.11"
       "--no-write-lock-file"
       "-L"
     ];
