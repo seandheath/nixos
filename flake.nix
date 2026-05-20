@@ -65,11 +65,6 @@
           chaotic.nixosModules.default
         ] ++ commonModules;
       };
-      pentest-vm = nixpkgs.lib.nixosSystem {
-        system = "x86_64-linux";
-        specialArgs = { inherit inputs; lib = nixpkgs.lib; };
-        modules = [ ./hosts/pentest-vm.nix ] ++ commonModules;
-      };
       surface = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
         specialArgs = { inherit inputs; lib = nixpkgs.lib; };
