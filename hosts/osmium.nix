@@ -104,15 +104,13 @@
   };
 
   # Prevent suspend when on AC power (docked)
-  services.logind = {
-    lidSwitch = "suspend";                    # Default when on battery
-    lidSwitchExternalPower = "ignore";        # Ignore lid when on AC
-    lidSwitchDocked = "ignore";               # Ignore lid when docked
-    settings.Login = {
-      HandlePowerKey = "suspend";
-      HandleSuspendKey = "suspend";
-      IdleAction = "ignore";
-    };
+  services.logind.settings.Login = {
+    HandleLidSwitch = "suspend";                # Default when on battery
+    HandleLidSwitchExternalPower = "ignore";    # Ignore lid when on AC
+    HandleLidSwitchDocked = "ignore";           # Ignore lid when docked
+    HandlePowerKey = "suspend";
+    HandleSuspendKey = "suspend";
+    IdleAction = "ignore";
   };
 
   # GameMode configuration
