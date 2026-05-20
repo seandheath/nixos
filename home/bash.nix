@@ -11,10 +11,6 @@
       # PATH
       export PATH="$HOME/.local/bin:$PATH"
 
-      # Environment Variables (secrets rendered by sops-nix)
-      source ${config.sops.templates."secrets.env".path}
-      export GEMINI_API_KEY GITLAB_TOKEN GITLAB_USERNAME
-      
       # ALIASES
       alias ns="nix search nixpkgs"
       alias dmesg="dmesg --color=always"

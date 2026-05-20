@@ -11,9 +11,6 @@
   ];
   sops.defaultSopsFile = ../secrets/secrets.yaml;
   sops.age.keyFile = "/home/sheath/.config/sops/age/keys.txt";
-  sops.secrets.gemini-api-key = {};
-  sops.secrets.gitlab-token = {};
-  sops.secrets.gitlab-username = {};
   home.packages = [
     inputs.cclaude.packages.x86_64-linux.default
     inputs.cclaude.packages.x86_64-linux.cclaude-build
