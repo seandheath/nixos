@@ -154,6 +154,12 @@ in
   # Watches for DRM connector change events from the kernel
   services.udev.extraRules = lib.mkAfter ''
     ACTION=="change", SUBSYSTEM=="drm", RUN+="${pkgs.systemd}/bin/systemctl start --no-block dock-monitors-hotplug.service"
+
+    # NVIDIA 580 registers a phantom nvidia_0 backlight (stuck, not wired to the
+    # panel) in Hybrid/Optimus mode; the real eDP panel is intel_backlight. The
+    # old NVreg_EnableBacklightHandler option was removed upstream, so detach
+    # nvidia_0 from the seat - logind drops it and GNOME selects intel_backlight.
+    SUBSYSTEM=="backlight", KERNEL=="nvidia_0", TAG-="master-of-seat", ENV{ID_SEAT}=""
   '';
 
   # System service that runs dock-monitors as the logged-in user on hotplug

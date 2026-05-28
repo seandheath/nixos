@@ -133,7 +133,7 @@
   # Services
   services.mullvad-vpn.enable = true;
   services.printing.enable = true;
-  services.printing.drivers = [ pkgs.epson-escpr2 ];
+  services.printing.drivers = [ pkgs.epson-escpr2 pkgs.brlaser ];
 
   # USB scanning via SANE.
   # brscan4 covers the Brother MFC-L2707DW; USB devices are plug-and-play
