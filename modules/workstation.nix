@@ -39,6 +39,7 @@
     # 3D printing and CAD
     prusa-slicer
     openscad
+    freecad
     
     # Note-taking and productivity
     obsidian 

@@ -1,4 +1,12 @@
 { config, pkgs, ... }:{
+  # Heroic 2.20.1 (heroic-unwrapped) bundles electron-39.8.10, which nixpkgs
+  # 25.11 now flags insecure (EOL Chromium). No newer Heroic on current
+  # nixpkgs drops it, so allow it explicitly. Re-check / drop this on future
+  # nixpkgs bumps once upstream moves to a supported Electron.
+  nixpkgs.config.permittedInsecurePackages = [
+    "electron-39.8.10"
+  ];
+
   # Proper Bluetooth HID profile for Xbox One/Series/Elite controllers.
   # Stock hid_microsoft exposes BT pads as pointer devices, causing the left
   # stick to move the cursor in games. xpadneo replaces it with a gamepad-only
