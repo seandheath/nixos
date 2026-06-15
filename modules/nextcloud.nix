@@ -20,7 +20,7 @@
       dbtype = "pgsql";
     };
     settings = {
-      trusted_domains = [ "nc.luckyobserver.com" "10.0.0.2" ];
+      trusted_domains = [ "nc.luckyobserver.com" "10.0.0.10" ];
       overwriteprotocol = "https";   # we terminate TLS at nginx in front of php-fpm
     };
   };

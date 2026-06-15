@@ -25,11 +25,11 @@
     };
   };
   networking.interfaces.br0.ipv4.addresses = [{
-    address = "10.0.0.2";
+    address = "10.0.0.10";
     prefixLength = 24;
   }];
   #networking.interfaces.enp0s31f6.ipv4.addresses = [{
-    #address = "10.0.0.2";
+    #address = "10.0.0.10";
     #prefixLength = 24;
   #}];
   networking.defaultGateway = "10.0.0.1";
