@@ -140,6 +140,10 @@
 
   # Enable Syncthing
   services.syncthing.enable = true;
+  # GUI stays on localhost (default 127.0.0.1:8384) — reach it via SSH port-forward:
+  #   ssh -L 8384:localhost:8384 sheath@10.0.0.10  ->  http://localhost:8384
+  # Only open the sync protocol ports (22000/tcp+udp, 21027/udp discovery).
+  services.syncthing.openDefaultPorts = true;
 
   # Disk layout, initrd modules, swap, hostPlatform and microcode all come from the
   # installer-generated ../hardware/hydrogen.nix (single source of disk-dependent config).
