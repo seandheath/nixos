@@ -4,13 +4,17 @@
 ### Added
 - hydrogen: self-hosted services — Nextcloud (`nc.luckyobserver.com`), Immich
   (`immich.luckyobserver.com`), calibre-web (`calibre.luckyobserver.com`), paperless-ngx
-  (`paper.luckyobserver.com`), all reverse-proxied by nginx and reachable only over
-  WireGuard/LAN. New modules: `modules/{nextcloud,immich,calibre,paperless}.nix`.
+  (`paper.luckyobserver.com`), reachable only over WireGuard/LAN. New modules:
+  `modules/{nextcloud,immich,calibre,paperless}.nix`.
 - hydrogen wired into `flake.nix` `nixosConfigurations` (was previously absent).
-- `modules/reverse-proxy.nix`: wildcard `*.luckyobserver.com` TLS via Cloudflare ACME DNS-01
-  (`acme-dns-credentials` sops secret); per-service vhosts attach via `useACMEHost`.
+- `modules/reverse-proxy.nix`: **http-only** internal nginx on hydrogen (port 80, routes
+  by Host). TLS is terminated on the router (which holds the Cloudflare token + wildcard
+  cert); Nextcloud trusts the router via `trusted_proxies`/`overwritehost`. No ACME/cert
+  on hydrogen.
 - `docs/nixrouter-wireguard-handoff.md`: router-side instructions (WireGuard split-tunnel
-  server + dnsmasq split-horizon DNS) for the separate `nixrouter` repo.
+  server, **nginx + `*.luckyobserver.com` Cloudflare DNS-01 wildcard TLS**, and
+  dnsmasq split-horizon DNS pointing to the router `10.0.0.1`) for the separate
+  `nixrouter` repo.
 
 ### Changed
 - hydrogen: 25.11 compatibility fixes — removed deprecated `sound.enable`, renamed
@@ -33,7 +37,9 @@
 - Service modules gate startup on the `/data` mount via `RequiresMountsFor = "/data"`.
 
 ### TODO (before switch)
-- Add sops secrets `acme-dns-credentials` (Cloudflare `CF_DNS_API_TOKEN`) and
-  `paperless-adminpass`.
-- Confirm `/data` is mounted to the real disk (placeholder UUID in `hosts/hydrogen.nix`).
+- Add sops secret `paperless-adminpass` to this repo. (`acme-dns-credentials` now lives on
+  the router, not hydrogen.)
+- Router side (separate `nixrouter` repo): add nginx + ACME wildcard + WireGuard per
+  `docs/nixrouter-wireguard-handoff.md`; point split-horizon DNS at the router.
+- Confirm `/data` is mounted to the real disk (installer prompt / generated hardware file).
 - Initialise calibre library: `calibredb add --library-path /data/calibre-library --empty`.

@@ -38,8 +38,7 @@
   networking.firewall.enable = true;
   networking.firewall.allowedTCPPorts = [
     22
-    80
-    443
+    80   # internal http reverse proxy; router terminates TLS in front of it
     6789
     7878
     8096

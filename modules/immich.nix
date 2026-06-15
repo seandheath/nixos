@@ -10,9 +10,8 @@
     mediaLocation = "/data/immich";
   };
 
+  # http vhost (port 80); TLS is terminated on the router in front of this host.
   services.nginx.virtualHosts."immich.luckyobserver.com" = {
-    useACMEHost = "luckyobserver.com";
-    forceSSL = true;
     locations."/" = {
       proxyPass = "http://127.0.0.1:2283";
       proxyWebsockets = true;
