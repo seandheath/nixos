@@ -345,7 +345,9 @@ if [[ "$USE_IMPERMANENCE" == "true" ]]; then
     if [[ "$WANT_DATA" =~ ^[Yy]$ ]]; then
         echo "Available block devices:"
         lsblk -o NAME,SIZE,FSTYPE,LABEL,UUID
-        read -p "Enter the existing data partition to mount as /data (e.g. sdb1): " DATA_NAME
+        echo "(For a multi-device btrfs / RAID array, pick ANY one member -- all members"
+        echo " share one filesystem UUID and the by-uuid mount assembles the whole array.)"
+        read -p "Enter the existing data device/partition to mount as /data (e.g. sdb1): " DATA_NAME
         DATA_DEV="/dev/${DATA_NAME}"
         DATA_UUID=$(sudo blkid -s UUID -o value "$DATA_DEV" || true)
         DATA_TYPE=$(sudo blkid -s TYPE -o value "$DATA_DEV" || true)
@@ -355,18 +357,28 @@ if [[ "$USE_IMPERMANENCE" == "true" ]]; then
         fi
         if [[ "$DATA_TYPE" == "btrfs" ]]; then
             DATA_OPTS='[ "noatime" "compress=zstd" ]'
+            # Confirm the full array (multi-device btrfs members share this UUID).
+            sudo btrfs device scan >/dev/null 2>&1 || true
+            echo "btrfs filesystem for UUID ${DATA_UUID}:"
+            sudo btrfs filesystem show "${DATA_UUID}" || true
+            ndev=$(sudo btrfs filesystem show "${DATA_UUID}" 2>/dev/null | grep -c 'devid' || true)
+            if [[ "${ndev:-1}" -gt 1 ]]; then
+                echo "NOTE: multi-device btrfs (${ndev} devices). The by-uuid mount assembles the"
+                echo "      whole array; ALL ${ndev} drives must be present at boot (RAID0 = no redundancy)."
+            fi
         else
             DATA_OPTS='[ "noatime" ]'
         fi
         DATA_FS_BLOCK="
-  # Existing data disk (preserved, not reformatted by the installer).
+  # Existing data filesystem (preserved, not reformatted by the installer).
+  # For a multi-device btrfs the shared UUID mounts the whole array.
   fileSystems.\"/data\" = {
     device = \"/dev/disk/by-uuid/${DATA_UUID}\";
     fsType = \"${DATA_TYPE}\";
     options = ${DATA_OPTS};
   };
 "
-        echo "Will mount ${DATA_DEV} (${DATA_TYPE}, ${DATA_UUID}) at /data."
+        echo "Will mount UUID ${DATA_UUID} (${DATA_TYPE}) at /data."
     fi
 
     sudo tee "$HARDWARE_DEST" > /dev/null << EOF
