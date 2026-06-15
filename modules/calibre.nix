@@ -1,6 +1,6 @@
 { config, lib, ... }:
 # calibre-web ebook library, reachable only over WireGuard/LAN at
-# https://calibre.nheath.com.
+# https://calibre.luckyobserver.com.
 #
 # NOTE: calibre-web requires an existing Calibre library (metadata.db) at
 # `calibreLibrary` or the service will fail to start. Initialise it once:
@@ -17,8 +17,8 @@
     };
   };
 
-  services.nginx.virtualHosts."calibre.nheath.com" = {
-    useACMEHost = "nheath.com";
+  services.nginx.virtualHosts."calibre.luckyobserver.com" = {
+    useACMEHost = "luckyobserver.com";
     forceSSL = true;
     locations."/" = {
       proxyPass = "http://127.0.0.1:8083";

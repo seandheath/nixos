@@ -1,6 +1,6 @@
 { config, lib, ... }:
 # paperless-ngx document management, reachable only over WireGuard/LAN at
-# https://paper.nheath.com. Documents dropped into the consume dir
+# https://paper.luckyobserver.com. Documents dropped into the consume dir
 # (<dataDir>/consume) or uploaded via the web UI are OCR'd and indexed.
 # scanbd button-driven scanning from the MFC-L2707DW is deferred (out of scope).
 {
@@ -14,13 +14,13 @@
     dataDir = "/data/paperless";
     passwordFile = config.sops.secrets.paperless-adminpass.path;
     settings = {
-      PAPERLESS_URL = "https://paper.nheath.com";
+      PAPERLESS_URL = "https://paper.luckyobserver.com";
       PAPERLESS_OCR_LANGUAGE = "eng";
     };
   };
 
-  services.nginx.virtualHosts."paper.nheath.com" = {
-    useACMEHost = "nheath.com";
+  services.nginx.virtualHosts."paper.luckyobserver.com" = {
+    useACMEHost = "luckyobserver.com";
     forceSSL = true;
     locations."/" = {
       proxyPass = "http://127.0.0.1:28981";

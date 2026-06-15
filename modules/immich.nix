@@ -1,6 +1,6 @@
 { config, lib, ... }:
 # Immich photo/video server, reachable only over WireGuard/LAN at
-# https://immich.nheath.com. The 25.11 module provisions its own PostgreSQL
+# https://immich.luckyobserver.com. The 25.11 module provisions its own PostgreSQL
 # (with the pgvector/vectorchord extension) and Redis automatically.
 {
   services.immich = {
@@ -10,8 +10,8 @@
     mediaLocation = "/data/immich";
   };
 
-  services.nginx.virtualHosts."immich.nheath.com" = {
-    useACMEHost = "nheath.com";
+  services.nginx.virtualHosts."immich.luckyobserver.com" = {
+    useACMEHost = "luckyobserver.com";
     forceSSL = true;
     locations."/" = {
       proxyPass = "http://127.0.0.1:2283";

@@ -2,12 +2,12 @@
 
 ## [Unreleased]
 ### Added
-- hydrogen: self-hosted services — Nextcloud (`nc.nheath.com`), Immich
-  (`immich.nheath.com`), calibre-web (`calibre.nheath.com`), paperless-ngx
-  (`paper.nheath.com`), all reverse-proxied by nginx and reachable only over
+- hydrogen: self-hosted services — Nextcloud (`nc.luckyobserver.com`), Immich
+  (`immich.luckyobserver.com`), calibre-web (`calibre.luckyobserver.com`), paperless-ngx
+  (`paper.luckyobserver.com`), all reverse-proxied by nginx and reachable only over
   WireGuard/LAN. New modules: `modules/{nextcloud,immich,calibre,paperless}.nix`.
 - hydrogen wired into `flake.nix` `nixosConfigurations` (was previously absent).
-- `modules/reverse-proxy.nix`: wildcard `*.nheath.com` TLS via Cloudflare ACME DNS-01
+- `modules/reverse-proxy.nix`: wildcard `*.luckyobserver.com` TLS via Cloudflare ACME DNS-01
   (`acme-dns-credentials` sops secret); per-service vhosts attach via `useACMEHost`.
 - `docs/nixrouter-wireguard-handoff.md`: router-side instructions (WireGuard split-tunnel
   server + dnsmasq split-horizon DNS) for the separate `nixrouter` repo.

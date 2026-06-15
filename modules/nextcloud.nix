@@ -1,7 +1,7 @@
 { config, pkgs, lib, ... }:
-# Nextcloud on hydrogen, reachable only over WireGuard/LAN at https://nc.nheath.com.
+# Nextcloud on hydrogen, reachable only over WireGuard/LAN at https://nc.luckyobserver.com.
 # The nextcloud module generates its own nginx vhost on `hostName`; we attach the
-# wildcard *.nheath.com cert (defined in reverse-proxy.nix) to it below.
+# wildcard *.luckyobserver.com cert (defined in reverse-proxy.nix) to it below.
 {
   # Admin password sourced from sops (reuses the pre-existing secret).
   sops.secrets.nextcloud-adminpass.owner = "nextcloud";
@@ -9,7 +9,7 @@
   services.nextcloud = {
     enable = true;
     package = pkgs.nextcloud32;
-    hostName = "nc.nheath.com";
+    hostName = "nc.luckyobserver.com";
     https = true;
     datadir = "/data/nextcloud";
     database.createLocally = true;   # provisions local PostgreSQL (no dbpass needed)
@@ -20,13 +20,13 @@
       dbtype = "pgsql";
     };
     settings = {
-      trusted_domains = [ "nc.nheath.com" "10.0.0.2" ];
+      trusted_domains = [ "nc.luckyobserver.com" "10.0.0.2" ];
       overwriteprotocol = "https";   # we terminate TLS at nginx in front of php-fpm
     };
   };
 
-  services.nginx.virtualHosts."nc.nheath.com" = {
-    useACMEHost = "nheath.com";
+  services.nginx.virtualHosts."nc.luckyobserver.com" = {
+    useACMEHost = "luckyobserver.com";
     forceSSL = true;
   };
 

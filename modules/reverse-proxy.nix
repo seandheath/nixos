@@ -11,10 +11,10 @@
   # A records or inbound 80/443 required.
   #
   # Secret `acme-dns-credentials` is an env file containing:
-  #   CF_DNS_API_TOKEN=<token scoped to Zone:DNS:Edit on nheath.com>
+  #   CF_DNS_API_TOKEN=<token scoped to Zone:DNS:Edit on luckyobserver.com>
   sops.secrets.acme-dns-credentials = {};
-  security.acme.certs."nheath.com" = {
-    domain = "*.nheath.com";
+  security.acme.certs."luckyobserver.com" = {
+    domain = "*.luckyobserver.com";
     dnsProvider = "cloudflare";
     environmentFile = config.sops.secrets.acme-dns-credentials.path;
     group = "nginx";   # let nginx read the issued cert/key
@@ -30,5 +30,5 @@
 
   # Per-service virtualHosts are defined in each service module
   # (nextcloud.nix, immich.nix, calibre.nix, paperless.nix), all attaching to
-  # the wildcard cert above via `useACMEHost = "nheath.com"`.
+  # the wildcard cert above via `useACMEHost = "luckyobserver.com"`.
 }
