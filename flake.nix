@@ -57,6 +57,13 @@
       ];
     in {
     nixosConfigurations = {
+      hydrogen = nixpkgs.lib.nixosSystem {
+        system = "x86_64-linux";
+        specialArgs = { inherit inputs; lib = nixpkgs.lib; };
+        modules = [
+          ./hosts/hydrogen.nix
+        ] ++ commonModules;
+      };
       osmium = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
         specialArgs = { inherit inputs; lib = nixpkgs.lib; };

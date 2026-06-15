@@ -1,6 +1,13 @@
 { config, pkgs, lib, ... }: {
   imports = [
     ../users/user.nix
+    ../modules/core.nix
+    ../modules/sops.nix
+    ../modules/reverse-proxy.nix
+    ../modules/nextcloud.nix
+    ../modules/immich.nix
+    ../modules/calibre.nix
+    ../modules/paperless.nix
   ];
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
@@ -44,7 +51,6 @@
     wget
     htop
     tree
-    thefuck
     ripgrep
     srm
     vlc
@@ -90,7 +96,6 @@
   };
 
   # Enable sound with pipewire.
-  sound.enable = true;
   hardware.pulseaudio.enable = false;
   security.rtkit.enable = true;
   services.pipewire = {
@@ -126,7 +131,10 @@
 
   # Enable NVIDIA
   services.xserver.videoDrivers = [ "nvidia" ];
-  hardware.opengl.enable = true;
+  hardware.graphics.enable = true;
+  # Driver >= 560 requires an explicit choice of kernel module flavour.
+  # Closed modules are the safe default for unknown/pre-Turing GPUs.
+  hardware.nvidia.open = false;
 
   # Enable Syncthing
   services.syncthing.enable = true;

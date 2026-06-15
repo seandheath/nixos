@@ -1,0 +1,33 @@
+{ config, lib, ... }:
+# paperless-ngx document management, reachable only over WireGuard/LAN at
+# https://paper.nheath.com. Documents dropped into the consume dir
+# (<dataDir>/consume) or uploaded via the web UI are OCR'd and indexed.
+# scanbd button-driven scanning from the MFC-L2707DW is deferred (out of scope).
+{
+  # Initial superuser password from sops (new secret).
+  sops.secrets.paperless-adminpass.owner = "paperless";
+
+  services.paperless = {
+    enable = true;
+    address = "127.0.0.1";
+    port = 28981;
+    dataDir = "/data/paperless";
+    passwordFile = config.sops.secrets.paperless-adminpass.path;
+    settings = {
+      PAPERLESS_URL = "https://paper.nheath.com";
+      PAPERLESS_OCR_LANGUAGE = "eng";
+    };
+  };
+
+  services.nginx.virtualHosts."paper.nheath.com" = {
+    useACMEHost = "nheath.com";
+    forceSSL = true;
+    locations."/" = {
+      proxyPass = "http://127.0.0.1:28981";
+      proxyWebsockets = true;
+      extraConfig = ''
+        client_max_body_size 1G;
+      '';
+    };
+  };
+}

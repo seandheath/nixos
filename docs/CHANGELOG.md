@@ -1,0 +1,24 @@
+# Changelog
+
+## [Unreleased]
+### Added
+- hydrogen: self-hosted services — Nextcloud (`nc.nheath.com`), Immich
+  (`immich.nheath.com`), calibre-web (`calibre.nheath.com`), paperless-ngx
+  (`paper.nheath.com`), all reverse-proxied by nginx and reachable only over
+  WireGuard/LAN. New modules: `modules/{nextcloud,immich,calibre,paperless}.nix`.
+- hydrogen wired into `flake.nix` `nixosConfigurations` (was previously absent).
+- `modules/reverse-proxy.nix`: wildcard `*.nheath.com` TLS via Cloudflare ACME DNS-01
+  (`acme-dns-credentials` sops secret); per-service vhosts attach via `useACMEHost`.
+- `docs/nixrouter-wireguard-handoff.md`: router-side instructions (WireGuard split-tunnel
+  server + dnsmasq split-horizon DNS) for the separate `nixrouter` repo.
+
+### Changed
+- hydrogen: 25.11 compatibility fixes — removed deprecated `sound.enable`, renamed
+  `hardware.opengl` → `hardware.graphics`, set required `hardware.nvidia.open = false`,
+  dropped removed `thefuck` package.
+
+### TODO (before switch)
+- Add sops secrets `acme-dns-credentials` (Cloudflare `CF_DNS_API_TOKEN`) and
+  `paperless-adminpass`.
+- Confirm `/data` is mounted to the real disk (placeholder UUID in `hosts/hydrogen.nix`).
+- Initialise calibre library: `calibredb add --library-path /data/calibre-library --empty`.
