@@ -19,8 +19,9 @@
     };
   };
 
-  # http vhost (port 80); TLS is terminated on the router in front of this host.
   services.nginx.virtualHosts."paper.luckyobserver.com" = {
+    useACMEHost = "luckyobserver.com";
+    forceSSL = true;
     locations."/" = {
       proxyPass = "http://127.0.0.1:28981";
       proxyWebsockets = true;

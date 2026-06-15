@@ -1,19 +1,34 @@
 { config, ... }:
-# HTTP-only internal reverse proxy on hydrogen.
-#
-# TLS is terminated upstream on the ROUTER (which holds the Cloudflare token and the
-# *.luckyobserver.com wildcard cert). The router proxies https://<svc>.luckyobserver.com
-# to http://10.0.0.2 preserving the Host header; this nginx then routes by Host on port 80
-# to the local services. Nextcloud's php-fpm needs a local webserver regardless, so nginx
-# stays on hydrogen -- just without ACME/TLS.
 {
+  security.acme = {
+    acceptTerms = true;
+    defaults.email = "se@nheath.com";
+  };
+
+  # Single wildcard cert for every internal service hostname, issued via the
+  # Cloudflare DNS-01 challenge. Works for WireGuard/LAN-only hosts because
+  # DNS-01 validates with a TXT record Cloudflare creates/removes — no public
+  # A records or inbound 80/443 required.
+  #
+  # Secret `acme-dns-credentials` is an env file containing:
+  #   CF_DNS_API_TOKEN=<token scoped to Zone:DNS:Edit on luckyobserver.com>
+  sops.secrets.acme-dns-credentials = {};
+  security.acme.certs."luckyobserver.com" = {
+    domain = "*.luckyobserver.com";
+    dnsProvider = "cloudflare";
+    environmentFile = config.sops.secrets.acme-dns-credentials.path;
+    group = "nginx";   # let nginx read the issued cert/key
+  };
+
   services.nginx = {
     enable = true;
     recommendedProxySettings = true;
+    recommendedTlsSettings = true;
     recommendedGzipSettings = true;
     recommendedOptimisation = true;
   };
 
-  # Per-service virtualHosts (http, port 80) are defined in each service module
-  # (nextcloud.nix auto-creates its own; immich/calibre/paperless define theirs).
+  # Per-service virtualHosts are defined in each service module
+  # (nextcloud.nix, immich.nix, calibre.nix, paperless.nix), all attaching to
+  # the wildcard cert above via `useACMEHost = "luckyobserver.com"`.
 }
