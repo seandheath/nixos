@@ -267,17 +267,48 @@ echo "Copying configuration to /mnt/home/sheath/nixos..."
 sudo mkdir -p /mnt/home/sheath
 sudo cp -r . /mnt/home/sheath/nixos
 
-# --- Optional: install sops age key ---
+# --- Install sops age key ---
 # sops-nix decrypts secrets at first activation using this key; without it,
 # secret-backed services (acme, nextcloud, paperless) fail on first boot.
-# /home is a persistent subvol, so the key survives thereafter.
 echo
-read -p "Path to sops age key to install (or Enter to skip): " AGE_KEY_SRC
-if [[ -n "$AGE_KEY_SRC" && -f "$AGE_KEY_SRC" ]]; then
-    sudo install -Dm600 "$AGE_KEY_SRC" /mnt/home/sheath/.config/sops/age/keys.txt
-    echo "Age key installed at /home/sheath/.config/sops/age/keys.txt"
-elif [[ -n "$AGE_KEY_SRC" ]]; then
-    echo "Warning: '${AGE_KEY_SRC}' not found; skipping age key install."
+
+# Destination depends on layout: impermanence keeps it on the persistent /persist
+# subvol (root-owned system path, no user-home ownership issues); simple mode uses
+# the home path. These must match `sops.age.keyFile` for the host.
+if [[ "$USE_IMPERMANENCE" == "true" ]]; then
+    AGE_KEY_DEST="/mnt/persist/secrets/age-keys.txt"
+else
+    AGE_KEY_DEST="/mnt/home/sheath/.config/sops/age/keys.txt"
+fi
+
+# Decrypt $1 to stdout using whatever age implementation is available in the live env.
+age_decrypt() {
+    if command -v age >/dev/null 2>&1; then age -d "$1"
+    elif command -v rage >/dev/null 2>&1; then rage -d "$1"
+    else nix --extra-experimental-features 'nix-command flakes' run nixpkgs#age -- -d "$1"
+    fi
+}
+
+if [[ -f secrets/age-key.enc ]]; then
+    echo "Decrypting secrets/age-key.enc (enter its passphrase)..."
+    sudo mkdir -p "$(dirname "$AGE_KEY_DEST")"
+    if age_decrypt secrets/age-key.enc | sudo tee "$AGE_KEY_DEST" >/dev/null; then
+        sudo chmod 600 "$AGE_KEY_DEST"
+        echo "Age key installed at ${AGE_KEY_DEST#/mnt}"
+    else
+        sudo rm -f "$AGE_KEY_DEST"
+        echo "ERROR: failed to decrypt secrets/age-key.enc. Secret-backed services will"
+        echo "fail on first boot until you place the key at ${AGE_KEY_DEST#/mnt} manually."
+    fi
+else
+    # Fallback: copy a plaintext key from a path the user provides.
+    read -p "secrets/age-key.enc not found. Path to plaintext age key (or Enter to skip): " AGE_KEY_SRC
+    if [[ -n "$AGE_KEY_SRC" && -f "$AGE_KEY_SRC" ]]; then
+        sudo install -Dm600 "$AGE_KEY_SRC" "$AGE_KEY_DEST"
+        echo "Age key installed at ${AGE_KEY_DEST#/mnt}"
+    elif [[ -n "$AGE_KEY_SRC" ]]; then
+        echo "Warning: '${AGE_KEY_SRC}' not found; skipping age key install."
+    fi
 fi
 
 # --- Handle Hardware Configuration ---

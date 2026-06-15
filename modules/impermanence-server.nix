@@ -12,6 +12,12 @@
   # Initrd systemd: matches the repo's other Btrfs hosts. Harmless without LUKS/rollback.
   boot.initrd.systemd.enable = true;
 
+  # Keep the sops age key on the persistent /persist subvol (root-owned system path)
+  # rather than under a user's home, so a fresh install doesn't leave ~/.config
+  # root-owned. The installer writes it here (decrypted from secrets/age-key.enc).
+  # Overrides the home-path default set in modules/sops.nix.
+  sops.age.keyFile = lib.mkForce "/persist/secrets/age-keys.txt";
+
   # /persist skeleton (used today only as the btrfs autoScrub target + future secrets dir).
   systemd.tmpfiles.rules = [
     "d /persist 0755 root root -"
