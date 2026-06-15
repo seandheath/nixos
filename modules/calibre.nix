@@ -28,4 +28,7 @@
       '';
     };
   };
+
+  # calibreLibrary lives on the separate /data disk; gate startup on the mount.
+  systemd.services.calibre-web.unitConfig.RequiresMountsFor = "/data";
 }

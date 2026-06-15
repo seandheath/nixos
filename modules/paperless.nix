@@ -30,4 +30,11 @@
       '';
     };
   };
+
+  # dataDir (DB + media + consume) lives on the separate /data disk; gate startup
+  # of every paperless unit on the mount.
+  systemd.services.paperless-web.unitConfig.RequiresMountsFor = "/data";
+  systemd.services.paperless-consumer.unitConfig.RequiresMountsFor = "/data";
+  systemd.services.paperless-scheduler.unitConfig.RequiresMountsFor = "/data";
+  systemd.services.paperless-task-queue.unitConfig.RequiresMountsFor = "/data";
 }

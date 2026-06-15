@@ -29,4 +29,8 @@
     useACMEHost = "nheath.com";
     forceSSL = true;
   };
+
+  # Data dir lives on the separate /data disk; don't start before it is mounted.
+  systemd.services.nextcloud-setup.unitConfig.RequiresMountsFor = "/data";
+  systemd.services.phpfpm-nextcloud.unitConfig.RequiresMountsFor = "/data";
 }

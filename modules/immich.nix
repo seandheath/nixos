@@ -22,4 +22,7 @@
       '';
     };
   };
+
+  # mediaLocation lives on the separate /data disk; gate startup on the mount.
+  systemd.services.immich-server.unitConfig.RequiresMountsFor = "/data";
 }

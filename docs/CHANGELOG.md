@@ -17,6 +17,21 @@
   `hardware.opengl` → `hardware.graphics`, set required `hardware.nvidia.open = false`,
   dropped removed `thefuck` package.
 
+### Added (impermanence install)
+- `install.sh`: new mode 3 "Impermanence (Btrfs, no encryption)" for unattended remote
+  reboot (no LUKS prompt); a `/data` disk prompt that mounts an existing partition by
+  detecting its UUID + fstype via `blkid` (no reformat); and an optional sops age-key
+  install step. All disk-dependent values are written into the generated
+  `hardware/<host>.nix`.
+- `modules/impermanence-server.nix`: layout-only Btrfs/`/persist` module for hydrogen
+  (no LUKS, no active root-wipe; matches sulphur's real behaviour).
+
+### Changed (impermanence install)
+- `hosts/hydrogen.nix`: now imports the installer-generated `hardware/hydrogen.nix`
+  (single source of disk UUIDs) + `impermanence-server.nix`; inline `fileSystems`/`boot`/
+  `swapDevices`/`hostPlatform`/microcode removed; `networking.useDHCP = false` (plain).
+- Service modules gate startup on the `/data` mount via `RequiresMountsFor = "/data"`.
+
 ### TODO (before switch)
 - Add sops secrets `acme-dns-credentials` (Cloudflare `CF_DNS_API_TOKEN`) and
   `paperless-adminpass`.
