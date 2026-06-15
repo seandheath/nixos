@@ -138,6 +138,28 @@
   # Closed modules are the safe default for unknown/pre-Turing GPUs.
   hardware.nvidia.open = false;
 
+  # nix-ld so generic dynamically-linked binaries run (e.g. the official Claude
+  # Code CLI in ~/.local/bin). Mirrors sulphur's modules/workstation.nix config.
+  programs.nix-ld = {
+    enable = true;
+    libraries = with pkgs; [
+      zstd
+      stdenv.cc.cc.lib
+      zlib
+      glib
+      libGL
+      libx11
+      libxcursor
+      libxrandr
+      libxi
+      libxkbcommon
+      wayland
+      fontconfig
+      freetype
+      dbus
+    ];
+  };
+
   # Enable Syncthing
   services.syncthing.enable = true;
   # GUI stays on localhost (default 127.0.0.1:8384) — reach it via SSH port-forward:
