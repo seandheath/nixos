@@ -10,6 +10,12 @@
 # dumps. paperless + calibre-web use SQLite inside their data dirs, which Borg
 # captures directly. Redis is cache-only and is not backed up.
 #
+# CLI: `borg-local` and `borg-remote` (run as root) wrap the borg binary with the
+# matching repo + credentials preset, so e.g. `sudo borg-local list` or
+# `sudo borg-remote extract ::ARCHIVE path` just work. The synthetic subcommand
+# `sudo borg-<local|remote> backup` runs an on-demand backup: it refreshes the
+# pg_dumps, then triggers that repo's borg job (archive + prune).
+#
 # SECRETS (add to secrets/secrets.yaml via sops):
 #   borg-passphrase  - repo encryption passphrase. KEEP A COPY OFF-HYDROGEN; without
 #                      it the backups are unrecoverable.
@@ -25,10 +31,42 @@ let
   ];
   prune = { keep = { daily = 7; weekly = 16; monthly = 24; }; };
   passCommand = "cat ${config.sops.secrets.borg-passphrase.path}";
+
+  # Repo targets + transport, shared between the borg jobs and the CLI wrappers
+  # so there is a single source of truth.
+  localRepo = "/data/borg";   # parent /data is the mount; borg init creates the repo
+  # BorgBase repo (an identifier, not a credential — access needs borg-ssh-key + passphrase).
+  remoteRepo = "ssh://hl4nxm2t@hl4nxm2t.repo.borgbase.com/./repo";
+  remoteRsh =
+    "ssh -i ${config.sops.secrets.borg-ssh-key.path} -o StrictHostKeyChecking=accept-new";
+
+  # `borg-<name>`: borg with this repo's env preset, plus a `backup` subcommand
+  # that refreshes pg_dumps then runs the systemd job. Must run as root (repo
+  # perms, sops-protected key/passphrase, and `systemctl start` of system units).
+  mkBorgCli = { name, repo, rsh ? null }:
+    pkgs.writeShellScriptBin "borg-${name}" ''
+      set -eu
+      export BORG_REPO=${lib.escapeShellArg repo}
+      export BORG_PASSCOMMAND=${lib.escapeShellArg passCommand}
+      ${lib.optionalString (rsh != null) "export BORG_RSH=${lib.escapeShellArg rsh}"}
+      if [ "''${1-}" = "backup" ]; then
+        echo "Refreshing PostgreSQL dumps (nextcloud, immich)..."
+        ${pkgs.systemd}/bin/systemctl start --wait \
+          postgresqlBackup-nextcloud.service postgresqlBackup-immich.service
+        echo "Running borg ${name} backup (archive + prune)..."
+        exec ${pkgs.systemd}/bin/systemctl start --wait borgbackup-job-${name}.service
+      fi
+      exec ${pkgs.borgbackup}/bin/borg "$@"
+    '';
 in
 {
   sops.secrets.borg-passphrase = { };
   sops.secrets.borg-ssh-key = { };
+
+  environment.systemPackages = [
+    (mkBorgCli { name = "local"; repo = localRepo; })
+    (mkBorgCli { name = "remote"; repo = remoteRepo; rsh = remoteRsh; })
+  ];
 
   # Consistent Postgres dumps at 02:45, before the 03:00 Borg runs.
   services.postgresqlBackup = {
@@ -40,7 +78,7 @@ in
 
   services.borgbackup.jobs.local = {
     paths = backupPaths;
-    repo = "/data/borg";   # parent /data is the mount; borg init creates the repo
+    repo = localRepo;
     encryption = { mode = "repokey-blake2"; inherit passCommand; };
     compression = "zstd";
     inherit prune;
@@ -49,11 +87,9 @@ in
 
   services.borgbackup.jobs.remote = {
     paths = backupPaths;
-    # BorgBase repo (an identifier, not a credential — access needs borg-ssh-key + passphrase).
-    repo = "ssh://hl4nxm2t@hl4nxm2t.repo.borgbase.com/./repo";
+    repo = remoteRepo;
     encryption = { mode = "repokey-blake2"; inherit passCommand; };
-    environment.BORG_RSH =
-      "ssh -i ${config.sops.secrets.borg-ssh-key.path} -o StrictHostKeyChecking=accept-new";
+    environment.BORG_RSH = remoteRsh;
     compression = "zstd";
     inherit prune;
     startAt = "*-*-* 03:00:00";
