@@ -9,8 +9,6 @@
 - hydrogen wired into `flake.nix` `nixosConfigurations` (was previously absent).
 - `modules/reverse-proxy.nix`: wildcard `*.luckyobserver.com` TLS via Cloudflare ACME DNS-01
   (`acme-dns-credentials` sops secret); per-service vhosts attach via `useACMEHost`.
-- `docs/nixrouter-wireguard-handoff.md`: router-side instructions (WireGuard split-tunnel
-  server + dnsmasq split-horizon DNS) for the separate `nixrouter` repo.
 
 ### Changed
 - hydrogen: 25.11 compatibility fixes — removed deprecated `sound.enable`, renamed
@@ -30,10 +28,3 @@
 - `hosts/hydrogen.nix`: now imports the installer-generated `hardware/hydrogen.nix`
   (single source of disk UUIDs) + `impermanence-server.nix`; inline `fileSystems`/`boot`/
   `swapDevices`/`hostPlatform`/microcode removed; `networking.useDHCP = false` (plain).
-- Service modules gate startup on the `/data` mount via `RequiresMountsFor = "/data"`.
-
-### TODO (before switch)
-- Add sops secrets `acme-dns-credentials` (Cloudflare `CF_DNS_API_TOKEN`) and
-  `paperless-adminpass`.
-- Confirm `/data` is mounted to the real disk (placeholder UUID in `hosts/hydrogen.nix`).
-- Initialise calibre library: `calibredb add --library-path /data/calibre-library --empty`.
