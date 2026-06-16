@@ -19,15 +19,14 @@ let
   source  = "ADF Duplex";   # both sides; blank backs dropped by swskip below
   mode    = "Color";        # Color | Gray | Lineart
   res     = "300";          # dpi
-  swskip  = "5";            # blank-page skip: drop pages with < N% content
+  swskip  = "5";            # blank-page skip: drop pages with < N% content (set "0" to disable)
 
-  # Paper size of the scan window, in mm. Set to Legal (8.5 x 14") so both Letter
-  # and Legal — and mixed stacks — are captured without clipping; --swcrop=yes
-  # (below) then trims each page down to its real edges, so shorter sheets aren't
-  # padded with blank space. For long-document mode (up to ~220") raise pageHeight
-  # and drop res to <=200. fi-7160 max width is 8.5".
+  # Fixed scan window = US Letter (8.5 x 11"), in mm. No software auto-crop/deskew:
+  # those heuristics mis-detect page edges on the fujitsu backend and crop into the
+  # document, so the full fixed window is captured every time. To scan Legal/long
+  # documents, temporarily raise pageHeight here (or run scanimage manually) and rebuild.
   pageWidth  = "215.9";     # 8.5 in
-  pageHeight = "355.6";     # 14 in (Legal)
+  pageHeight = "279.4";     # 11 in (Letter)
 
   consumeDir = "${config.services.paperless.dataDir}/consume";
   # Staging must share a filesystem with consumeDir so the final `mv` is an atomic
@@ -54,7 +53,7 @@ let
       scanimage "''${dev_args[@]}" \
         --source "${source}" --mode "${mode}" --resolution "${res}" \
         --page-width "${pageWidth}" --page-height "${pageHeight}" \
-        --swcrop=yes --swdeskew=yes --swskip="${swskip}" \
+        --swskip="${swskip}" \
         --batch="$work/p%04d.tif" --format=tiff || rc=$?
       if [ "$rc" -ne 0 ] && [ "$rc" -ne 7 ]; then
         echo "scanimage failed (rc=$rc)" >&2
