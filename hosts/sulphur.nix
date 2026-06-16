@@ -197,5 +197,54 @@ in
     };
   };
 
+  # WireGuard configuration for home LAN access
+  sops.secrets.wg-priv-sulphur = { };
+
+  networking.wg-quick.interfaces.wg0 = {
+    address = [ "10.40.0.3/24" ];
+    privateKeyFile = config.sops.secrets.wg-priv-sulphur.path;
+    table = "off"; # Prevent wg-quick from auto-adding routes to the main table
+    
+    peers = [
+      {
+        publicKey = "ILwElzleBCCQ8vrGGiV2gUY0B33IHB456MQtgT2ZUTE=";
+        allowedIPs = [ "10.0.0.0/24" "10.40.0.0/24" ];
+        endpoint = "vpn.luckyobserver.com:51820";
+        persistentKeepalive = 25;
+      }
+    ];
+
+    postUp = ''
+      # Add route to home LAN with high metric (1000) so local Wi-Fi route takes precedence when at home
+      ip route add 10.0.0.0/24 dev wg0 metric 1000
+    '';
+
+    postDown = ''
+      ip route del 10.0.0.0/24 dev wg0 metric 1000 || true
+    '';
+  };
+
+  # Required to avoid dropping asymmetric routing replies from WireGuard interface
+  networking.firewall.checkReversePath = "loose";
+
+  # Configure Mullvad settings automatically on boot/activation
+  systemd.services.mullvad-configure = {
+    description = "Configure Mullvad settings (LAN sharing and custom DNS)";
+    after = [ "mullvad-daemon.service" ];
+    requires = [ "mullvad-daemon.service" ];
+    wantedBy = [ "multi-user.target" ];
+    serviceConfig = {
+      Type = "oneshot";
+      ExecStart = pkgs.writeShellScript "mullvad-configure" ''
+        # Wait for mullvad daemon to be fully ready
+        until ${config.services.mullvad-vpn.package}/bin/mullvad status >/dev/null 2>&1; do
+          sleep 1
+        done
+        ${config.services.mullvad-vpn.package}/bin/mullvad lan set allow
+        ${config.services.mullvad-vpn.package}/bin/mullvad dns set custom 10.0.0.1 1.1.1.1
+      '';
+    };
+  };
+
   system.stateVersion = "25.11";
 }
