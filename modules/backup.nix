@@ -48,8 +48,8 @@ in
 
   services.borgbackup.jobs.remote = {
     paths = backupPaths;
-    # TODO: replace with your BorgBase repo URL (BorgBase UI -> repo -> "Borg" URL).
-    repo = "ssh://XXXX@XXXX.repo.borgbase.com/./repo";
+    # BorgBase repo (an identifier, not a credential — access needs borg-ssh-key + passphrase).
+    repo = "ssh://hl4nxm2t@hl4nxm2t.repo.borgbase.com/./repo";
     encryption = { mode = "repokey-blake2"; inherit passCommand; };
     environment.BORG_RSH =
       "ssh -i ${config.sops.secrets.borg-ssh-key.path} -o StrictHostKeyChecking=accept-new";
