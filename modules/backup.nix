@@ -20,6 +20,7 @@ let
     "/var/lib/immich"
     "/var/lib/paperless"
     "/var/lib/calibre-web"
+    "/var/lib/syncthing"       # synced folders + config.xml (device keys/IDs) + index DB
     "/var/backup/postgresql"   # consistent pg_dumps (nextcloud + immich)
   ];
   prune = { keep = { daily = 7; weekly = 16; monthly = 24; }; };
