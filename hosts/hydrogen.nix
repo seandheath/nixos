@@ -9,6 +9,7 @@
     ../modules/immich.nix
     ../modules/calibre.nix
     ../modules/paperless.nix
+    ../modules/scanner.nix
     ../modules/backup.nix
   ];
   boot.loader.systemd-boot.enable = true;
