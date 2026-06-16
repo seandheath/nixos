@@ -9,6 +9,7 @@
     ../modules/immich.nix
     ../modules/calibre.nix
     ../modules/paperless.nix
+    ../modules/backup.nix
   ];
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;

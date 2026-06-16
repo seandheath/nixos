@@ -11,7 +11,7 @@
     package = pkgs.nextcloud32;
     hostName = "nc.luckyobserver.com";
     https = true;
-    datadir = "/data/nextcloud";
+    # Data lives on root (/var/lib/nextcloud); backed up via Borg (modules/backup.nix).
     database.createLocally = true;   # provisions local PostgreSQL (no dbpass needed)
     configureRedis = true;           # local Redis for file locking / caching
     config = {
@@ -29,8 +29,4 @@
     useACMEHost = "luckyobserver.com";
     forceSSL = true;
   };
-
-  # Data dir lives on the separate /data disk; don't start before it is mounted.
-  systemd.services.nextcloud-setup.unitConfig.RequiresMountsFor = "/data";
-  systemd.services.phpfpm-nextcloud.unitConfig.RequiresMountsFor = "/data";
 }

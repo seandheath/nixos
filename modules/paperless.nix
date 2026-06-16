@@ -11,7 +11,8 @@
     enable = true;
     address = "127.0.0.1";
     port = 28981;
-    dataDir = "/data/paperless";
+    # Data (SQLite DB + media + consume) lives on root (/var/lib/paperless);
+    # backed up via Borg (modules/backup.nix).
     passwordFile = config.sops.secrets.paperless-adminpass.path;
     settings = {
       PAPERLESS_URL = "https://paper.luckyobserver.com";
@@ -31,10 +32,4 @@
     };
   };
 
-  # dataDir (DB + media + consume) lives on the separate /data disk; gate startup
-  # of every paperless unit on the mount.
-  systemd.services.paperless-web.unitConfig.RequiresMountsFor = "/data";
-  systemd.services.paperless-consumer.unitConfig.RequiresMountsFor = "/data";
-  systemd.services.paperless-scheduler.unitConfig.RequiresMountsFor = "/data";
-  systemd.services.paperless-task-queue.unitConfig.RequiresMountsFor = "/data";
 }

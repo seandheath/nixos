@@ -7,7 +7,7 @@
     enable = true;
     host = "127.0.0.1";
     port = 2283;
-    mediaLocation = "/data/immich";
+    # Media lives on root (/var/lib/immich); backed up via Borg (modules/backup.nix).
   };
 
   services.nginx.virtualHosts."immich.luckyobserver.com" = {
@@ -22,7 +22,4 @@
       '';
     };
   };
-
-  # mediaLocation lives on the separate /data disk; gate startup on the mount.
-  systemd.services.immich-server.unitConfig.RequiresMountsFor = "/data";
 }

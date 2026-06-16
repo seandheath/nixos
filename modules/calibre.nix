@@ -4,15 +4,16 @@
 #
 # NOTE: calibre-web requires an existing Calibre library (metadata.db) at
 # `calibreLibrary` or the service will fail to start. Initialise it once:
-#   calibredb add --library-path /data/calibre-library --empty
+#   calibredb add --library-path /var/lib/calibre-web/library --empty
 # (or import any book), then restart calibre-web.
+# Library lives on root; backed up via Borg (modules/backup.nix).
 {
   services.calibre-web = {
     enable = true;
     listen.ip = "127.0.0.1";
     listen.port = 8083;
     options = {
-      calibreLibrary = "/data/calibre-library";
+      calibreLibrary = "/var/lib/calibre-web/library";
       enableBookUploading = true;
     };
   };
@@ -28,7 +29,4 @@
       '';
     };
   };
-
-  # calibreLibrary lives on the separate /data disk; gate startup on the mount.
-  systemd.services.calibre-web.unitConfig.RequiresMountsFor = "/data";
 }
