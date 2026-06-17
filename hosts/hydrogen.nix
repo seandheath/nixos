@@ -92,6 +92,16 @@
   services.displayManager.gdm.enable = true;
   services.desktopManager.gnome.enable = true;
 
+  # GNOME's power daemon initiates idle-suspend on its own (independent of the
+  # masked systemd sleep targets below). hydrogen is a 24/7 server — never let
+  # the session auto-suspend on idle. Applies to fresh sessions after rebuild.
+  services.desktopManager.gnome.extraGSettingsOverrides = ''
+    [org.gnome.settings-daemon.plugins.power]
+    sleep-inactive-ac-type='nothing'
+    sleep-inactive-battery-type='nothing'
+  '';
+  services.desktopManager.gnome.extraGSettingsOverridePackages = [ pkgs.gnome-settings-daemon ];
+
   # Configure keymap in X11
   services.xserver.xkb = {
     layout = "us";
@@ -121,6 +131,8 @@
   systemd.targets.suspend.enable = false;
   systemd.targets.hibernate.enable = false;
   systemd.targets.hybrid-sleep.enable = false;
+  # Don't let logind suspend/shut down on idle either (belt-and-suspenders).
+  services.logind.settings.Login.IdleAction = "ignore";
 
   # Allow unfree packages
   nixpkgs.config.allowUnfree = true;
