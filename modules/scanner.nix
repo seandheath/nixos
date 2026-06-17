@@ -16,10 +16,17 @@
 # wiki Scanners page, adapted from the upstream scanbd.conf example).
 let
   # Default scan profile. Tweak these and `nixos-rebuild switch`.
-  source  = "ADF Duplex";   # both sides; blank backs dropped by swskip below
-  mode    = "Color";        # Color | Gray | Lineart
-  res     = "300";          # dpi
-  swskip  = "5";            # blank-page skip: drop pages with < N% content (set "0" to disable)
+  source     = "ADF Duplex";   # both sides; blank/bleedthrough backs dropped below
+  mode       = "Color";        # Color | Gray | Lineart
+  res        = "300";          # dpi
+  # Blank-page skip + bleedthrough suppression. brightness/contrast lighten and
+  # clip faint front-side show-through toward white *before* swskip estimates page
+  # content, so bleedthrough backs read as blank and get dropped. Tune all three
+  # against a real duplex stack and `nixos-rebuild switch`. Range -127..127,
+  # default 0 (+brightness lightens, +contrast steepens). Set swskip "0" to disable.
+  swskip     = "8";            # blank-page skip: drop pages with < N% content
+  brightness = "15";           # + lightens; pushes bleedthrough toward white
+  contrast   = "20";           # + clips faint pixels
 
   # Fixed scan window = US Letter (8.5 x 11"), in mm. No software auto-crop/deskew:
   # those heuristics mis-detect page edges on the fujitsu backend and crop into the
@@ -53,6 +60,7 @@ let
       scanimage "''${dev_args[@]}" \
         --source "${source}" --mode "${mode}" --resolution "${res}" \
         --page-width "${pageWidth}" --page-height "${pageHeight}" \
+        --brightness="${brightness}" --contrast="${contrast}" \
         --swskip="${swskip}" \
         --batch="$work/p%04d.tif" --format=tiff || rc=$?
       if [ "$rc" -ne 0 ] && [ "$rc" -ne 7 ]; then
