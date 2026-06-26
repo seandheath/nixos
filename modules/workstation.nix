@@ -105,6 +105,10 @@
     # Web browser
     google-chrome
     mullvad-browser
+
+    # USB hardware tools (Great Scott Gadgets Cynthion)
+    cynthion   # CLI/Python utilities for the Cynthion USB test instrument
+    packetry   # USB 2.0 protocol analyzer GUI for Cynthion
   ];
 
   # Programs
@@ -132,6 +136,9 @@
   };
   
   # Services
+  # Cynthion udev rules (ships 54-cynthion.rules; TAG+="uaccess" grants the
+  # active physical-session user device access — no plugdev group needed).
+  services.udev.packages = [ pkgs.cynthion ];
   services.mullvad-vpn.enable = true;
   services.printing.enable = true;
   services.printing.drivers = [ pkgs.epson-escpr2 pkgs.brlaser ];
