@@ -33,6 +33,11 @@
       url = "github:seandheath/cclaude";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    pi-flake = {
+      url = "github:ChauDucToan/pi-flake";
+      # Deliberately does NOT follow nixpkgs — pi-flake targets nixpkgs-unstable
+      # and forcing our 25.11 pin risks build breakage (mirrors nix-gaming above).
+    };
   };
 
   outputs = { self, nixpkgs, nixos-hardware, home-manager, sops-nix, agenix, impermanence, disko, chaotic, nix-gaming, nix-flatpak, cclaude, ... }@inputs:
