@@ -40,6 +40,7 @@
     prusa-slicer
     openscad
     freecad
+    kicad
     
     # Note-taking and productivity
     obsidian 
