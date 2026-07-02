@@ -28,7 +28,7 @@
     gemini-cli
     git
     python3
-    vscode
+    vscodium
     aider-chat
     gnumake
     nodejs

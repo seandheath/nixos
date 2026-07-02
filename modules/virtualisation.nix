@@ -9,7 +9,7 @@
       vscode-fhs = prev.buildFHSEnv {
         name = "vscode-fhs";
         targetPkgs = pkgs: with pkgs; [
-          vscode
+          vscodium
           podman
           podman-compose
         ];
@@ -17,7 +17,7 @@
           "--ro-bind /etc/subuid /etc/subuid"
           "--ro-bind /etc/subgid /etc/subgid"
         ];
-        runScript = "code";
+        runScript = "codium";
       };
     })
   ];
