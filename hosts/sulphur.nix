@@ -9,6 +9,7 @@ in
     ../modules/steam.nix
     ../modules/mo2.nix
     ../modules/cemu.nix
+    ../modules/farcry2.nix
     ../modules/workstation.nix
     ../modules/virtualisation.nix
     ../modules/impermanence.nix
