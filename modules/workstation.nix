@@ -287,6 +287,7 @@
     - **Commit messages:** Short, technical, imperative mood (e.g., `add MODBUS parser for holding registers`). No fluff.
     - **Never include "co-authored by Claude", "AI-generated", or similar strings in commits.**
     - **Commit, Push, Plan.** Whenever you finish implementing a plan, commit the changes, push the changes, and re-enter plan mode.
+    - When working on system administration projects (editing NixOS configuration) you do not need to make a feature branch. Do a test build after making changes and if it passes you can directly commit and push. This only applies for system administration.
 
     ## Communication Rules
 
