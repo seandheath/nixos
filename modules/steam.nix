@@ -34,10 +34,16 @@
         # 64-bit
         freetype
         fontconfig
-        
+        # The Binding of Isaac: Rebirth (native, appid 250900) links
+        # libGLU.so.1, which the Steam runtime doesn't ship. Without it the
+        # native binary dies at startup with "error while loading shared
+        # libraries: libGLU.so.1". libGL/mesa GLU is separate from the driver.
+        libGLU
+
         # 32-bit (critical for Wine)
         pkgsi686Linux.freetype
         pkgsi686Linux.fontconfig
+        pkgsi686Linux.libGLU
       ];
     };
   };
