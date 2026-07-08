@@ -12,18 +12,24 @@
   boot.kernelParams = [
     "nvme_core.default_ps_max_latency_us=0"
     "i915.enable_psr=0"  # Disable PSR to fix aux errors on Arrow Lake graphics
-    # Suppress the phantom nvidia_0 backlight so GNOME/mutter can only pick the
-    # real eDP panel (intel_backlight). In Hybrid mode nvidia_0 is a stuck, unwired
-    # raw backlight; on resume the eDP connector briefly re-probes and mutter falls
-    # back to the "first raw" device - nvidia_0 (PCI 01:00.0 sorts before Intel's
-    # 00:02.0) - then caches it, so keys/slider silently drive a dead device.
-    #
-    # nixos-hardware's asus/zephyrus/shared/backlight.nix tries to do this but has
-    # a typo: "NVReg_RegistryDwords" (capital R) is not a valid nvidia token and is
-    # silently ignored (/proc/driver/nvidia/params shows RegistryDwords empty). The
-    # correct token is "NVreg_"; this line overrides it. Verify after boot:
-    #   grep RegistryDwords /proc/driver/nvidia/params   # -> EnableBrightnessControl=0
-    #   ls /sys/class/backlight/                         # -> intel_backlight only
+
+    # Brightness keys/slider did nothing: intel_backlight exists but writes to it
+    # never moved the panel. The kernel told us why during eDP-1 probe:
+    #   [drm] [CONNECTOR:262:eDP-1] Panel is missing HDR static metadata. Possible
+    #   support for Intel HDR backlight interface is not used. If your backlight
+    #   controls don't work try booting with i915.enable_dpcd_backlight=3.
+    # nixos-hardware's asus module sets =1 (DPCD, non-HDR); this panel needs =3
+    # (DPCD incl. the HDR/VESA interface). Our params are appended after the
+    # module's, and last-wins for an int modparam, so =3 overrides =1. Verify:
+    #   cat /proc/cmdline   # -> ...enable_dpcd_backlight=3 must appear LAST
+    "i915.enable_dpcd_backlight=3"
+
+    # NOTE (dead-but-harmless): the NVreg line below was an attempt to suppress the
+    # phantom nvidia_0 raw backlight so mutter couldn't bind to it. It does NOT work
+    # on the OPEN nvidia driver - the correct token applies (params show
+    # EnableBrightnessControl=0) yet nvidia_0 still spawns. Kept only because losing
+    # it changes nothing; the real backlight fix is enable_dpcd_backlight=3 above.
+    # If mutter is ever seen driving nvidia_0 after resume, mask it via udev instead.
     "nvidia.NVreg_RegistryDwords=EnableBrightnessControl=0"
   ];
 
