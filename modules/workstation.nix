@@ -8,6 +8,9 @@
   ];
   # Common workstation applications that work with any desktop environment
   environment.systemPackages = with pkgs; [
+    # Screenshots
+    flameshot
+
     # Document creation and processing
     tectonic
     pandoc
@@ -28,7 +31,6 @@
     gemini-cli
     git
     python3
-    vscodium
     aider-chat
     gnumake
     nodejs

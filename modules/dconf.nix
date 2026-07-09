@@ -79,13 +79,22 @@
             "/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom1/"
           ];
           home = [ "<Super>e" ];
-          area-screenshot-clip = [ "<Ctrl><Alt><Shift>s" ];
+          # Free the built-in area screenshot; flameshot takes this chord below.
+          area-screenshot-clip = mkEmptyArray type.string;
         };
         "org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0" =
           {
             binding = "<Alt>Return";
             command = "/etc/profiles/per-user/sheath/bin/kitty";
             name = "open-terminal";
+          };
+        # flameshot gui = interactive area select. --delay 200 works around GNOME
+        # Wayland losing the region grab if the tool spawns before the chord releases.
+        "org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom1" =
+          {
+            binding = "<Ctrl><Alt><Shift>s";
+            command = "flameshot gui --delay 200";
+            name = "flameshot-area";
           };
         "org/gnome/germinal/legacy".theme-variant = "dark";
       };
