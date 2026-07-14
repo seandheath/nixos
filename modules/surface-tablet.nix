@@ -2,6 +2,8 @@
 { config, lib, pkgs, ... }:
 
 {
+  imports = [ ./bluetooth.nix ];
+
   services.upower.enable = true;
   programs.dconf.enable = true;
 
@@ -233,15 +235,5 @@
     hide-on-key-press=True
   '';
 
-  # Bluetooth support for tablet peripherals
-  hardware.bluetooth = {
-    enable = true;
-    powerOnBoot = true;
-    settings = {
-      General = {
-        Enable = "Source,Sink,Media,Socket";
-        Experimental = true;
-      };
-    };
-  };
+  # Bluetooth support for tablet peripherals is provided by ./bluetooth.nix
 }
