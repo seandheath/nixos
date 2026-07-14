@@ -8,6 +8,8 @@
         ms-python.debugpy
         detachhead.basedpyright   # open-source language server / type checker
         charliermarsh.ruff        # lint + format
+        llvm-vs-code-extensions.vscode-clangd  # C/C++ language server client
+        teabyii.ayu               # Ayu color themes
       ];
       userSettings = {
         # Pylance's license forbids running on VSCodium, so stop ms-python from
@@ -20,7 +22,15 @@
           "editor.formatOnSave" = true;
           "editor.codeActionsOnSave"."source.organizeImports" = "explicit";
         };
+        # Pin clangd to the nix-store binary (same clang-tools neovim uses) so the
+        # extension never tries to auto-download a dynamically-linked clangd, which
+        # can't run on NixOS. clang-tools ships clangd/clang-format/clang-tidy.
+        "clangd.path" = "${pkgs.clang-tools}/bin/clangd";
+        "clangd.onConfigChanged" = "restart";
+        "clangd.checkUpdates" = false;  # binary is nix-managed; suppress update nagging
         "telemetry.telemetryLevel" = "off";
+        "workbench.colorTheme" = "Ayu Dark Bordered";
+        "claudeCode.preferredLocation" = "panel";
       };
     };
   };

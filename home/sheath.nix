@@ -6,6 +6,7 @@
     ./git.nix
     ./go.nix
     ./neovim.nix
+    ./vscode.nix
     ./monitors.nix
     inputs.sops-nix.homeManagerModules.sops
   ];
