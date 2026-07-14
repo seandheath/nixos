@@ -3,8 +3,8 @@
     enable = true;
     openDefaultPorts = true;
     user = "sheath";
-    dataDir = "/home/sheath";
-    configDir = "/home/sheath/.config/syncthing";
+    dataDir = config.users.users.sheath.home;
+    configDir = "${config.users.users.sheath.home}/.config/syncthing";
     guiAddress = "127.0.0.1:8384";
   };
 }

@@ -11,7 +11,7 @@
     inputs.sops-nix.homeManagerModules.sops
   ];
   sops.defaultSopsFile = ../secrets/secrets.yaml;
-  sops.age.keyFile = "/home/sheath/.config/sops/age/keys.txt";
+  sops.age.keyFile = "${config.home.homeDirectory}/.config/sops/age/keys.txt";
 
   # Pi coding agent (pi.dev) — the Open WebUI provider config is rendered at
   # activation from sops so the internal URL, model id and API key never land
