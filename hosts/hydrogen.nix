@@ -134,8 +134,7 @@
   # Don't let logind suspend/shut down on idle either (belt-and-suspenders).
   services.logind.settings.Login.IdleAction = "ignore";
 
-  # Allow unfree packages
-  nixpkgs.config.allowUnfree = true;
+  # (allowUnfree is set centrally in flake.nix commonModules)
 
   # Enable the OpenSSH daemon.
   services.openssh = {

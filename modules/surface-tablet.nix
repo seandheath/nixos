@@ -57,14 +57,14 @@
   boot.initrd.kernelModules = [ "surface_aggregator" ];
 
   # Enable all firmware (required for Surface hardware)
-  nixpkgs.config.allowUnfree = true;
+  # (allowUnfree is set centrally in flake.nix commonModules)
   hardware.enableRedistributableFirmware = true;
   hardware.enableAllFirmware = true;
 
   # Surface Pen (stylus) support
   services.xserver.wacom.enable = true;
 
-  # Disable power-profiles-daemon to avoid conflict with TLP
+  # Power management via power-profiles-daemon (no TLP configured on this host).
   services.power-profiles-daemon.enable = true;
 
   # Memory optimization for 4GB RAM systems

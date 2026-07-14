@@ -13,10 +13,6 @@
       url = "github:Mic92/sops-nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    agenix = {
-      url = "github:ryantm/agenix";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
     impermanence.url = "github:nix-community/impermanence";
     disko = {
       url = "github:nix-community/disko";
@@ -40,12 +36,13 @@
     };
   };
 
-  outputs = { self, nixpkgs, nixos-hardware, home-manager, sops-nix, agenix, impermanence, disko, chaotic, nix-gaming, nix-flatpak, cclaude, ... }@inputs:
+  outputs = { self, nixpkgs, nixos-hardware, home-manager, sops-nix, impermanence, disko, chaotic, nix-gaming, nix-flatpak, cclaude, ... }@inputs:
     let
       commonModules = [
         home-manager.nixosModules.home-manager
         sops-nix.nixosModules.sops
         nix-flatpak.nixosModules.nix-flatpak
+        ./modules/nix-settings.nix
         {
           home-manager.useGlobalPkgs = true;
           home-manager.useUserPackages = true;
@@ -53,10 +50,6 @@
           home-manager.extraSpecialArgs = { inherit inputs; };
           users.users.sheath = import ./users/sheath.nix;
           users.groups.sheath = {};
-          nix.settings.download-buffer-size = 1073741824;
-          nix.settings.experimental-features = [ "nix-command" "flakes" ];
-          nix.settings.substituters = [ "https://pebble.cachix.org" ];
-          nix.settings.trusted-public-keys = [ "pebble.cachix.org-1:aTqwT2hR6lGggw/rPISRcHZctDv2iF7ewsVxf3Hq6ow=" ];
           nixpkgs.config.allowUnfree = true;
         }
       ];

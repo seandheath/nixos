@@ -3,11 +3,8 @@
 { config, pkgs, lib, inputs, ... }:
 
 {
-  # Cachix for pre-built nix-gaming binaries
-  nix.settings = {
-    substituters = [ "https://nix-gaming.cachix.org" ];
-    trusted-public-keys = [ "nix-gaming.cachix.org-1:nbjlureqMbRAxR1gJ/f3hxemL9svXaZF/Ees8vCUUs4=" ];
-  };
+  # nix-gaming.cachix.org substituter is configured centrally in
+  # modules/nix-settings.nix (imported by all hosts).
 
   environment.systemPackages = [
     # MO2 installer from nix-gaming flake
