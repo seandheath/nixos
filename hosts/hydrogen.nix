@@ -15,6 +15,9 @@
   ];
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
+  # Adds a "Memory Test (memtest86+)" entry to the systemd-boot menu. Used to
+  # diagnose the transient btrfs csum failures (RAM the prime suspect).
+  boot.loader.systemd-boot.memtest86.enable = true;
 
   networking.hostName = "hydrogen"; # Define your hostname.
 
