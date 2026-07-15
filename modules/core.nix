@@ -1,8 +1,17 @@
-# Edit this configuration file to define what should be installed on
-# your system.  Help is available in the configuration.nix(5) man page
-# and in the NixOS manual (accessible by running ‘nixos-help’).
+# Base system config for hydrogen (the only host that imports this module):
+# admin CLI tooling + sudo policy.
+{ config, pkgs, lib, ... }:
+{
+  # Passwordless sudo for sheath. SECURITY: any process running as sheath, or a
+  # compromised SSH key, gets root with no password prompt. Scoped to hydrogen
+  # (this module) only. Enables unattended remote administration.
+  security.sudo.extraRules = [
+    {
+      users = [ "sheath" ];
+      commands = [ { command = "ALL"; options = [ "NOPASSWD" ]; } ];
+    }
+  ];
 
-{ config, pkgs, lib, ... }:{
   environment.systemPackages = with pkgs; [
     pv
     progress
