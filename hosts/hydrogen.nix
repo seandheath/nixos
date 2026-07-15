@@ -11,6 +11,7 @@
     ../modules/paperless.nix
     ../modules/scanner.nix
     ../modules/backup.nix
+    ../modules/auto-update.nix        # nightly stable-branch security updates (server runs 24/7)
   ];
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
