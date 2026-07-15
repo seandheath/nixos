@@ -143,6 +143,12 @@
     settings.PermitRootLogin = "no";
   };
 
+  # PostgreSQL for nextcloud + immich (shared instance). Pinned explicitly rather
+  # than tracking the stateVersion default, so future stateVersion bumps don't
+  # silently trigger another major upgrade. Moving 15 -> 17 is a deliberate
+  # dump/restore migration (see docs/plan); the pg15 data dir is left intact.
+  services.postgresql.package = pkgs.postgresql_17;
+
   # Enable NVIDIA
   services.xserver.videoDrivers = [ "nvidia" ];
   hardware.graphics.enable = true;
@@ -189,5 +195,5 @@
   # this value at the release version of the first install of this system.
   # Before changing this value read the documentation for this option
   # (e.g. man configuration.nix or on https://nixos.org/nixos/options.html).
-  system.stateVersion = "23.11"; # Did you read the comment?
+  system.stateVersion = "25.11"; # bumped 23.11 -> 25.11 alongside the pg15->17 migration
 }
