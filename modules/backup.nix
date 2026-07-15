@@ -23,7 +23,7 @@
 let
   backupPaths = [
     "/var/lib/nextcloud"
-    "/var/lib/immich"
+    "/data/immich"             # media moved off root SSD to the big /data disk
     "/var/lib/paperless"
     "/var/lib/calibre-web"
     "/var/lib/syncthing"       # synced folders + config.xml (device keys/IDs) + index DB
