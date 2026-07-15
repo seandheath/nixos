@@ -55,16 +55,6 @@
       options = [ "fmask=0022" "dmask=0022" ];
     };
 
-  # Big 5.5T btrfs data disk (RAID0 over sda+sdb). Holds Immich media
-  # (/data/immich), the local Borg repo (/data/borg), and existing movies/tv.
-  # subvol=/ is the top-level subvolume (subvolid 5) where that content lives.
-  # nofail so a missing/degraded disk never blocks boot.
-  fileSystems."/data" =
-    { device = "/dev/disk/by-uuid/75c4fbbf-7ab0-42f2-b333-31d825d280c2";
-      fsType = "btrfs";
-      options = [ "subvol=/" "compress=zstd" "noatime" "nofail" ];
-    };
-
   swapDevices = [ ];
 
   nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
