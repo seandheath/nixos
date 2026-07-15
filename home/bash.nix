@@ -47,30 +47,39 @@
           srm -rf "$dir"
       }
       
-      nr() {
-        local target_host
+      # Pick the host to build for: fzf-choose on the generic "nixos" installer
+      # image, otherwise the current machine.
+      _nix_target_host() {
         if [[ "$HOSTNAME" == "nixos" ]]; then
-          target_host=$(ls -1 $HOME/nixos/hosts | sed 's/\.nix$//' | fzf)
+          ls -1 $HOME/nixos/hosts | sed 's/\.nix$//' | fzf
         else
-          target_host=$HOSTNAME
+          echo "$HOSTNAME"
         fi
+      }
+
+      # nr: deploy the current config against the pinned flake.lock. Does NOT bump
+      # inputs -- nixpkgs/security updates are handled nightly by system.autoUpgrade
+      # (modules/auto-update.nix). Use `nu` when you deliberately want to advance
+      # the lock.
+      nr() {
+        local target_host=$(_nix_target_host)
         if [[ -n "$target_host" ]]; then
-          nix flake update --flake $HOME/nixos && \
           sudo nixos-rebuild switch --no-write-lock-file --flake $HOME/nixos#"$target_host"
         fi
       }
-      
+
+      # nb: same as nr but stage for next boot (kernel/bootloader changes).
       nb() {
-        local target_host
-        if [[ "$HOSTNAME" == "nixos" ]]; then
-          target_host=$(ls -1 $HOME/nixos/hosts | sed 's/\.nix$//' | fzf)
-        else
-          target_host=$HOSTNAME
-        fi
+        local target_host=$(_nix_target_host)
         if [[ -n "$target_host" ]]; then
-          nix flake update --flake $HOME/nixos && \
           sudo nixos-rebuild boot --no-write-lock-file --flake $HOME/nixos#"$target_host"
         fi
+      }
+
+      # nu: deliberately bump ALL flake inputs (nixpkgs + home-manager + ...),
+      # rewriting flake.lock, then switch. Commit the resulting lock change.
+      nu() {
+        nix flake update --flake $HOME/nixos && nr
       }
 
       pdfrasterize() (
