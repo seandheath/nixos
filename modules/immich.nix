@@ -8,6 +8,12 @@
     host = "127.0.0.1";
     port = 2283;
     # Media lives on root (/var/lib/immich); backed up via Borg (modules/backup.nix).
+
+    # Immich has fully migrated off pgvecto.rs to VectorChord. The leftover
+    # `vectors` extension is not installable on pg17 (no vectors.control) and was
+    # never created here, so stop preloading the dead vectors.so — VectorChord
+    # (enableVectorChord, default) is the only vector extension immich needs.
+    database.enableVectors = false;
   };
 
   services.nginx.virtualHosts."immich.luckyobserver.com" = {
