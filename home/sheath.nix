@@ -18,7 +18,17 @@ in
     ./vscode.nix
     ./monitors.nix
     inputs.sops-nix.homeManagerModules.sops
+    inputs.nix-index-database.homeModules.nix-index
   ];
+
+  # nix-index: `nix-locate <file>` finds which package provides a binary/file,
+  # and hooks bash's command-not-found to suggest the package. comma (`,`)
+  # runs an uninstalled program directly from the index. The file database is
+  # the prebuilt one from the nix-index-database input (no local `nix-index`
+  # run); it refreshes when that input is bumped (`nu`). Shared across all
+  # hosts via commonModules.
+  programs.nix-index.enable = true;
+  programs.nix-index-database.comma.enable = true;
 
   # Pi's Open WebUI provider config is rendered at activation from sops so the
   # internal URL, model id and API key never land in the (public) flake or the

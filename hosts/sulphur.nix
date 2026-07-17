@@ -53,6 +53,7 @@ in
     pciutils
     usbutils
     lshw
+    file
     btrfs-progs
     (callPackage ../packages/jackify.nix {})
   ];

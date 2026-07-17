@@ -29,6 +29,13 @@
       url = "github:seandheath/cclaude";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    # Prebuilt nix-index database (nix-locate/command-not-found/comma).
+    # DB is pinned to this input's rev and refreshes on deliberate input bumps
+    # (`nu`), not the nightly autoUpgrade (which runs --no-write-lock-file).
+    nix-index-database = {
+      url = "github:nix-community/nix-index-database";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     pi-flake = {
       url = "github:ChauDucToan/pi-flake";
       # Deliberately does NOT follow nixpkgs — pi-flake targets nixpkgs-unstable

@@ -16,7 +16,6 @@
     pv
     progress
     neovim
-    nix-index
     wormhole-william
     git
     curl
