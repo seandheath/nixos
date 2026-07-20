@@ -7,7 +7,10 @@
     enable = true;
     host = "127.0.0.1";
     port = 2283;
-    # Media lives on root (/var/lib/immich); backed up via Borg (modules/backup.nix).
+    # Media lives on the big /data disk (/data/immich), off the small root SSD.
+    # The dir must be pre-created and owned by immich (module doesn't create a
+    # non-default mediaLocation). Backed up via Borg (modules/backup.nix).
+    mediaLocation = "/data/immich";
 
     # Immich has fully migrated off pgvecto.rs to VectorChord. The leftover
     # `vectors` extension is not installable on pg17 (no vectors.control) and was
@@ -15,6 +18,12 @@
     # (enableVectorChord, default) is the only vector extension immich needs.
     database.enableVectors = false;
   };
+
+  # Don't start immich before the /data disk is mounted (media lives there now).
+  # The module's real units are immich-server + immich-machine-learning (there is
+  # no "immich" unit). Mirrors the RequiresMountsFor guard on the local borg job.
+  systemd.services.immich-server.unitConfig.RequiresMountsFor = "/data";
+  systemd.services.immich-machine-learning.unitConfig.RequiresMountsFor = "/data";
 
   services.nginx.virtualHosts."immich.luckyobserver.com" = {
     useACMEHost = "luckyobserver.com";
