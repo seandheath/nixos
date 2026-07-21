@@ -127,6 +127,23 @@
   networking.firewall.interfaces."br0".allowedTCPPorts = [ 21115 21116 21117 21118 21119 ];
   networking.firewall.interfaces."br0".allowedUDPPorts = [ 21116 ];
 
+  # Auto-start the RustDesk host with the (autologin) graphical session, so the box
+  # accepts connections after boot without launching it by hand. Runs as a user
+  # service under graphical-session.target so it inherits the Wayland/DBus/portal
+  # env needed for screen capture. Unattended password + direct-IP are set once in
+  # the app (stateful, in ~/.config/rustdesk).
+  systemd.user.services.rustdesk = {
+    description = "RustDesk remote-desktop host";
+    partOf = [ "graphical-session.target" ];
+    after = [ "graphical-session.target" ];
+    wantedBy = [ "graphical-session.target" ];
+    serviceConfig = {
+      ExecStart = "${pkgs.rustdesk-flutter}/bin/rustdesk";
+      Restart = "on-failure";
+      RestartSec = 5;
+    };
+  };
+
   # Configure keymap in X11
   services.xserver.xkb = {
     layout = "us";
