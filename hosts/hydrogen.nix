@@ -95,6 +95,10 @@
   # Enable the GNOME Desktop Environment.
   services.displayManager.gdm.enable = true;
   services.desktopManager.gnome.enable = true;
+  # Run the session on X11, not Wayland: gnome-remote-desktop's screen capture
+  # produces blank/white frames on NVIDIA+Wayland. X11 capture works reliably with
+  # the proprietary driver, which is what the RDP screen-share needs.
+  services.displayManager.gdm.wayland = false;
   # NOTE: autoLogin for sheath is already enabled further below — that running
   # session is what the gnome-remote-desktop user daemon screen-shares.
 
