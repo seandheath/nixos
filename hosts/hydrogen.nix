@@ -97,12 +97,12 @@
   services.displayManager.gdm.enable = true;
   services.desktopManager.gnome.enable = true;
   # NOTE: autoLogin for sheath is already enabled further below — that running
-  # session (on the laptop's eDP panel) is what Sunshine captures for Moonlight.
+  # session (on the laptop's eDP panel) is what RustDesk captures for remote clients.
 
   # GNOME's power daemon initiates idle-suspend on its own (independent of the
   # masked systemd sleep targets below). hydrogen is a 24/7 server — never let
   # the session auto-suspend on idle. Also disable the lock screen + idle blanking
-  # so Sunshine always has a live, rendered desktop on the eDP panel to capture.
+  # so remote-desktop capture (RustDesk) always has a live desktop on the eDP panel.
   # Applies to fresh sessions after rebuild.
   services.desktopManager.gnome.extraGSettingsOverrides = ''
     [org.gnome.settings-daemon.plugins.power]
@@ -118,27 +118,12 @@
   '';
   services.desktopManager.gnome.extraGSettingsOverridePackages = [ pkgs.gnome-settings-daemon ];
 
-  # Remote desktop: Sunshine (KMS capture + NVENC) streamed to Moonlight clients.
-  # RDP via gnome-remote-desktop was abandoned — mutter's screencast produces blank
-  # frames on NVIDIA+Wayland (upstream mutter #3297). Sunshine's KMS capture bypasses
-  # that broken path. capSysAdmin grants the cap_sys_admin needed for KMS capture on
-  # Wayland; nvidia-drm.modeset=1 (from hardware.nvidia.modesetting) is required and
-  # already set. First run: set admin creds + pair Moonlight at https://<hydrogen-ip>:47990.
-  services.sunshine = {
-    enable = true;
-    # Build with CUDA/NVENC. Without it Sunshine falls back to a software encode
-    # path whose GL frame-copy errors (GL_INVALID_VALUE) on NVIDIA → black stream;
-    # the NVENC/GPU path avoids that. Driver libs are at /run/opengl-driver/lib.
-    package = pkgs.sunshine.override { cudaSupport = true; };
-    capSysAdmin = true;   # required for Wayland KMS screen capture
-    openFirewall = true;  # Moonlight/Sunshine ports (LAN)
-    autoStart = true;     # start with the autologin session
-  };
-
-  # RustDesk direct-IP remote desktop (LAN). Uses the xdg-desktop-portal ScreenCast
-  # path — a different capture route than Sunshine/gnome-remote-desktop. Host app
-  # runs in the autologin session; set an unattended password + enable direct-IP in
-  # its Security settings. 21118 is the direct-access port; open its full range.
+  # RustDesk direct-IP remote desktop (LAN). Captures via the xdg-desktop-portal
+  # ScreenCast path, which works on this NVIDIA+Wayland box — unlike gnome-remote-desktop
+  # RDP (blank frames, mutter #3297) and Sunshine KMS capture (GL_INVALID_VALUE), both
+  # tried and abandoned. Host app runs in the autologin session; set an unattended
+  # password + enable direct-IP in its Security settings. 21118 is the direct-access
+  # port; open its full range.
   networking.firewall.interfaces."br0".allowedTCPPorts = [ 21115 21116 21117 21118 21119 ];
   networking.firewall.interfaces."br0".allowedUDPPorts = [ 21116 ];
 

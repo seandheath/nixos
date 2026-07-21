@@ -22,8 +22,7 @@
     thunderbird
 
     # Remote access
-    moonlight-qt   # Moonlight client for hydrogen's Sunshine host
-    rustdesk-flutter   # RustDesk (host on hydrogen, client on workstations); LAN direct-IP
+    rustdesk-flutter   # RustDesk client for hydrogen (host); LAN direct-IP
 
     # Development tools
     hexo-cli
