@@ -106,6 +106,13 @@
   '';
   services.desktopManager.gnome.extraGSettingsOverridePackages = [ pkgs.gnome-settings-daemon ];
 
+  # Remote desktop over RDP. gnome-remote-desktop screen-shares sheath's active
+  # GNOME session (connect to the live desktop). Credentials + a self-signed TLS
+  # cert are configured statefully per-user with `grdctl rdp ...` (not pure Nix).
+  # Scoped to the LAN bridge (br0) only; hydrogen has no WireGuard interface.
+  services.gnome.gnome-remote-desktop.enable = true;
+  networking.firewall.interfaces."br0".allowedTCPPorts = [ 3389 ];
+
   # Configure keymap in X11
   services.xserver.xkb = {
     layout = "us";
