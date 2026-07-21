@@ -90,10 +90,27 @@
           };
         # flameshot gui = interactive area select. --delay 200 works around GNOME
         # Wayland losing the region grab if the tool spawns before the chord releases.
+        #
+        # Launched via systemd-run, NOT directly. gsd-media-keys runs in
+        # session.slice/org.gnome.SettingsDaemon.MediaKeys.service and its children
+        # inherit that cgroup, so xdg-desktop-portal attributes the Screenshot request
+        # to that unit rather than to the empty (host) app-id. The only grant in the
+        # permission store is for the empty app-id, so the portal fell back to a
+        # permission dialog -- which mutter refuses to show, since flameshot has no
+        # window and therefore no focus ("Only the focused app is allowed to show a
+        # system access dialog"). Result was a silent "Unable to capture screen".
+        # systemd-run places flameshot in its own app.slice unit, which the portal
+        # maps to the empty app-id, matching the stored grant and skipping the dialog.
+        #
+        # Depends on undeclarable state: ~/.local/share/flatpak/db/screenshot. If that
+        # is wiped, re-grant by running `flameshot gui` once from a focused terminal
+        # and approving the prompt.
         "org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom1" =
           {
             binding = "<Ctrl><Alt><Shift>s";
-            command = "flameshot gui --delay 200";
+            command =
+              "/run/current-system/sw/bin/systemd-run --user --collect --quiet "
+              + "/run/current-system/sw/bin/flameshot gui --delay 200";
             name = "flameshot-area";
           };
         "org/gnome/germinal/legacy".theme-variant = "dark";
