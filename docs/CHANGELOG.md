@@ -15,6 +15,16 @@
   `hardware.opengl` → `hardware.graphics`, set required `hardware.nvidia.open = false`,
   dropped removed `thefuck` package.
 
+### Fixed
+- sulphur: flameshot's `<Ctrl><Alt><Shift>s` binding failed with "Unable to capture
+  screen" on GNOME Wayland. gsd-media-keys children inherit its `session.slice` cgroup,
+  so xdg-desktop-portal attributed the Screenshot request to that unit rather than the
+  empty host app-id holding the permission-store grant; the resulting permission dialog
+  was refused by mutter because flameshot has no focus. `modules/dconf.nix` now launches
+  it via `systemd-run --user`, placing it in `app.slice` where the grant applies.
+  Depends on `~/.local/share/flatpak/db/screenshot`, which is not declarable — if wiped,
+  run `flameshot gui` once from a focused terminal and approve the prompt.
+
 ### Added (impermanence install)
 - `install.sh`: new mode 3 "Impermanence (Btrfs, no encryption)" for unattended remote
   reboot (no LUKS prompt); a `/data` disk prompt that mounts an existing partition by
