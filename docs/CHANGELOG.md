@@ -16,6 +16,18 @@
   dropped removed `thefuck` package.
 
 ### Fixed
+- hydrogen: `modules/impermanence-server.nix` marks `/persist` `neededForBoot`, so sops
+  secrets install at boot. `sops-install-secrets` runs from the initrd activation script,
+  which executes before the ordinary fileSystems are mounted -- activation ran at 14:42:35
+  and `/persist` was mounted at 14:42:38, so the age key at `/persist/secrets/age-keys.txt`
+  was unreadable, `setupSecrets` failed, `/run/secrets` was never created, and every
+  sops-consuming unit died with `243/CREDENTIALS`: paperless-{web,consumer,scheduler},
+  `nextcloud-setup`, `acme-order-renew-luckyobserver.com`, and both borg jobs. The failure
+  was self-concealing -- any later `nixos-rebuild switch` re-runs activation with `/persist`
+  mounted and silently repairs `/run/secrets` -- so it was only visible between a reboot and
+  the next rebuild, and had been failing on every boot since at least Jul 15. Verify this one
+  across an actual reboot, not a rebuild.
+
 - sulphur: dropped flameshot entirely; `<Ctrl><Alt><Shift>s` now uses gnome-shell's
   built-in `area-screenshot-clip` (area select to clipboard, no portal round-trip).
   Flameshot on GNOME Wayland needed three stacked workarounds -- `systemd-run` for
