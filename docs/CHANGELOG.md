@@ -24,6 +24,10 @@
   it via `systemd-run --user`, placing it in `app.slice` where the grant applies.
   Depends on `~/.local/share/flatpak/db/screenshot`, which is not declarable — if wiped,
   run `flameshot gui` once from a focused terminal and approve the prompt.
+- sulphur: flameshot's selection overlay only covered one monitor. A Wayland client
+  cannot span one surface across outputs; `QT_QPA_PLATFORM=xcb` makes the overlay an
+  X11 window over rootless Xwayland's full 4000x3040 root, covering all three displays.
+  Capture still comes from the Screenshot portal, so image content is unaffected.
 
 ### Added (impermanence install)
 - `install.sh`: new mode 3 "Impermanence (Btrfs, no encryption)" for unattended remote
