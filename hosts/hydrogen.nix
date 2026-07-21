@@ -10,6 +10,7 @@
     ../modules/calibre.nix
     ../modules/paperless.nix
     ../modules/scanner.nix
+    ../modules/ollama.nix             # local LLM inference (loopback only), for paperless
     ../modules/backup.nix
     ../modules/auto-update.nix        # nightly stable-branch security updates (server runs 24/7)
   ];
