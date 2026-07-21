@@ -28,6 +28,13 @@
   cannot span one surface across outputs; `QT_QPA_PLATFORM=xcb` makes the overlay an
   X11 window over rootless Xwayland's full 4000x3040 root, covering all three displays.
   Capture still comes from the Screenshot portal, so image content is unaffected.
+- sulphur: flameshot's overlay left the right edge of the laptop panel unselectable.
+  `text-scaling-factor=1.25` sets `Xft.dpi=120`, from which Qt6/xcb derives a 1.25
+  scale and placed the correctly-sized 4000x3040 overlay at x=-360 instead of x=0.
+  `QT_FONT_DPI=96` restores a +0+0 origin. Also dropped `--delay 200`, whose stated
+  rationale (a chord-release race) was not the actual bug; verified reliable without it.
+- sulphur: `home-manager.backupFileExtension = "hm-bak"` — a single unmanaged file HM
+  wanted to own previously failed the whole activation and with it `nixos-rebuild switch`.
 
 ### Added (impermanence install)
 - `install.sh`: new mode 3 "Impermanence (Btrfs, no encryption)" for unattended remote

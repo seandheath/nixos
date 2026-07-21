@@ -88,8 +88,8 @@
             command = "/etc/profiles/per-user/sheath/bin/kitty";
             name = "open-terminal";
           };
-        # flameshot gui = interactive area select. --delay 200 works around GNOME
-        # Wayland losing the region grab if the tool spawns before the chord releases.
+        # flameshot gui = interactive area select. Three env/spawn workarounds are
+        # needed to make this usable on GNOME Wayland; each is load-bearing.
         #
         # Launched via systemd-run, NOT directly. gsd-media-keys runs in
         # session.slice/org.gnome.SettingsDaemon.MediaKeys.service and its children
@@ -113,13 +113,24 @@
         # Capture is unaffected: flameshot still sources the image from the Screenshot
         # portal (verified -- an xcb-platform `flameshot full` returns the whole desktop
         # with real content, not the XWayland-only black grab an X11 grab would give).
+        #
+        # QT_FONT_DPI=96 fixes the overlay's origin. text-scaling-factor=1.25 sets
+        # Xft.dpi=120, from which Qt6/xcb derives a 1.25 scale; the overlay was then
+        # placed at x=-360 (1440 * 0.25) instead of x=0. Size was correct at 4000x3040,
+        # so it hung off the left and left the rightmost 360px -- the right edge of the
+        # laptop panel -- unselectable. Pinning 96 DPI restores +0+0 (measured via
+        # xwininfo). Side effect: flameshot's own toolbar renders unscaled (1x).
+        #
+        # No --delay: the previous 200ms was credited to a chord-release race that
+        # turned out not to be the bug (the real cause was the app-id/focus issue
+        # above). Verified reliable without it.
         "org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom1" =
           {
             binding = "<Ctrl><Alt><Shift>s";
             command =
               "/run/current-system/sw/bin/systemd-run --user --collect --quiet "
-              + "-E QT_QPA_PLATFORM=xcb "
-              + "/run/current-system/sw/bin/flameshot gui --delay 200";
+              + "-E QT_QPA_PLATFORM=xcb -E QT_FONT_DPI=96 "
+              + "/run/current-system/sw/bin/flameshot gui";
             name = "flameshot-area";
           };
         "org/gnome/germinal/legacy".theme-variant = "dark";
