@@ -95,6 +95,8 @@
   # Enable the GNOME Desktop Environment.
   services.displayManager.gdm.enable = true;
   services.desktopManager.gnome.enable = true;
+  # NOTE: autoLogin for sheath is already enabled further below — that running
+  # session is what the gnome-remote-desktop user daemon screen-shares.
 
   # GNOME's power daemon initiates idle-suspend on its own (independent of the
   # masked systemd sleep targets below). hydrogen is a 24/7 server — never let
@@ -106,15 +108,15 @@
   '';
   services.desktopManager.gnome.extraGSettingsOverridePackages = [ pkgs.gnome-settings-daemon ];
 
-  # Headless remote desktop over RDP (connect after boot with no console login).
-  # Uses gnome-remote-desktop's SYSTEM daemon: RDP creds + TLS cert live in
-  # /etc/gnome-remote-desktop/grd.conf (GKeyFile — no user keyring), set once with
-  # `sudo grdctl --system rdp ...`. grdctl's own `rdp enable` can't flip the state
-  # on NixOS (it tries to write /etc/systemd/system, which is read-only), so we
-  # boot-enable the daemon here instead — that is what grdctl reports as "enabled".
-  # Scoped to the LAN bridge (br0) only; hydrogen has no WireGuard interface.
+  # Remote desktop over RDP. Headless remote-login (grdctl --system) proved
+  # unreliable on this NVIDIA laptop — the greeter->session handover falls into a
+  # reconnect loop. Instead: autoLogin (below) keeps a real GNOME session running
+  # from boot on the laptop's own display, and gnome-remote-desktop's per-user
+  # daemon screen-shares it (no greeter, no handover). RDP creds + TLS cert are set
+  # per-user with `grdctl rdp ...`; that needs the login keyring unlocked, so set
+  # the Login keyring password empty in Seahorse (autologin can't unlock it).
+  # LAN bridge (br0) only; hydrogen has no WireGuard interface.
   services.gnome.gnome-remote-desktop.enable = true;
-  systemd.services.gnome-remote-desktop.wantedBy = [ "graphical.target" ];
   networking.firewall.interfaces."br0".allowedTCPPorts = [ 3389 ];
 
   # Configure keymap in X11
