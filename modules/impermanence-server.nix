@@ -18,6 +18,18 @@
   # Overrides the home-path default set in modules/sops.nix.
   sops.age.keyFile = lib.mkForce "/persist/secrets/age-keys.txt";
 
+  # ...and make sure /persist is actually mounted by the time sops needs it.
+  # sops-install-secrets runs from the initrd activation script, which executes BEFORE
+  # the ordinary fileSystems are mounted (observed: activation at 14:42:35, "Mounted
+  # /persist" at 14:42:38). Without neededForBoot the age key above is invisible at that
+  # point, setupSecrets fails, /run/secrets is never created, and every sops-consuming
+  # unit dies with 243/CREDENTIALS -- paperless, nextcloud-setup, acme renewal, borg.
+  # The failure is self-concealing: a later `nixos-rebuild switch` re-runs activation
+  # with /persist mounted and silently repairs /run/secrets, so the system only looks
+  # broken between a reboot and the next rebuild.
+  # neededForBoot pulls the mount into the initrd, ahead of activation.
+  fileSystems."/persist".neededForBoot = true;
+
   # /persist skeleton (used today only as the btrfs autoScrub target + future secrets dir).
   systemd.tmpfiles.rules = [
     "d /persist 0755 root root -"
