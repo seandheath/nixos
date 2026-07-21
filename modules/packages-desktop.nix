@@ -21,9 +21,8 @@
     discord
     thunderbird
 
-    # Remote access (RDP client for hydrogen's gnome-remote-desktop, etc.)
-    remmina      # GTK RDP/VNC client; bundles FreeRDP for RDP
-    freerdp      # xfreerdp CLI fallback
+    # Remote access — Moonlight client for hydrogen's Sunshine host
+    moonlight-qt
 
     # Development tools
     hexo-cli
