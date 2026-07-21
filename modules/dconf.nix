@@ -76,62 +76,21 @@
         "org/gnome/settings-daemon/plugins/media-keys" = {
           custom-keybindings = [
             "/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0/"
-            "/org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom1/"
           ];
           home = [ "<Super>e" ];
-          # Free the built-in area screenshot; flameshot takes this chord below.
-          area-screenshot-clip = mkEmptyArray type.string;
+          # Area-select screenshot to clipboard, handled by gnome-shell itself. This
+          # previously spawned flameshot, which needed three stacked workarounds on
+          # GNOME Wayland (portal app-id, xcb overlay, HiDPI origin) and still dropped
+          # the crop and saved the whole desktop. The shell's built-in needs no portal
+          # round-trip, so none of that applies. Use `area-screenshot` instead of
+          # `-clip` if you want it written to ~/Pictures rather than the clipboard.
+          area-screenshot-clip = [ "<Ctrl><Alt><Shift>s" ];
         };
         "org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0" =
           {
             binding = "<Alt>Return";
             command = "/etc/profiles/per-user/sheath/bin/kitty";
             name = "open-terminal";
-          };
-        # flameshot gui = interactive area select. Three env/spawn workarounds are
-        # needed to make this usable on GNOME Wayland; each is load-bearing.
-        #
-        # Launched via systemd-run, NOT directly. gsd-media-keys runs in
-        # session.slice/org.gnome.SettingsDaemon.MediaKeys.service and its children
-        # inherit that cgroup, so xdg-desktop-portal attributes the Screenshot request
-        # to that unit rather than to the empty (host) app-id. The only grant in the
-        # permission store is for the empty app-id, so the portal fell back to a
-        # permission dialog -- which mutter refuses to show, since flameshot has no
-        # window and therefore no focus ("Only the focused app is allowed to show a
-        # system access dialog"). Result was a silent "Unable to capture screen".
-        # systemd-run places flameshot in its own app.slice unit, which the portal
-        # maps to the empty app-id, matching the stored grant and skipping the dialog.
-        #
-        # Depends on undeclarable state: ~/.local/share/flatpak/db/screenshot. If that
-        # is wiped, re-grant by running `flameshot gui` once from a focused terminal
-        # and approving the prompt.
-        #
-        # QT_QPA_PLATFORM=xcb makes the selection overlay span all monitors. A Wayland
-        # client cannot place one surface across several outputs, so the native overlay
-        # only ever appeared on a single monitor. On the xcb platform it becomes an X11
-        # window over rootless Xwayland's full 4000x3040 root, covering all three.
-        # Capture is unaffected: flameshot still sources the image from the Screenshot
-        # portal (verified -- an xcb-platform `flameshot full` returns the whole desktop
-        # with real content, not the XWayland-only black grab an X11 grab would give).
-        #
-        # QT_FONT_DPI=96 fixes the overlay's origin. text-scaling-factor=1.25 sets
-        # Xft.dpi=120, from which Qt6/xcb derives a 1.25 scale; the overlay was then
-        # placed at x=-360 (1440 * 0.25) instead of x=0. Size was correct at 4000x3040,
-        # so it hung off the left and left the rightmost 360px -- the right edge of the
-        # laptop panel -- unselectable. Pinning 96 DPI restores +0+0 (measured via
-        # xwininfo). Side effect: flameshot's own toolbar renders unscaled (1x).
-        #
-        # No --delay: the previous 200ms was credited to a chord-release race that
-        # turned out not to be the bug (the real cause was the app-id/focus issue
-        # above). Verified reliable without it.
-        "org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom1" =
-          {
-            binding = "<Ctrl><Alt><Shift>s";
-            command =
-              "/run/current-system/sw/bin/systemd-run --user --collect --quiet "
-              + "-E QT_QPA_PLATFORM=xcb -E QT_FONT_DPI=96 "
-              + "/run/current-system/sw/bin/flameshot gui";
-            name = "flameshot-area";
           };
         "org/gnome/germinal/legacy".theme-variant = "dark";
       };

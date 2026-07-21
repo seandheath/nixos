@@ -3,8 +3,8 @@
 { pkgs, ... }:
 {
   environment.systemPackages = with pkgs; [
-    # Screenshots
-    flameshot
+    # Screenshots: gnome-shell's built-in area capture (see modules/dconf.nix).
+    # flameshot was dropped -- unusable on GNOME Wayland.
 
     # Document creation and processing
     tectonic

@@ -16,23 +16,13 @@
   dropped removed `thefuck` package.
 
 ### Fixed
-- sulphur: flameshot's `<Ctrl><Alt><Shift>s` binding failed with "Unable to capture
-  screen" on GNOME Wayland. gsd-media-keys children inherit its `session.slice` cgroup,
-  so xdg-desktop-portal attributed the Screenshot request to that unit rather than the
-  empty host app-id holding the permission-store grant; the resulting permission dialog
-  was refused by mutter because flameshot has no focus. `modules/dconf.nix` now launches
-  it via `systemd-run --user`, placing it in `app.slice` where the grant applies.
-  Depends on `~/.local/share/flatpak/db/screenshot`, which is not declarable — if wiped,
-  run `flameshot gui` once from a focused terminal and approve the prompt.
-- sulphur: flameshot's selection overlay only covered one monitor. A Wayland client
-  cannot span one surface across outputs; `QT_QPA_PLATFORM=xcb` makes the overlay an
-  X11 window over rootless Xwayland's full 4000x3040 root, covering all three displays.
-  Capture still comes from the Screenshot portal, so image content is unaffected.
-- sulphur: flameshot's overlay left the right edge of the laptop panel unselectable.
-  `text-scaling-factor=1.25` sets `Xft.dpi=120`, from which Qt6/xcb derives a 1.25
-  scale and placed the correctly-sized 4000x3040 overlay at x=-360 instead of x=0.
-  `QT_FONT_DPI=96` restores a +0+0 origin. Also dropped `--delay 200`, whose stated
-  rationale (a chord-release race) was not the actual bug; verified reliable without it.
+- sulphur: dropped flameshot entirely; `<Ctrl><Alt><Shift>s` now uses gnome-shell's
+  built-in `area-screenshot-clip` (area select to clipboard, no portal round-trip).
+  Flameshot on GNOME Wayland needed three stacked workarounds -- `systemd-run` for
+  portal app-id attribution, `QT_QPA_PLATFORM=xcb` for a multi-monitor overlay, and
+  `QT_FONT_DPI=96` for the overlay origin under 1.25 scaling -- and still discarded
+  the selection, saving the full 4000x3040 desktop instead of the crop. Not worth
+  carrying; the shell's built-in has none of these failure modes.
 - sulphur: `home-manager.backupFileExtension = "hm-bak"` — a single unmanaged file HM
   wanted to own previously failed the whole activation and with it `nixos-rebuild switch`.
 
