@@ -96,28 +96,39 @@
   services.displayManager.gdm.enable = true;
   services.desktopManager.gnome.enable = true;
   # NOTE: autoLogin for sheath is already enabled further below — that running
-  # session is what the gnome-remote-desktop user daemon screen-shares.
+  # session (on the laptop's eDP panel) is what Sunshine captures for Moonlight.
 
   # GNOME's power daemon initiates idle-suspend on its own (independent of the
   # masked systemd sleep targets below). hydrogen is a 24/7 server — never let
-  # the session auto-suspend on idle. Applies to fresh sessions after rebuild.
+  # the session auto-suspend on idle. Also disable the lock screen + idle blanking
+  # so Sunshine always has a live, rendered desktop on the eDP panel to capture.
+  # Applies to fresh sessions after rebuild.
   services.desktopManager.gnome.extraGSettingsOverrides = ''
     [org.gnome.settings-daemon.plugins.power]
     sleep-inactive-ac-type='nothing'
     sleep-inactive-battery-type='nothing'
+
+    [org.gnome.desktop.screensaver]
+    lock-enabled=false
+    idle-activation-enabled=false
+
+    [org.gnome.desktop.session]
+    idle-delay=uint32 0
   '';
   services.desktopManager.gnome.extraGSettingsOverridePackages = [ pkgs.gnome-settings-daemon ];
 
-  # Remote desktop over RDP. Headless remote-login (grdctl --system) proved
-  # unreliable on this NVIDIA laptop — the greeter->session handover falls into a
-  # reconnect loop. Instead: autoLogin (below) keeps a real GNOME session running
-  # from boot on the laptop's own display, and gnome-remote-desktop's per-user
-  # daemon screen-shares it (no greeter, no handover). RDP creds + TLS cert are set
-  # per-user with `grdctl rdp ...`; that needs the login keyring unlocked, so set
-  # the Login keyring password empty in Seahorse (autologin can't unlock it).
-  # LAN bridge (br0) only; hydrogen has no WireGuard interface.
-  services.gnome.gnome-remote-desktop.enable = true;
-  networking.firewall.interfaces."br0".allowedTCPPorts = [ 3389 ];
+  # Remote desktop: Sunshine (KMS capture + NVENC) streamed to Moonlight clients.
+  # RDP via gnome-remote-desktop was abandoned — mutter's screencast produces blank
+  # frames on NVIDIA+Wayland (upstream mutter #3297). Sunshine's KMS capture bypasses
+  # that broken path. capSysAdmin grants the cap_sys_admin needed for KMS capture on
+  # Wayland; nvidia-drm.modeset=1 (from hardware.nvidia.modesetting) is required and
+  # already set. First run: set admin creds + pair Moonlight at https://<hydrogen-ip>:47990.
+  services.sunshine = {
+    enable = true;
+    capSysAdmin = true;   # required for Wayland KMS screen capture
+    openFirewall = true;  # Moonlight/Sunshine ports (LAN)
+    autoStart = true;     # start with the autologin session
+  };
 
   # Configure keymap in X11
   services.xserver.xkb = {
