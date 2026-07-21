@@ -125,6 +125,10 @@
   # already set. First run: set admin creds + pair Moonlight at https://<hydrogen-ip>:47990.
   services.sunshine = {
     enable = true;
+    # Build with CUDA/NVENC. Without it Sunshine falls back to a software encode
+    # path whose GL frame-copy errors (GL_INVALID_VALUE) on NVIDIA → black stream;
+    # the NVENC/GPU path avoids that. Driver libs are at /run/opengl-driver/lib.
+    package = pkgs.sunshine.override { cudaSupport = true; };
     capSysAdmin = true;   # required for Wayland KMS screen capture
     openFirewall = true;  # Moonlight/Sunshine ports (LAN)
     autoStart = true;     # start with the autologin session
