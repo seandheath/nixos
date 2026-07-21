@@ -134,6 +134,13 @@
     autoStart = true;     # start with the autologin session
   };
 
+  # RustDesk direct-IP remote desktop (LAN). Uses the xdg-desktop-portal ScreenCast
+  # path — a different capture route than Sunshine/gnome-remote-desktop. Host app
+  # runs in the autologin session; set an unattended password + enable direct-IP in
+  # its Security settings. 21118 is the direct-access port; open its full range.
+  networking.firewall.interfaces."br0".allowedTCPPorts = [ 21115 21116 21117 21118 21119 ];
+  networking.firewall.interfaces."br0".allowedUDPPorts = [ 21116 ];
+
   # Configure keymap in X11
   services.xserver.xkb = {
     layout = "us";
