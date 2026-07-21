@@ -106,11 +106,15 @@
   '';
   services.desktopManager.gnome.extraGSettingsOverridePackages = [ pkgs.gnome-settings-daemon ];
 
-  # Remote desktop over RDP. gnome-remote-desktop screen-shares sheath's active
-  # GNOME session (connect to the live desktop). Credentials + a self-signed TLS
-  # cert are configured statefully per-user with `grdctl rdp ...` (not pure Nix).
+  # Headless remote desktop over RDP (connect after boot with no console login).
+  # Uses gnome-remote-desktop's SYSTEM daemon: RDP creds + TLS cert live in
+  # /etc/gnome-remote-desktop/grd.conf (GKeyFile — no user keyring), set once with
+  # `sudo grdctl --system rdp ...`. grdctl's own `rdp enable` can't flip the state
+  # on NixOS (it tries to write /etc/systemd/system, which is read-only), so we
+  # boot-enable the daemon here instead — that is what grdctl reports as "enabled".
   # Scoped to the LAN bridge (br0) only; hydrogen has no WireGuard interface.
   services.gnome.gnome-remote-desktop.enable = true;
+  systemd.services.gnome-remote-desktop.wantedBy = [ "graphical.target" ];
   networking.firewall.interfaces."br0".allowedTCPPorts = [ 3389 ];
 
   # Configure keymap in X11
