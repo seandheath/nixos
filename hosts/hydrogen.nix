@@ -51,6 +51,7 @@
     8989
   ];
   environment.systemPackages = with pkgs; [
+    rustdesk-flutter   # RustDesk host (this box is remote-controlled); LAN direct-IP
     rustup
     firefox
     git
