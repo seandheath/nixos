@@ -105,11 +105,20 @@
         # Depends on undeclarable state: ~/.local/share/flatpak/db/screenshot. If that
         # is wiped, re-grant by running `flameshot gui` once from a focused terminal
         # and approving the prompt.
+        #
+        # QT_QPA_PLATFORM=xcb makes the selection overlay span all monitors. A Wayland
+        # client cannot place one surface across several outputs, so the native overlay
+        # only ever appeared on a single monitor. On the xcb platform it becomes an X11
+        # window over rootless Xwayland's full 4000x3040 root, covering all three.
+        # Capture is unaffected: flameshot still sources the image from the Screenshot
+        # portal (verified -- an xcb-platform `flameshot full` returns the whole desktop
+        # with real content, not the XWayland-only black grab an X11 grab would give).
         "org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom1" =
           {
             binding = "<Ctrl><Alt><Shift>s";
             command =
               "/run/current-system/sw/bin/systemd-run --user --collect --quiet "
+              + "-E QT_QPA_PLATFORM=xcb "
               + "/run/current-system/sw/bin/flameshot gui --delay 200";
             name = "flameshot-area";
           };
