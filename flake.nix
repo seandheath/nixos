@@ -55,6 +55,11 @@
           home-manager.useUserPackages = true;
           home-manager.users.sheath = import ./home/sheath.nix;
           home-manager.extraSpecialArgs = { inherit inputs; };
+          # Rename pre-existing files aside instead of aborting activation. Without
+          # this a single unmanaged file that HM wants to own fails the whole
+          # home-manager-sheath.service, and with it the nixos-rebuild switch --
+          # a stale ~/.cache/nix-index/files did exactly that on 2026-07-21.
+          home-manager.backupFileExtension = "hm-bak";
           users.users.sheath = import ./users/sheath.nix;
           users.groups.sheath = {};
           nixpkgs.config.allowUnfree = true;
