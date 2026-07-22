@@ -11,6 +11,17 @@
 # Backed up implicitly? No -- deliberately NOT added to modules/backup.nix backupPaths,
 # since a model blob is re-downloadable and would only bloat the borg repo.
 {
+  # The P4200 is Pascal (compute capability 6.1). nixpkgs' CUDA capability DB marks 6.1
+  # with dontDefaultAfterCudaMajorMinorVersion = "12.3", and the toolkit here is 12.8, so
+  # Pascal is NOT in the default gencode set -- pkgs.ollama-cuda ships kernels for sm_75+
+  # (Turing onward) only. At runtime ollama detects the card but logs "filtering device
+  # which didn't fully initialize" and falls back to CPU, because ggml-cuda has no Pascal
+  # kernels. 6.1 is still *supported* by CUDA 12.8 (NVIDIA drops Pascal only in CUDA 13),
+  # it just has to be requested explicitly. This forces a from-source rebuild of the CUDA
+  # ggml backend; ollama is the only CUDA consumer on hydrogen so the blast radius is just
+  # that package. Verified empirically 2026-07-21: without this, total_vram="0 B".
+  nixpkgs.config.cudaCapabilities = [ "6.1" ];
+
   services.ollama = {
     enable = true;
 
