@@ -15,6 +15,20 @@
   `hardware.opengl` → `hardware.graphics`, set required `hardware.nvidia.open = false`,
   dropped removed `thefuck` package.
 
+### Added
+- hydrogen: local LLM document classification for paperless. `modules/ollama.nix` runs
+  ollama on loopback (`127.0.0.1:11434`, no vhost/firewall port) serving `qwen2.5:7b`;
+  `modules/paperless-gpt.nix` runs `icereed/paperless-gpt` v0.27.0 as a pinned podman
+  container (hydrogen's first container host) that watches paperless for the
+  `paperless-gpt-auto` tag and writes back an LLM title/tags/correspondent/document-type.
+  The container uses host networking to reach paperless and ollama on loopback; its own UI
+  is bound to `127.0.0.1:8080`. API token in sops (`paperless-gpt-token`); `CREATE_NEW_TAGS`
+  starts `false` so the model can only assign existing tags. `/var/lib/paperless-gpt` added
+  to borg. NB: the P4200 is Pascal (sm_61), which is a non-default CUDA 12.8 gencode target,
+  so `nixpkgs.config.cudaCapabilities = [ "6.1" ]` forces a from-source `ollama-cuda` build
+  -- without it ollama silently ran on CPU (`total_vram="0 B"`). GPU inference measured at
+  ~33 tok/s. This means every future nixpkgs ollama bump recompiles from source (~10 min).
+
 ### Fixed
 - hydrogen: `modules/impermanence-server.nix` marks `/persist` `neededForBoot`, so sops
   secrets install at boot. `sops-install-secrets` runs from the initrd activation script,

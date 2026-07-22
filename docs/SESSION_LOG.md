@@ -1,5 +1,52 @@
 # Session Log
 
+## Session: 2026-07-22
+
+### Changes Made
+- `modules/ollama.nix`: new. `services.ollama` with `pkgs.ollama-cuda` on loopback, serving
+  `qwen2.5:7b` via `loadModels`. Includes `nixpkgs.config.cudaCapabilities = [ "6.1" ]`.
+- `modules/paperless-gpt.nix`: new. Podman OCI container `icereed/paperless-gpt:v0.27.0`,
+  host networking, sops `paperless-gpt-token`, state under `/var/lib/paperless-gpt`.
+- `hosts/hydrogen.nix`: imported both modules.
+- `modules/backup.nix`: added `/var/lib/paperless-gpt` to `backupPaths`.
+- `secrets/secrets.yaml`: added `paperless-gpt-token` (env file: `PAPERLESS_API_TOKEN=...`).
+
+### Diagnosis: ollama ran on CPU despite ollama-cuda
+Everything at the NixOS layer was correct -- driver healthy (`nvidia-smi` OK), the systemd
+unit had `DeviceAllow` for the nvidia char devices, `LD_LIBRARY_PATH` included
+`/run/opengl-driver/lib` + the cuda 12.8 runtime, and `libggml-cuda.so` was present and
+`ldd`-clean. Yet startup logged `total_vram="0 B"`, CPU-only. With `OLLAMA_DEBUG=1` the probe
+showed the real cause: `verifying if device is supported ... compute=6.1` immediately
+followed by `filtering device which didn't fully initialize ... library=CUDA`. The card was
+detected but ggml-cuda had no kernels for it.
+
+Root cause in nixpkgs' cuda capability DB (`_cuda/db/bootstrap/cuda.nix`): capability `6.1`
+has `dontDefaultAfterCudaMajorMinorVersion = "12.3"`, and the toolkit is 12.8, so Pascal is
+not in the default gencode set -- `ollama-cuda` compiled for sm_75+ only. Fix:
+`nixpkgs.config.cudaCapabilities = [ "6.1" ]` (6.1 is still *supported* by 12.8; NVIDIA drops
+Pascal only in CUDA 13). Post-fix: `total_vram="8.0 GiB"`, model 100% in VRAM (4830 MiB,
+`size_vram == size`), ~33 tok/s on an invoice-classification prompt returning clean JSON.
+
+### Decisions
+- **GPU over CPU** (user choice). CPU inference worked out of the box and is adequate for
+  async classification, but the user opted to use the P4200. Tradeoff accepted: the
+  non-default sm_61 arch means from-source `ollama-cuda` rebuilds on every nixpkgs bump,
+  absorbed by the nightly auto-update.
+- **podman scoped in the module**, not via importing `modules/virtualisation.nix` (which is
+  desktop-flavoured and used only by sulphur/osmium).
+- **Bind mounts owned 10001:10001** (the image's default PUID/PGID under rootful podman)
+  rather than named volumes, so borg can point at `/var/lib/paperless-gpt` directly.
+- **Deploy via build-on-hydrogen**, not `nix copy`: sheath is not a trusted daemon user on
+  hydrogen and root ssh is disabled, so pushing the closure fails the signature check. The
+  same locked flake yields an identical derivation built locally.
+
+### Known Issues / Next
+- **Live classification not yet run.** ollama GPU path and paperless-gpt<->paperless auth are
+  both verified independently, but no document has been tagged `paperless-gpt-auto` end to
+  end -- it mutates real metadata, left to the user to drive.
+- A `paperless-gpt-failed` tag already existed in paperless before this deploy (26 docs);
+  something ran paperless-gpt here previously. Not investigated.
+
 ## Session: 2026-07-21
 
 ### Changes Made
