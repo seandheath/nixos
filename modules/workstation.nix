@@ -53,6 +53,13 @@
   environment.sessionVariables.NIXOS_OZONE_WL = "1";
   #environment.sessionVariables.GST_PLUGIN_SYSTEM_PATH_1_0 = "/run/current-system/sw/lib/gstreamer-1.0";
 
+  # direnv + nix-direnv: auto-load per-project `nix develop` shells on `cd`.
+  # nix-direnv caches the dev shell so re-entry doesn't re-evaluate the flake.
+  home-manager.users.sheath.programs.direnv = {
+    enable = true;
+    nix-direnv.enable = true;
+  };
+
   # Claude Code global configuration
   home-manager.users.sheath.home.file.".claude/CLAUDE.md".text = ''
     # CLAUDE.md — Global Configuration
