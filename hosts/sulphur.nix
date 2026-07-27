@@ -14,6 +14,7 @@ in
     ../modules/virtualisation.nix
     ../modules/impermanence.nix
     ../modules/wivrn.nix
+    ../modules/fleet-vpn.nix
   ];
 
   # Boot
