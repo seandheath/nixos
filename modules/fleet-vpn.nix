@@ -14,8 +14,23 @@
 # We connect to the server by IP, so no tunnel-provided DNS is configured
 # (keeps hydrogen clear of resolvconf).
 { config, lib, ... }:
+let
+  isHydrogen = config.networking.hostName == "hydrogen";
+  # The `ssh jellyfin` login key. sulphur already carries it on disk; hydrogen
+  # is an impermanent server with no ~/.ssh, so it gets the key from sops.
+  fleetSshKey =
+    if isHydrogen then config.sops.secrets.fleet-ssh-key.path else "/home/sheath/.ssh/jellyfin";
+in
 {
   sops.secrets.wg-priv-fleet = { };
+
+  # Fleet SSH login key — provisioned only where ~/.ssh doesn't already hold it
+  # (hydrogen). owner/mode so ssh accepts it (private keys must be user-owned and
+  # not group/other-readable). Same sops pattern as borg-ssh-key.
+  sops.secrets.fleet-ssh-key = lib.mkIf isHydrogen {
+    owner = "sheath";
+    mode = "0400";
+  };
 
   networking.wg-quick.interfaces.fleet = {
     autostart = false; # never up at boot; manual switch (see header)
@@ -50,4 +65,17 @@
     hostNames = [ "100.64.0.80" ];
     publicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFd0ZwFQwDQsRZFssVJeqIt53gwcMy+9wYT9APllnngV";
   };
+
+  # `ssh jellyfin` -> sheath@100.64.0.80 over the fleet tunnel. Declared at the
+  # system level (/etc/ssh/ssh_config) so hydrogen gets it without a managed
+  # ~/.ssh/config; on sulphur the user's own ~/.ssh/config alias (read first)
+  # takes precedence over this identical block. IdentitiesOnly mirrors the
+  # user's `Host *` setting so only this key is offered.
+  programs.ssh.extraConfig = ''
+    Host jellyfin
+      HostName 100.64.0.80
+      User sheath
+      IdentityFile ${fleetSshKey}
+      IdentitiesOnly yes
+  '';
 }
