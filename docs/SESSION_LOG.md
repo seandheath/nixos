@@ -1,5 +1,80 @@
 # Session Log
 
+## Session: 2026-07-28
+
+### Changes Made
+- `modules/minecraft-server.nix`: new. Vanilla declarative server, `/var/lib/minecraft`.
+- `modules/minecraft-couch.nix`: new. Bluetooth + xpadneo, MAC-keyed udev symlinks,
+  bubblewrap per-player wrapper, `minecraft-couch@` VT session unit, generated Hyprland
+  config, `hyprctl`-driven window placement, four `makeDesktopItem` entries,
+  `minecraft-couch-sync`.
+- `hosts/hydrogen.nix`: imported both; 25565 on `br0`; performance governor; lid ignored;
+  `hardware.nvidia.package` pinned to `production`; `enable32Bit`.
+- `modules/backup.nix`: `/var/lib/minecraft` in `backupPaths` + world-flush hooks.
+- `users/sheath.nix`: `input` group.
+- `docs/minecraft.md`: new runbook.
+
+### Spec vs. reality
+The design spec (`~/Downloads/specification.md`) targets "an HP ZBook" — that is hydrogen.
+Four of its assumptions did not survive contact with this repo:
+
+- **"Scope 25565 to wg0."** hydrogen has no wg0. The hub is on the router and remote peers
+  route to hydrogen's LAN address, so tunnel traffic arrives on `br0`. One `br0` rule
+  covers LAN + tunnel; the internet stays blocked because the router forwards only 51820.
+- **"Pin `hardware.nvidia.package` to a 580 legacy branch."** No `legacy_580` attribute
+  exists in nixos-25.11, and `stable`/`latest`/`beta`/`production` are *all* 580.142
+  already. Pinned to `production` as drift insurance rather than as a fix.
+- **AuthMe in the client mod stack.** AuthMe lets an *online* account log into an offline
+  launcher; every couch client is an offline account on an `online-mode=false` server, so
+  it does nothing here. Dropped — which removes the version-compatibility laggard the spec
+  itself flags as gating the Minecraft version choice.
+- **A nested compositor for the couch session.** Mutter cannot fullscreen a nested
+  compositor's window, and GNOME must keep running (RustDesk capture). Replaced with a real
+  logind session on tty7.
+
+### Decisions
+- **Separate VT over nesting.** `PAMName=login` + `TTYPath=/dev/tty7` makes logind register
+  the unit as a real session, which is what lets Hyprland take DRM master when the VT goes
+  active; GNOME goes inactive and releases it. Native DRM, no double compositing. Tradeoff:
+  this is the one unvalidated piece — this box has a bad history with DRM/capture paths
+  (gnome-remote-desktop, Sunshine). Fallback documented in `docs/minecraft.md`: nest inside
+  `gamescope -f`, which *can* request fullscreen from Mutter where Hyprland cannot. Only the
+  session script and unit would change.
+- **Explicit `hyprctl` placement over the dwindle layout.** Dwindle splits the focused
+  window, so four clients tile as "left half + three stacked", not quadrants. Placing each
+  window by address as it maps is deterministic regardless of JVM start order and makes the
+  1/2/3-player layouts fall out of the same code.
+- **Four Prism data dirs.** Prism's single-instance lock is
+  `ApplicationId::fromPathAndVersion(dataPath, version)` — verified in upstream
+  `launcher/Application.cpp`. Without distinct `--dir` values the second `--launch` is
+  handled by the *first* launcher process, which spawns the game outside the second
+  sandbox and every character moves in unison. `minecraft-couch-sync` symlinks the shared
+  trees so this is not four copies and mods are still installed once in the GUI.
+- **Warning, not assertion, for placeholder controller MACs.** The server half must deploy
+  while the pads are being paired.
+- **`--offline` + `--server` on the Prism command line**, so no child touches an account
+  picker or a multiplayer menu.
+
+### Bugs caught before deploy
+- udev rejected the whole ruleset: a trailing `# comment` on a rule line is a syntax error
+  (`udevadm verify` runs at build time — `Invalid key/value pair`). Comments moved above.
+- The borg world-flush hook was silently a no-op. `lib.escapeShellArg` applied to the
+  command alone and then hand-quoted inside `sh -c '…'` produced
+  `sh -c 'echo 'save-all flush' > fifo'`, which the outer shell splits into two arguments;
+  sh takes the second as `$0`, the redirection never happens. Now the entire inner script
+  is escaped once as a unit.
+
+### Known Issues / Next
+- **Nothing is deployed or runtime-tested.** `nix build` of hydrogen's toplevel passes on
+  sulphur; that is all. The VT handoff, controller isolation and frame pacing are all
+  untested on the real machine.
+- Controller MACs are placeholders — `bluetoothctl devices` on hydrogen, then rebuild.
+- The Prism instance does not exist yet; `docs/minecraft.md` §"First-time setup" is the
+  runbook.
+- Off-tunnel closed-port check for 25565 not yet performed.
+- Offline mode means all four players are Steve/Alex. Real usability problem with four kids
+  on one screen; nameplate legibility at quarter-screen needs checking.
+
 ## Session: 2026-07-22
 
 ### Changes Made

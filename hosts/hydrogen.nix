@@ -15,6 +15,8 @@
     ../modules/backup.nix
     ../modules/auto-update.nix        # nightly stable-branch security updates (server runs 24/7)
     ../modules/fleet-vpn.nix          # on-demand WireGuard tunnel to the Jellyfin fleet (manual switch)
+    ../modules/minecraft-server.nix   # persistent vanilla world (system service, no session needed)
+    ../modules/minecraft-couch.nix    # 1-4 player split-screen launcher on the projector
   ];
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
@@ -127,7 +129,22 @@
   # tried and abandoned. Host app runs in the autologin session; set an unattended
   # password + enable direct-IP in its Security settings. 21118 is the direct-access
   # port; open its full range.
-  networking.firewall.interfaces."br0".allowedTCPPorts = [ 21115 21116 21117 21118 21119 ];
+  networking.firewall.interfaces."br0".allowedTCPPorts = [
+    21115 21116 21117 21118 21119   # RustDesk (see above)
+
+    # Minecraft (modules/minecraft-server.nix). Scoped to br0 rather than opened
+    # globally: the server runs online-mode=false and performs no identity
+    # verification, so reachability IS the authentication boundary.
+    #
+    # There is no wg0 on this host — the WireGuard hub lives on the router
+    # (vpn.luckyobserver.com, tunnel 10.40.0.0/24) and remote peers route to
+    # hydrogen's LAN address 10.0.0.10, so tunnel traffic ingresses on br0 just
+    # like LAN traffic. This rule therefore admits the home LAN and enrolled
+    # peers, and nothing else: the router forwards only 51820/udp, so 25565 is
+    # not reachable from the internet. Verify that from off-tunnel after any
+    # router change — it is the single most important check for this service.
+    25565
+  ];
   networking.firewall.interfaces."br0".allowedUDPPorts = [ 21116 ];
 
   # Auto-start the RustDesk host with the (autologin) graphical session, so the box
@@ -177,7 +194,20 @@
   systemd.targets.hibernate.enable = false;
   systemd.targets.hybrid-sleep.enable = false;
   # Don't let logind suspend/shut down on idle either (belt-and-suspenders).
-  services.logind.settings.Login.IdleAction = "ignore";
+  # The machine is also a server that happens to have a lid: closing it must not
+  # interrupt a remote Minecraft session. The sleep targets above already make
+  # suspend impossible; these stop logind from trying.
+  services.logind.settings.Login = {
+    IdleAction = "ignore";
+    HandleLidSwitch = "ignore";
+    HandleLidSwitchDocked = "ignore";
+    HandleLidSwitchExternalPower = "ignore";
+  };
+
+  # Xeon E-2176M with HWP. The default balanced energy-performance preference
+  # leaves frames on the table under sustained load (four Minecraft clients plus
+  # the server), and this box is mains-powered 24/7.
+  powerManagement.cpuFreqGovernor = "performance";
 
   # (allowUnfree is set centrally in flake.nix commonModules)
 
@@ -197,9 +227,22 @@
   # Enable NVIDIA
   services.xserver.videoDrivers = [ "nvidia" ];
   hardware.graphics.enable = true;
+  # Cheap insurance against a Steam/Proton-shaped "missing 32-bit lib" rabbit
+  # hole later; costs a few hundred MB of closure.
+  hardware.graphics.enable32Bit = true;
   # Driver >= 560 requires an explicit choice of kernel module flavour.
   # Closed modules are the safe default for unknown/pre-Turing GPUs.
   hardware.nvidia.open = false;
+
+  # The Quadro P4200 is Pascal (GP104GLM), and Pascal is end-of-life: R580 is the
+  # last branch NVIDIA supports for Maxwell/Pascal/Volta, with critical security
+  # updates for Quadro parts through October 2028 but no further feature updates.
+  # Every branch in the current nixpkgs pin (stable/latest/beta/production) is
+  # 580.142, so this pin is a no-op TODAY — its job is to stop the nightly
+  # auto-update (modules/auto-update.nix) from silently moving the GPU onto a 590
+  # branch that does not support this card. Revisit deliberately at the next
+  # NixOS release bump; when nixpkgs grows a legacy_580 attribute, switch to it.
+  hardware.nvidia.package = config.boot.kernelPackages.nvidiaPackages.production;
 
   # nix-ld so generic dynamically-linked binaries run (e.g. the official Claude
   # Code CLI in ~/.local/bin). Mirrors sulphur's modules/workstation.nix config.

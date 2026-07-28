@@ -1,6 +1,52 @@
 # Changelog
 
 ## [Unreleased]
+### Added (minecraft)
+- hydrogen: persistent vanilla Minecraft server. `modules/minecraft-server.nix` —
+  `services.minecraft-server` declarative, 1.21.10, world at `/var/lib/minecraft`, 6 GB
+  heap with a bounded G1 pause target. `online-mode=false` (couch clients are offline
+  accounts) with `enforce-secure-profile=false` alongside it, which is required or
+  unauthenticated clients are kicked on their first chat message. `openFirewall = false`;
+  25565 is instead added to the existing `networking.firewall.interfaces."br0"` list in
+  `hosts/hydrogen.nix`. NB: there is **no wg0 on hydrogen** — the WireGuard hub is on the
+  router (`vpn.luckyobserver.com`, tunnel 10.40.0.0/24) and peers route to hydrogen's LAN
+  address, so tunnel traffic ingresses on `br0` like LAN traffic and one rule covers both;
+  the router forwards only 51820/udp, so 25565 stays closed from the internet.
+- hydrogen: 1–4 player couch split-screen. `modules/minecraft-couch.nix` provides four
+  generated `.desktop` entries ("Minecraft — N Player(s)") → `minecraft-couch N` →
+  `minecraft-couch@N.service`, a **real logind session on tty7** (`PAMName=login` +
+  `TTYPath`, with `chvt` in `ExecStartPre`/`ExecStopPost`) running Hyprland with a
+  generated config. Not a nested compositor: GNOME must keep running for RustDesk capture,
+  and Mutter can neither tile into quadrants nor fullscreen a nested compositor's window.
+  Window placement is explicit via `hyprctl` by address rather than dwindle, which would
+  otherwise give "left half + three stacked" for four clients; geometry is read from
+  `hyprctl monitors`, so no 1080p assumption. Each client runs under bubblewrap with a
+  tmpfs over `/dev/input` and only its own pad's *resolved* event node bound back in —
+  otherwise every client sees every pad and all four characters move in unison. Stable
+  player identity via MAC-keyed udev rules (`ATTRS{uniq}` + `ENV{ID_INPUT_JOYSTICK}`);
+  `services.joycond` stays off because its virtual uinput devices have no `uniq`.
+  Placeholder MACs produce a build *warning*, not an assertion, so the server half
+  deploys while controllers are being paired. Four Prism data dirs (`--dir`) because Prism's
+  single-instance lock is keyed on the data path — a second `--launch` would otherwise be
+  handled by the first process and escape its sandbox; `minecraft-couch-sync` symlinks the
+  shared trees and the mods folder so mods are still installed once, in the GUI.
+  Also pulls in `modules/bluetooth.nix` (hydrogen had no Bluetooth stack) and
+  `hardware.xpadneo.enable` for the Xbox Elite pad. Runbook: `docs/minecraft.md`.
+- `modules/backup.nix`: `/var/lib/minecraft` added to `backupPaths`; both borg jobs now
+  `save-off`/`save-all flush` through `/run/minecraft-server.stdin` before archiving, with
+  `save-on` in `ExecStopPost` (not `postHook`, which is skipped when borg fails and would
+  leave autosave off until the next server restart).
+
+### Changed (minecraft)
+- hydrogen: `powerManagement.cpuFreqGovernor = "performance"` (HWP's balanced EPP leaves
+  frames on the table under sustained load), lid switch ignored in all three
+  `HandleLidSwitch*` settings, `hardware.graphics.enable32Bit = true`.
+- hydrogen: `hardware.nvidia.package` pinned explicitly to the `production` branch. Every
+  branch in the current pin is already 580.142, so this is a no-op today; its job is to
+  stop the nightly `auto-update` from moving this Pascal card (GP104GLM, EOL after R580)
+  onto a 590 branch that does not support it. Revisit at the next release bump.
+- `users/sheath.nix`: added `input` to `extraGroups` (evdev access for the couch clients).
+
 ### Added
 - hydrogen: self-hosted services — Nextcloud (`nc.luckyobserver.com`), Immich
   (`immich.luckyobserver.com`), calibre-web (`calibre.luckyobserver.com`), paperless-ngx

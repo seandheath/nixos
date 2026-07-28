@@ -28,10 +28,39 @@ let
     "/var/lib/paperless-gpt"   # paperless-gpt UI settings + custom prompts (small)
     "/var/lib/calibre-web"
     "/var/lib/syncthing"       # synced folders + config.xml (device keys/IDs) + index DB
+    "/var/lib/minecraft"       # the world (see minecraftFlush below) + server.properties
     "/var/backup/postgresql"   # consistent pg_dumps (nextcloud + immich)
   ];
   prune = { keep = { daily = 7; weekly = 16; monthly = 24; }; };
   passCommand = "cat ${config.sops.secrets.borg-passphrase.path}";
+
+  # Minecraft writes region files continuously, so archiving the live world can
+  # capture a half-written chunk. The server's console is exposed as a FIFO by
+  # services.minecraft-server (ListenFIFO /run/minecraft-server.stdin, held open
+  # by the service and removed when it stops). Suspend autosave and checkpoint
+  # before the archive; resume after.
+  #
+  # `save-on` is an ExecStopPost, NOT a postHook: postHook is skipped when borg
+  # exits non-zero, which would leave autosave off until the next server restart.
+  # ExecStopPost runs on success and failure alike.
+  #
+  # `timeout` guards against a write blocking forever if the FIFO ever outlives
+  # its reader; `|| true` keeps a stopped/absent server from failing the backup.
+  #
+  # The whole inner script is escaped ONCE, as a unit. Escaping just the command
+  # and hand-quoting around it produces `sh -c 'echo 'save-all flush' > fifo'`,
+  # which the outer shell splits into two arguments -- sh then treats the second
+  # as $0, the redirection never happens, and the flush silently does nothing.
+  mcConsole = cmd: ''
+    ${pkgs.coreutils}/bin/timeout 5 ${pkgs.bash}/bin/bash -c \
+      ${lib.escapeShellArg "echo ${cmd} > /run/minecraft-server.stdin"} || true
+  '';
+  minecraftFlush = ''
+    ${mcConsole "save-off"}
+    ${mcConsole "save-all flush"}
+    ${pkgs.coreutils}/bin/sleep 5
+  '';
+  minecraftResume = pkgs.writeShellScript "minecraft-save-on" (mcConsole "save-on");
 
   # Repo targets + transport, shared between the borg jobs and the CLI wrappers
   # so there is a single source of truth.
@@ -84,6 +113,7 @@ in
     compression = "zstd";
     inherit prune;
     startAt = "*-*-* 03:00:00";
+    preHook = minecraftFlush;
   };
 
   services.borgbackup.jobs.remote = {
@@ -94,7 +124,12 @@ in
     compression = "zstd";
     inherit prune;
     startAt = "*-*-* 03:00:00";
+    preHook = minecraftFlush;
   };
+
+  # Always re-enable the world autosave, even if borg failed. See minecraftFlush.
+  systemd.services.borgbackup-job-local.serviceConfig.ExecStopPost = [ "${minecraftResume}" ];
+  systemd.services.borgbackup-job-remote.serviceConfig.ExecStopPost = [ "${minecraftResume}" ];
 
   # The local job writes to /data — don't run it before the disk is mounted.
   systemd.services.borgbackup-job-local.unitConfig.RequiresMountsFor = "/data";
