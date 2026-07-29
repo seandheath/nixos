@@ -8,10 +8,10 @@
   `Ghidra/Extensions/`. ReVa requires Ghidra >= 12.0, which nixos-25.11 does not have in
   either `ghidra` or `ghidra-bin`. `modules/packages-desktop.nix` swaps `ghidra` for it;
   the derivation still provides `bin/ghidra` and `bin/ghidra-analyzeHeadless`.
-  `modules/workstation.nix` declares the RE workspace `~/projects/re` with a project-scope
-  `.mcp.json` pointing at `http://localhost:8080/mcp/message` plus a `.claude/settings.json`
-  granting `mcp__ReVa` and `enableAllProjectMcpServers`. Ghidra-side plugin activation is
-  GUI state in `~/.config/ghidra` and remains a one-time manual step.
+  ReVa serves MCP on `http://localhost:8080/mcp/message` and is registered at **user scope**
+  in `~/.claude.json` (`claude mcp add --scope user --transport http ReVa ...`), not declared
+  in nix — see `modules/workstation.nix` for why. Ghidra-side plugin activation is GUI state
+  in `~/.config/ghidra` and remains a one-time manual step.
 
 ### Added (minecraft)
 - hydrogen: persistent vanilla Minecraft server. `modules/minecraft-server.nix` —

@@ -5,7 +5,8 @@
 ### Changes Made
 - `packages/ghidra-reva.nix`: new. Ghidra 12.1 (`ghidra-bin` overrideAttrs) + ReVa v7.3.0.
 - `modules/packages-desktop.nix`: `ghidra` → `ghidra-reva`.
-- `modules/workstation.nix`: `~/projects/re/.mcp.json` + `~/projects/re/.claude/settings.json`.
+- `modules/workstation.nix`: comment recording that ReVa's MCP registration is user-scope
+  and intentionally not declarative.
 
 ### Decisions
 - **Pinned Ghidra to 12.1, not 12.1.2.** Ghidra validates an extension's
@@ -23,15 +24,22 @@
   a custom phase with no `runHook postInstall`, so a `postInstall` attribute never executes —
   a silent no-op, not an error. `postFixup` appends to ghidra-bin's own, which creates
   `$out/bin` and wraps `support/launch.sh` with openjdk21 (12.1 wants JDK >= 21, still fine).
-- **MCP registered project-scope, not `claude mcp add --scope user`.** User scope lives in
-  `~/.claude.json`, which Claude Code rewrites itself; home-manager should not contend for it.
+- **MCP registered at user scope, in `~/.claude.json` — reversing an earlier decision.**
+  First attempt declared a project-scope `~/projects/re/.mcp.json` from home-manager, to keep
+  the registration in nix and out of Claude Code's mutable state. It did not survive contact:
+  `.mcp.json` applies only to the directory `claude` is launched from, but ReVa is one
+  localhost endpoint acting on whatever program Ghidra has open — not per-project. The real
+  workflow is a session in `~/workspace/android-stuff/arm-trusted-firmware` reading ATF source
+  *and* driving Ghidra to port symbols into a BL31 dump; a `~/projects/re`-pinned registration
+  forced a `cd` away from the source to reach the decompiler. Declarativeness buys little here
+  anyway — the endpoint is localhost-only and inert without Ghidra running on the same box.
 
 ### Known Issues
 - Enabling "ReVa Application Plugin" (Project view) and "ReVa Plugin" (CodeBrowser, then
   Save Tool) is per-user GUI state under `~/.config/ghidra` — cannot be declared, must be
   clicked once after the first launch.
-- `~/projects/re/.mcp.json` is a read-only store symlink; a second MCP server for that
-  workspace means editing `modules/workstation.nix`.
+- ReVa's registration lives in `~/.claude.json`, so it does not follow to another machine;
+  re-add with the `claude mcp add` line in `modules/workstation.nix`.
 - Headless mode (`mcp-reva`, the `reverse-engineering-assistant` Python distribution) is
   not packaged — GUI/assistant mode only.
 

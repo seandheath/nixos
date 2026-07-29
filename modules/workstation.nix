@@ -141,35 +141,20 @@
   '';
   home-manager.users.sheath.home.file.".claude/CLAUDE.md".force = true;
 
-  # Reverse-engineering workspace: ~/projects/re is where Ghidra projects live and
-  # where `claude` should be launched from to reach ReVa (packages/ghidra-reva.nix).
+  # ReVa's MCP server (packages/ghidra-reva.nix) is registered at *user* scope in
+  # ~/.claude.json, deliberately not declared here.
   #
-  # ReVa runs its MCP server *inside* Ghidra over streamable HTTP, so the server is
-  # only reachable while Ghidra is open with a project loaded. Registration is done
-  # with a project-scope .mcp.json rather than `claude mcp add --scope user`, which
-  # would write to ~/.claude.json — Claude Code's own mutable state, which
-  # home-manager should not be fighting over.
+  # This started as a project-scope ~/projects/re/.mcp.json to keep the registration
+  # in nix and off Claude Code's mutable state. That was wrong in practice: .mcp.json
+  # only applies to the directory claude is launched from, but ReVa is a single
+  # localhost endpoint that acts on whatever program Ghidra currently has open — it
+  # is not per-project at all. Pinning it to one directory meant leaving the source
+  # tree under ~/workspace to talk to it, which defeats the point of having source
+  # and decompiler in the same session (e.g. porting ATF symbols into a BL31 dump).
   #
-  # NB: both files below are read-only store symlinks. Adding another MCP server to
-  # this workspace means editing here, not the JSON. Claude Code's /permissions
-  # writes to .claude/settings.local.json, which stays mutable, so it does not clash.
-  home-manager.users.sheath.home.file."projects/re/.mcp.json" = {
-    force = true;
-    text = builtins.toJSON {
-      mcpServers.ReVa = {
-        type = "http";
-        url = "http://localhost:8080/mcp/message";
-      };
-    };
-  };
-
-  home-manager.users.sheath.home.file."projects/re/.claude/settings.json" = {
-    force = true;
-    text = builtins.toJSON {
-      # Trust the .mcp.json above instead of re-prompting for approval each session.
-      enableAllProjectMcpServers = true;
-      # Upstream's recommended rule: allow every ReVa tool without per-call prompts.
-      permissions.allow = [ "mcp__ReVa" ];
-    };
-  };
+  # Re-create with:
+  #   claude mcp add --scope user --transport http ReVa http://localhost:8080/mcp/message
+  #
+  # Not worth fighting to keep declarative: the endpoint is localhost-only and means
+  # nothing without a Ghidra instance running on this same machine.
 }
