@@ -89,7 +89,11 @@
         "org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0" =
           {
             binding = "<Alt>Return";
-            command = "/etc/profiles/per-user/sheath/bin/ptyxis";
+            # --new-window, not bare `ptyxis`: Ptyxis is a single-instance
+            # GApplication, so a second invocation is delivered to the running
+            # process as an `activate` signal, which it answers by presenting the
+            # window it already has. Only the explicit action opens another one.
+            command = "/etc/profiles/per-user/sheath/bin/ptyxis --new-window";
             name = "open-terminal";
           };
         # Ptyxis (see home/ptyxis.nix). Its home-manager module only installs the
