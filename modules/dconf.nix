@@ -89,9 +89,27 @@
         "org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0" =
           {
             binding = "<Alt>Return";
-            command = "/etc/profiles/per-user/sheath/bin/kitty";
+            command = "/etc/profiles/per-user/sheath/bin/ptyxis";
             name = "open-terminal";
           };
+        # Ptyxis (see home/ptyxis.nix). Its home-manager module only installs the
+        # package, so the terminal's config — what kitty kept in kitty.conf — is
+        # all GSettings and lives here. These land in the NixOS user-profile dconf
+        # database, i.e. as defaults: changing them in Ptyxis' preferences writes
+        # to ~/.config/dconf/user, which takes precedence.
+        "org/gnome/Ptyxis" = {
+          # Ptyxis keys profiles by UUID and generates a random one on first run.
+          # Pinning one lets us declare the default profile's settings below.
+          default-profile-uuid = "7dedaffc-1181-49b1-a03c-aa0ed8390d80";
+          profile-uuids = [ "7dedaffc-1181-49b1-a03c-aa0ed8390d80" ];
+          use-system-font = false;
+          font-name = "B612 Mono 11";
+        };
+        # Relocatable org.gnome.Ptyxis.Profile schema — the UUID must match above.
+        "org/gnome/Ptyxis/Profiles/7dedaffc-1181-49b1-a03c-aa0ed8390d80" = {
+          label = "Default";
+          login-shell = true; # was kitty's `shell = "bash --login"`
+        };
         "org/gnome/germinal/legacy".theme-variant = "dark";
       };
     }];

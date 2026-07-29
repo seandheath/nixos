@@ -11,7 +11,7 @@ in
 {
   imports = [
     ./bash.nix
-    ./kitty.nix
+    ./ptyxis.nix
     ./git.nix
     ./go.nix
     ./neovim.nix
