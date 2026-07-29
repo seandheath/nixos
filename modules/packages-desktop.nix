@@ -1,6 +1,10 @@
 # Common desktop application set for workstation hosts. Extracted from
 # workstation.nix; grouped by concern. DE-agnostic (works on any desktop).
 { pkgs, ... }:
+let
+  # Binary repack of Levin's proprietary firmware-image tool; not in nixpkgs.
+  imjtool = import ../packages/imjtool.nix { inherit pkgs; };
+in
 {
   environment.systemPackages = with pkgs; [
     # Screenshots: gnome-shell's built-in area capture (see modules/dconf.nix).
@@ -38,6 +42,7 @@
 
     # Reverse engineering
     ghidra   # NSA SRE suite; wrapper pins its own JDK, no system java needed
+    imjtool  # Android/embedded firmware images (bootimg, sparse, UEFI, super.img)
 
     # 3D printing and CAD
     prusa-slicer
