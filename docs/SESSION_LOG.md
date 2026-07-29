@@ -1,5 +1,40 @@
 # Session Log
 
+## Session: 2026-07-29
+
+### Changes Made
+- `packages/ghidra-reva.nix`: new. Ghidra 12.1 (`ghidra-bin` overrideAttrs) + ReVa v7.3.0.
+- `modules/packages-desktop.nix`: `ghidra` → `ghidra-reva`.
+- `modules/workstation.nix`: `~/projects/re/.mcp.json` + `~/projects/re/.claude/settings.json`.
+
+### Decisions
+- **Pinned Ghidra to 12.1, not 12.1.2.** Ghidra validates an extension's
+  `extension.properties` `version=` against the running application version and rejects a
+  mismatch. ReVa ships one prebuilt zip per supported Ghidra release; v7.3.0 covers 12.0,
+  12.0.1–12.0.4 and 12.1 only. nixpkgs master is already on 12.1.2, for which no ReVa asset
+  exists — so tracking nixpkgs here would silently disable the extension. **Bump the Ghidra
+  version and the ReVa version together, and only to a pair that upstream ships.**
+- **Overrode `ghidra-bin`, not `ghidra`.** `ghidra-bin` is a fetchzip of the NSA release, so
+  a bump is a URL + hash edit; the source-built `ghidra` carries a gradle dependency lock
+  (`deps.json`) that would need regenerating. Consequence: nixpkgs' `ghidra.withExtensions` /
+  `buildGhidraExtension` framework is unavailable (it depends on nixpkgs' `NIX_GHIDRAHOME`
+  patch, which exists only on the source build), hence the extension is unzipped by hand.
+- **Extension installed in `postFixup`, not `postInstall`.** `ghidra-bin`'s `installPhase` is
+  a custom phase with no `runHook postInstall`, so a `postInstall` attribute never executes —
+  a silent no-op, not an error. `postFixup` appends to ghidra-bin's own, which creates
+  `$out/bin` and wraps `support/launch.sh` with openjdk21 (12.1 wants JDK >= 21, still fine).
+- **MCP registered project-scope, not `claude mcp add --scope user`.** User scope lives in
+  `~/.claude.json`, which Claude Code rewrites itself; home-manager should not contend for it.
+
+### Known Issues
+- Enabling "ReVa Application Plugin" (Project view) and "ReVa Plugin" (CodeBrowser, then
+  Save Tool) is per-user GUI state under `~/.config/ghidra` — cannot be declared, must be
+  clicked once after the first launch.
+- `~/projects/re/.mcp.json` is a read-only store symlink; a second MCP server for that
+  workspace means editing `modules/workstation.nix`.
+- Headless mode (`mcp-reva`, the `reverse-engineering-assistant` Python distribution) is
+  not packaged — GUI/assistant mode only.
+
 ## Session: 2026-07-28
 
 ### Changes Made

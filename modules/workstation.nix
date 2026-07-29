@@ -140,4 +140,36 @@
     - **Feedback requests:** Always include a recommended course of action when asking for my input.
   '';
   home-manager.users.sheath.home.file.".claude/CLAUDE.md".force = true;
+
+  # Reverse-engineering workspace: ~/projects/re is where Ghidra projects live and
+  # where `claude` should be launched from to reach ReVa (packages/ghidra-reva.nix).
+  #
+  # ReVa runs its MCP server *inside* Ghidra over streamable HTTP, so the server is
+  # only reachable while Ghidra is open with a project loaded. Registration is done
+  # with a project-scope .mcp.json rather than `claude mcp add --scope user`, which
+  # would write to ~/.claude.json — Claude Code's own mutable state, which
+  # home-manager should not be fighting over.
+  #
+  # NB: both files below are read-only store symlinks. Adding another MCP server to
+  # this workspace means editing here, not the JSON. Claude Code's /permissions
+  # writes to .claude/settings.local.json, which stays mutable, so it does not clash.
+  home-manager.users.sheath.home.file."projects/re/.mcp.json" = {
+    force = true;
+    text = builtins.toJSON {
+      mcpServers.ReVa = {
+        type = "http";
+        url = "http://localhost:8080/mcp/message";
+      };
+    };
+  };
+
+  home-manager.users.sheath.home.file."projects/re/.claude/settings.json" = {
+    force = true;
+    text = builtins.toJSON {
+      # Trust the .mcp.json above instead of re-prompting for approval each session.
+      enableAllProjectMcpServers = true;
+      # Upstream's recommended rule: allow every ReVa tool without per-call prompts.
+      permissions.allow = [ "mcp__ReVa" ];
+    };
+  };
 }

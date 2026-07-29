@@ -1,6 +1,18 @@
 # Changelog
 
 ## [Unreleased]
+### Added (reverse engineering)
+- sulphur: Ghidra 12.1 with the ReVa MCP server extension. `packages/ghidra-reva.nix` —
+  an `overrideAttrs` on nixpkgs `ghidra-bin` (a plain fetchzip of the NSA release build)
+  bumping 11.4.2 → 12.1 and unpacking ReVa v7.3.0's prebuilt extension zip into
+  `Ghidra/Extensions/`. ReVa requires Ghidra >= 12.0, which nixos-25.11 does not have in
+  either `ghidra` or `ghidra-bin`. `modules/packages-desktop.nix` swaps `ghidra` for it;
+  the derivation still provides `bin/ghidra` and `bin/ghidra-analyzeHeadless`.
+  `modules/workstation.nix` declares the RE workspace `~/projects/re` with a project-scope
+  `.mcp.json` pointing at `http://localhost:8080/mcp/message` plus a `.claude/settings.json`
+  granting `mcp__ReVa` and `enableAllProjectMcpServers`. Ghidra-side plugin activation is
+  GUI state in `~/.config/ghidra` and remains a one-time manual step.
+
 ### Added (minecraft)
 - hydrogen: persistent vanilla Minecraft server. `modules/minecraft-server.nix` —
   `services.minecraft-server` declarative, 1.21.10, world at `/var/lib/minecraft`, 6 GB

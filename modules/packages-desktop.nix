@@ -4,6 +4,8 @@
 let
   # Binary repack of Levin's proprietary firmware-image tool; not in nixpkgs.
   imjtool = import ../packages/imjtool.nix { inherit pkgs; };
+  # Ghidra 12.1 + ReVa MCP extension; nixpkgs ghidra is 11.4.2 and ReVa needs >=12.0.
+  ghidra-reva = import ../packages/ghidra-reva.nix { inherit pkgs; };
 in
 {
   environment.systemPackages = with pkgs; [
@@ -41,7 +43,10 @@ in
     zstd
 
     # Reverse engineering
-    ghidra   # NSA SRE suite; wrapper pins its own JDK, no system java needed
+    # NSA SRE suite; wrapper pins its own JDK, no system java needed. Provides
+    # `ghidra` and `ghidra-analyzeHeadless` like the plain nixpkgs package, plus
+    # the ReVa MCP server on localhost:8080 (see modules/workstation.nix).
+    ghidra-reva
     imjtool  # Android/embedded firmware images (bootimg, sparse, UEFI, super.img)
 
     # 3D printing and CAD
