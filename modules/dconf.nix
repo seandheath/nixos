@@ -107,7 +107,9 @@
           default-profile-uuid = "7dedaffc-1181-49b1-a03c-aa0ed8390d80";
           profile-uuids = [ "7dedaffc-1181-49b1-a03c-aa0ed8390d80" ];
           use-system-font = false;
-          font-name = "B612 Mono 11";
+          # Pango font description. Family must match what fontconfig reports for
+          # the package installed in home/ptyxis.nix.
+          font-name = "Inconsolata 11";
         };
         # Relocatable org.gnome.Ptyxis.Profile schema — the UUID must match above.
         "org/gnome/Ptyxis/Profiles/7dedaffc-1181-49b1-a03c-aa0ed8390d80" = {

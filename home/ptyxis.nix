@@ -10,6 +10,8 @@
   # The terminal font. programs.kitty used to pull this in via font.package;
   # nothing does now, so install it explicitly — NixOS' fontconfig scans
   # /etc/profiles/per-user/<name>/share/fonts, which is where useUserPackages
-  # puts it.
-  home.packages = [ pkgs.b612 ];
+  # puts it. Must stay in sync with font-name in modules/dconf.nix: the family
+  # name fontconfig exposes is "Inconsolata" (the package also ships the
+  # ligature variant as a separate "Ligconsolata" family).
+  home.packages = [ pkgs.inconsolata ];
 }
