@@ -141,6 +141,33 @@
   '';
   home-manager.users.sheath.home.file.".claude/CLAUDE.md".force = true;
 
+  # Claude Code permission rules, merged rather than declared.
+  #
+  # ~/.claude/settings.json is deliberately NOT a home.file: Claude Code writes to
+  # it itself (/config toggles like `tui`, one-shot dialog acknowledgements), and a
+  # read-only store symlink makes those writes fail. Instead this jq-merges the
+  # rules we care about into whatever is already there on every rebuild, so the
+  # file stays writable but our entries are self-healing.
+  #
+  # MCP rules match as mcp__<server> (whole server) or mcp__<server>__<tool> (one
+  # tool). Wildcards such as mcp__ReVa__* are NOT supported — the bare server name
+  # is what covers all of a server's tools.
+  # Imported as a sub-module rather than assigned inline: lib.hm.dag only exists
+  # inside home-manager's own module evaluation, not the NixOS one, and the rest
+  # of this file already assigns into home-manager.users.sheath.* by attr path
+  # (which cannot coexist with a direct `home-manager.users.sheath = ...`).
+  home-manager.users.sheath.imports = [ ({ lib, pkgs, ... }: {
+    home.activation.claudeSettings = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+      # No `run` wrapper: every command here redirects, and the redirect would
+      # still fire under `--dry-run` even though `run` swallowed the command.
+      settings="$HOME/.claude/settings.json"
+      mkdir -p "$(dirname "$settings")"
+      [ -s "$settings" ] || echo '{}' > "$settings"
+      ${pkgs.jq}/bin/jq '.permissions.allow = ((.permissions.allow // []) + ["mcp__ReVa"] | unique)' \
+        "$settings" > "$settings.tmp" && mv "$settings.tmp" "$settings"
+    '';
+  }) ];
+
   # ReVa's MCP server (packages/ghidra-reva.nix) is registered at *user* scope in
   # ~/.claude.json, deliberately not declared here.
   #
