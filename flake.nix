@@ -90,11 +90,11 @@
           nixos-hardware.nixosModules.microsoft-surface-go
         ] ++ commonModules;
       };
-      sulphur = nixpkgs.lib.nixosSystem {
+      sulfur = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
         specialArgs = { inherit inputs; lib = nixpkgs.lib; };
         modules = [
-          ./hosts/sulphur.nix
+          ./hosts/sulfur.nix
           nixos-hardware.nixosModules.asus-zephyrus-gu605my
           impermanence.nixosModules.impermanence
           chaotic.nixosModules.default

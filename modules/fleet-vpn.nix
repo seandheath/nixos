@@ -4,7 +4,7 @@
 # (shell + SFTP as user `sheath`, media group r/w).
 #
 # The grant is ONE device record — a single key/address. It cannot be live on
-# sulphur and hydrogen at the same time (the hub keys the endpoint by public
+# sulfur and hydrogen at the same time (the hub keys the endpoint by public
 # key; concurrent use flaps the handshake). Both hosts therefore declare the
 # identical tunnel with autostart DISABLED, and it is switched by hand — exactly
 # one host up at a time:
@@ -16,7 +16,7 @@
 { config, lib, ... }:
 let
   isHydrogen = config.networking.hostName == "hydrogen";
-  # The `ssh jellyfin` login key. sulphur already carries it on disk; hydrogen
+  # The `ssh jellyfin` login key. sulfur already carries it on disk; hydrogen
   # is an impermanent server with no ~/.ssh, so it gets the key from sops.
   fleetSshKey =
     if isHydrogen then config.sops.secrets.fleet-ssh-key.path else "/home/sheath/.ssh/jellyfin";
@@ -54,8 +54,8 @@ in
   };
 
   # WireGuard reply traffic returns on the tunnel iface; loosen reverse-path
-  # filtering so it isn't dropped. mkDefault so sulphur's existing plain "loose"
-  # (hosts/sulphur.nix) still wins without a conflict, and hydrogen (which sets
+  # filtering so it isn't dropped. mkDefault so sulfur's existing plain "loose"
+  # (hosts/sulfur.nix) still wins without a conflict, and hydrogen (which sets
   # nothing) inherits it.
   networking.firewall.checkReversePath = lib.mkDefault "loose";
 
@@ -68,7 +68,7 @@ in
 
   # `ssh jellyfin` -> sheath@100.64.0.80 over the fleet tunnel. Declared at the
   # system level (/etc/ssh/ssh_config) so hydrogen gets it without a managed
-  # ~/.ssh/config; on sulphur the user's own ~/.ssh/config alias (read first)
+  # ~/.ssh/config; on sulfur the user's own ~/.ssh/config alias (read first)
   # takes precedence over this identical block. IdentitiesOnly mirrors the
   # user's `Host *` setting so only this key is offered.
   programs.ssh.extraConfig = ''

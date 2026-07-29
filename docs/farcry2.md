@@ -2,7 +2,7 @@
 
 Declarative-ish setup for **Far Cry 2: Fortune's Edition** (Steam AppID **19900**) with
 **Realism+Redux v1.2.5** ("Original Colors, no player position", Nexus Mods #326) + the
-bundled **FoxAhead Multi-Fixer**, running under **GE-Proton**, on host `sulphur`.
+bundled **FoxAhead Multi-Fixer**, running under **GE-Proton**, on host `sulfur`.
 
 Managed by:
 - `modules/farcry2.nix` — vkBasalt 32-bit layer + `vkBasalt.conf`, and the `fc2-apply-mods` helper
@@ -11,7 +11,7 @@ Managed by:
 ## TL;DR — install
 
 ```sh
-sudo nixos-rebuild switch --flake .#sulphur     # installs fc2-apply-mods + vkBasalt
+sudo nixos-rebuild switch --flake .#sulfur     # installs fc2-apply-mods + vkBasalt
 # Install Far Cry 2 (app 19900) via Steam and launch it ONCE (creates the Proton prefix), quit.
 fc2-apply-mods                                   # overlay + symlink + sets Steam launch options
 ```

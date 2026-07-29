@@ -1,13 +1,13 @@
 { config, lib, pkgs, ... }:
 # Server-side "impermanence" layout for hydrogen.
 #
-# This is the LAYOUT-ONLY variant (matching the repo's actual behaviour on sulphur):
+# This is the LAYOUT-ONLY variant (matching the repo's actual behaviour on sulfur):
 # Btrfs subvolumes @root/@nix/@home/@persist/@log/@swap + a separate /data disk, with
 # NO LUKS and NO active root-wipe rollback service. Root persists like a normal install,
 # so /etc/shadow and /var/lib (service databases) survive reboots -- which means there is
 # no exhaustive persist list to get wrong and no data-loss risk on reboot. The trade-off
 # is that root is not actually ephemeral; the installer's @root-blank snapshot is unused
-# (same as sulphur today).
+# (same as sulfur today).
 {
   # Initrd systemd: matches the repo's other Btrfs hosts. Harmless without LUKS/rollback.
   boot.initrd.systemd.enable = true;

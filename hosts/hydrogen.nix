@@ -245,7 +245,7 @@
   hardware.nvidia.package = config.boot.kernelPackages.nvidiaPackages.production;
 
   # nix-ld so generic dynamically-linked binaries run (e.g. the official Claude
-  # Code CLI in ~/.local/bin). Mirrors sulphur's modules/workstation.nix config.
+  # Code CLI in ~/.local/bin). Mirrors sulfur's modules/workstation.nix config.
   programs.nix-ld = {
     enable = true;
     libraries = with pkgs; [

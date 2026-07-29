@@ -5,7 +5,7 @@ let
 in
 {
   imports = [
-    ../hardware/sulphur.nix
+    ../hardware/sulfur.nix
     ../modules/steam.nix
     ../modules/mo2.nix
     ../modules/cemu.nix
@@ -42,7 +42,7 @@ in
   };
 
   # Networking
-  networking.hostName = "sulphur";
+  networking.hostName = "sulfur";
   networking.networkmanager.enable = true;
   networking.networkmanager.wifi.powersave = false;
 
@@ -195,11 +195,11 @@ in
   };
 
   # WireGuard configuration for home LAN access
-  sops.secrets.wg-priv-sulphur = { };
+  sops.secrets.wg-priv-sulfur = { };
 
   networking.wg-quick.interfaces.wg0 = {
     address = [ "10.40.0.3/24" ];
-    privateKeyFile = config.sops.secrets.wg-priv-sulphur.path;
+    privateKeyFile = config.sops.secrets.wg-priv-sulfur.path;
     table = "off"; # Prevent wg-quick from auto-adding routes to the main table
     
     peers = [

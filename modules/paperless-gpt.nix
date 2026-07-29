@@ -8,7 +8,7 @@
 #
 # Not in nixpkgs (no package, no module), so it runs as a pinned OCI container. Hydrogen had
 # no container runtime before this; podman is enabled here rather than by importing the
-# desktop-oriented modules/virtualisation.nix (which sulphur/osmium use and which would drag
+# desktop-oriented modules/virtualisation.nix (which sulfur/osmium use and which would drag
 # in virt-manager etc.).
 #
 # The paperless API token lives in sops (`paperless-gpt-token`, an env file containing

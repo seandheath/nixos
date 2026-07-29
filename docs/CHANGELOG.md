@@ -1,6 +1,24 @@
 # Changelog
 
 ## [Unreleased]
+### Changed (host rename)
+- `sulphur` is now `sulfur` everywhere: flake attribute, `hosts/sulfur.nix`,
+  `hardware/sulfur.nix`, `networking.hostName`, and the sops keys `wg-pub-sulphur` /
+  `wg-priv-sulphur` → `wg-pub-sulfur` / `wg-priv-sulfur` (re-encrypted in place with
+  `EDITOR="sed -i …" sops secrets/secrets.yaml`; values verified unchanged). The flake
+  attribute and `networking.hostName` must stay equal — `modules/auto-update.nix` builds
+  `path:~/nixos/#${config.networking.hostName}`. Dated entries below keep the old spelling.
+  Outside the repo the router's DHCP/DNS reservation still says `sulphur`, and mDNS is now
+  `sulfur.local`.
+
+### Changed (terminal)
+- kitty → Ptyxis. `home/ptyxis.nix` replaces `home/kitty.nix`. The home-manager ptyxis module
+  only installs the package (and palettes), so what kitty kept in `kitty.conf` — B612 Mono 11
+  and `bash --login` — is now GSettings in `modules/dconf.nix`: `org.gnome.Ptyxis`
+  (`font-name`, `use-system-font = false`, a pinned default profile UUID) plus that profile's
+  `login-shell = true`. `pkgs.b612` is installed explicitly since nothing pulls it in anymore.
+  `<Alt>Return` spawns ptyxis. These land as dconf *defaults*, so Ptyxis' own preferences win.
+
 ### Added (reverse engineering)
 - sulphur: Ghidra 12.1 with the ReVa MCP server extension. `packages/ghidra-reva.nix` —
   an `overrideAttrs` on nixpkgs `ghidra-bin` (a plain fetchzip of the NSA release build)

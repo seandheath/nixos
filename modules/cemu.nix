@@ -7,7 +7,7 @@
   ];
 
   # Vulkan, gamepad SDL2 support, low-latency Pipewire and GameMode are all
-  # provided by steam.nix / workstation.nix / hosts/sulphur.nix already, so no
+  # provided by steam.nix / workstation.nix / hosts/sulfur.nix already, so no
   # additional system config is needed here.
   #
   # Recommended launch:

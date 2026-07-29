@@ -1,6 +1,6 @@
 # Far Cry 2 (Steam AppID 19900, Fortune's Edition) modding under Proton.
 #
-# Reuses the shared gaming stack from steam.nix / workstation.nix / sulphur.nix
+# Reuses the shared gaming stack from steam.nix / workstation.nix / sulfur.nix
 # (Steam, Proton-GE, gamescope, gamemode, 32-bit graphics, Vulkan). This module
 # adds only the FC2-specific bits:
 #   - vkBasalt (32-bit layer) for optional CAS sharpening
@@ -115,7 +115,7 @@ in
 {
   # --- vkBasalt: install both arch layers. FC2 is a 32-bit game, so the 32-bit
   # implicit-layer JSON (extraPackages32) is the one that actually matters; these
-  # merge with the hardware.graphics block in hosts/sulphur.nix. Enable per-game
+  # merge with the hardware.graphics block in hosts/sulfur.nix. Enable per-game
   # with ENABLE_VKBASALT=1 in the Steam launch options (see docs/farcry2.md).
   hardware.graphics.extraPackages   = [ pkgs.vkbasalt ];
   hardware.graphics.extraPackages32 = [ pkgs.pkgsi686Linux.vkbasalt ];

@@ -466,7 +466,7 @@ EOF
     echo "Hardware configuration generated at $HARDWARE_DEST"
 
     if [[ "$ENCRYPT" == "true" ]]; then
-        # --- Declarative passwords + persisted host keys (LUKS/impermanence, sulphur-style) ---
+        # --- Declarative passwords + persisted host keys (LUKS/impermanence, sulfur-style) ---
         echo "Setting up /persist structure..."
         sudo mkdir -p /mnt/persist/secrets
         sudo chmod 700 /mnt/persist/secrets
