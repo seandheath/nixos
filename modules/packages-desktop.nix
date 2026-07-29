@@ -36,6 +36,9 @@
     parallel
     zstd
 
+    # Reverse engineering
+    ghidra   # NSA SRE suite; wrapper pins its own JDK, no system java needed
+
     # 3D printing and CAD
     prusa-slicer
     openscad
