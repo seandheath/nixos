@@ -133,10 +133,16 @@ directly rather than hunting for a ReVa tool that does not exist.
 
 ## Write operations
 
-ReVa can rename symbols and set types in the **live** program — these are real edits
-to the analyst's database, not a scratch buffer. Before applying a batch of renames,
-confirm the open project is a copy rather than the primary one. Prefer one rename at
-a time with a stated justification over speculative bulk renaming.
+ReVa can comment, label, retype, rename locals, create and delete structures and write
+scripts in the **live** program. These are real edits to the analyst's database, not a
+scratch buffer, and **nothing will stop you** — every ReVa tool executes without asking for
+confirmation, including all the destructive ones. You are the only check on this.
+
+So: before any batch of edits, confirm with the analyst that the open project is a copy
+rather than the primary one. Prefer one edit at a time with a stated justification over
+speculative bulk changes. If you are unsure whether an edit is right, say so and leave it —
+an un-renamed function costs a minute; a database full of confident wrong names costs the
+analyst their trust in everything else in it, including the parts you got right.
 
 A reference source tree is the best source of names there is, and porting them in is one
 of the most valuable things you can do — but it is also the easiest way to write a

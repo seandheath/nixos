@@ -11,6 +11,7 @@
     ./packages-desktop.nix
     ./opencode.nix
     ./qwen-code.nix
+    ./re-container.nix
   ];
 
   # Programs

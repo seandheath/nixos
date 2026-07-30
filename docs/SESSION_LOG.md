@@ -13,6 +13,8 @@
   `~/.qwen/QWEN.md` (RE instructions), and a sops-templated `~/.qwen/.env` (the secrets).
 - `modules/workstation.nix`: also imports `./qwen-code.nix`.
 - `prompts/re-agent.md`: new (new top-level dir). Canonical RE agent instructions.
+- `packages/re-container.nix`, `modules/re-container.nix`: new. Sandboxed `cqwen`/`copencode`.
+- `modules/workstation.nix`: also imports `./re-container.nix`.
 - `modules/opencode.nix`, `modules/qwen-code.nix`: inline prose replaced with
   `source = ../prompts/re-agent.md`; keep-in-step comments replaced with a pointer to it.
 
@@ -105,6 +107,55 @@
   `resolveEnvVarsInObject`), and only `~/.qwen/.env` — the first candidate qwen-code's
   `findEnvFiles()` checks, and a file it reads but never writes — comes from sops. Verified
   the rewrite leaves the placeholders unresolved, so no secret reaches the rewritten file.
+- **Sandboxed the RE agents, because they are the ones that most need it.** Both are driven
+  by a remote model and handed a shell tool; uncontained they reach SSH keys, GPG and this
+  config. `cclaude` already solves this shape for Claude Code, so `cqwen`/`copencode` reuse
+  its security flags verbatim rather than inventing a posture.
+- **`--network=pasta:-T,8080` is the whole trick, and it took three attempts to find.**
+  ReVa binds loopback only, so the obvious routes fail: `host.containers.internal` is
+  pasta's gateway (169.254.1.2) and 8080 there is unreachable; `--map-guest-addr` did not
+  work either. pasta's `-T` forwards the *container's* localhost to the *host's*. Measured
+  inside the container: 8080 reachable, 8384 and 631 blocked, outbound 443 + DNS to the vLLM
+  endpoint fine. Strictly better than `--network=host`, which reaches ReVa by exposing every
+  host-local service. The unobvious payoff: because it is the container's *own* localhost
+  that forwards, `http://localhost:8080/mcp/message` works unchanged, so there is no
+  container-specific config to keep in step with the host's.
+- **dockerTools image, not a Containerfile.** cclaude uses debian + curl-to-bash because
+  that is how Claude Code ships. Both agents here are already Nix packages, so building the
+  image from them is reproducible, needs no build-time network, and cannot drift from what
+  `qwen`/`opencode` are on the host. Dropped cclaude's `/nix/store` mount and nix daemon
+  socket (Sean's call) so the agent can execute only what is in the image, and dropped SSH
+  agent forwarding outright.
+- **Two things bit during implementation, both worth remembering:**
+  - A tmpfs `$HOME` — chosen so secrets could never persist — does not work. Podman's
+    `--tmpfs` rejects `uid=`, so the mount lands owned by the namespace root and the uid-1000
+    agent cannot write to it. Fell back to cclaude's named volume with `,U`. To keep secrets
+    out of that volume anyway, the three endpoint values are passed as **environment
+    variables** rather than a mounted `.env`; qwen-code resolves settings.json's
+    `$OPENWEBUI_*` placeholders from the process environment identically (verified).
+  - OpenCode's config bakes `{file:<absolute host path>}` for the agent prompt and resolves
+    it literally, so config load fails outright inside the container until that exact path
+    exists. The prompt is mounted at the host path — the one host-shaped path in the
+    container, a single read-only file. Worth knowing if `home.homeDirectory` ever changes.
+- **All 88 ReVa tools are auto-approved, in both clients — and that is now a decision, not a
+  gap.** Found by probing rather than reading config: each agent was asked to attempt a real
+  `delete-structure`, and both dispatched it with no confirmation. The 14 write tools
+  (`set-comment`, `create-label`, `rename-variables`, `apply-data-type`, `delete-structure`,
+  `write-script`, …) are all in scope. The trap here is assuming the narrow `python3 -c`
+  allow-rules cover it: **MCP is a different code path from the shell tool**, so those rules
+  gate bash and do nothing for ReVa.
+  Sean's call: unrestricted ReVa is the point of the tool, and prompting on every retype
+  would cost more than the risk. Two consequences recorded in the module rather than
+  rediscovered later: the container gives *zero* protection to the Ghidra database, and the
+  only surviving control is procedural, so `prompts/re-agent.md` now tells the agent outright
+  that nothing will stop it and that confirming the project is a copy is on the analyst.
+  If it is ever revisited, both gating syntaxes are already worked out — qwen-code builds
+  `mcp__<server>__<tool>` rule names, OpenCode's permission schema is
+  `.catchall(PermissionRule)` with ReVa's tools named `reva_<tool>`.
+  Related, and not currently exploitable: `write-script` drops a file into the Ghidra
+  project, but `run-script` is dead on this install (stock launcher, no PyGhidra). That is a
+  property of `packages/ghidra-reva.nix`'s launcher, **not** a designed boundary — it would
+  stop holding silently if that ever moved to a PyGhidra launch.
 - **One canonical RE prompt, because "keep them in step" already failed.** Both modules
   inlined their own copy with a comment telling future-us to sync them by hand. Diffing the
   two *deployed* files after a single session found they had already diverged twice. Now
