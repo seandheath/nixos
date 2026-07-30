@@ -12,6 +12,9 @@
 - `modules/qwen-code.nix`: new. That package + a plain `~/.qwen/settings.json`, a plain
   `~/.qwen/QWEN.md` (RE instructions), and a sops-templated `~/.qwen/.env` (the secrets).
 - `modules/workstation.nix`: also imports `./qwen-code.nix`.
+- `prompts/re-agent.md`: new (new top-level dir). Canonical RE agent instructions.
+- `modules/opencode.nix`, `modules/qwen-code.nix`: inline prose replaced with
+  `source = ../prompts/re-agent.md`; keep-in-step comments replaced with a pointer to it.
 
 ### Decisions
 - **Scoped the work to the client half.** The spec describes Ghidra+ReVa, OpenCode and
@@ -102,6 +105,51 @@
   `resolveEnvVarsInObject`), and only `~/.qwen/.env` — the first candidate qwen-code's
   `findEnvFiles()` checks, and a file it reads but never writes — comes from sops. Verified
   the rewrite leaves the placeholders unresolved, so no secret reaches the rewritten file.
+- **One canonical RE prompt, because "keep them in step" already failed.** Both modules
+  inlined their own copy with a comment telling future-us to sync them by hand. Diffing the
+  two *deployed* files after a single session found they had already diverged twice. Now
+  `prompts/re-agent.md` is the only copy and both modules `source` it.
+  - **No per-client templating turned out to be necessary**, which is why this is a plain
+    `.md` and not a Nix function or a `substituteAll`-style template. Only two things
+    differed: a sentence about the install being RE-only (true of both clients at the point
+    either reads the file) and a mention of the shell tool *by name*. The latter is the one
+    real constraint on the canonical file — OpenCode's is `bash`, qwen-code's is
+    `run_shell_command` — so the text says "shell out to python3" and lets each model use
+    whatever its own tool is called. Both module comments now say this.
+  - Chose a new top-level `prompts/` dir over `docs/`: this is live config data that ships
+    to two clients, and burying it among CHANGELOG/SESSION_LOG invites an edit that
+    silently changes agent behaviour.
+- **The "there is no source tree" claim was wrong and is now fixed.** Sean sometimes opens
+  the agent inside source that is *representative* of the binary — upstream project, SDK,
+  vendor drop, a different version of the same component — specifically to give it hints.
+  The instructions asserted the opposite, which would have led an agent to ignore material
+  deliberately put in front of it. New "Reference source" section frames it as hint-not-
+  answer: good for names, struct/enum layouts, constants and algorithm shape (which survive
+  version drift and are expensive to recover from a binary), untrustworthy for anything
+  checkable, because the version may differ, the compiler restructures (inlining,
+  unrolling, tail merging, layout, dead-code removal), and ifdefs/feature flags may mean a
+  branch was never compiled in. Rule: hypothesis from source → confirm against binary →
+  attribute which is which → binary wins on conflict, and the conflict is itself a finding.
+  Also threaded into two existing sections: grepping source beats decompiling for locating
+  things (context budget), and source names are the best rename source but must be matched
+  on evidence first, since a wrong name gets believed later (write operations).
+- **Arithmetic guidance widened past hex addition.** It named only offsets, page
+  boundaries, field offsets and hex/dec conversion; a model does not read that as covering
+  "is bit 12 set" or "what is this as a signed int". Now covers masks/flag tests, shifts
+  and rotates, signed/unsigned and sign extension, endianness, and float/int
+  reinterpretation, each with a `python3 -c` one-liner **verified by running it** before
+  shipping. Stated the reason they matter more than a bad sum: a wrong address is usually
+  obviously out of range, whereas a wrong sign extension or byte swap is plausible and
+  survives review. (While checking the examples I got the expected value for the 12-bit
+  sign-extension case wrong myself — the one-liner was right — which is the section's
+  own argument, made accidentally.)
+- **No permission change was needed for any of that.** Both clients' `python3 -c *` rules
+  already admit `python3 -c 'import struct; …'`: a semicolon inside the quoted `-c`
+  argument does not split the command for matching. Control-tested rather than assumed —
+  a bare `touch` under `opencode run` blocks on an unanswerable confirmation and never
+  creates its probe file, so the `import struct` case really is the rule matching and not
+  non-interactive auto-approval. Both module comments record this, since narrowing the rule
+  later would silently break the new guidance.
 - **`QWEN.md`, not `QWEN_SYSTEM_MD`.** The global context file is *appended* to
   qwen-code's core system prompt as `userMemory`; `QWEN_SYSTEM_MD` **replaces** the base
   prompt entirely and would throw away its tool-usage and safety scaffolding. Since this

@@ -22,85 +22,23 @@
 
   # Operating constraints from the spec, as the RE agent's system prompt.
   #
+  # The prose is shared: prompts/re-agent.md is the single canonical copy, deployed
+  # verbatim here and to ~/.qwen/QWEN.md by modules/qwen-code.nix. It used to be inlined
+  # in both modules with a comment asking future-us to keep them in step, which lasted
+  # exactly one session before they drifted. Edit the canonical file, never this path.
+  # Keep that file client-neutral — in particular it must not name a shell tool, since
+  # OpenCode calls it `bash` and qwen-code calls it `run_shell_command`.
+  #
   # Deliberately NOT named AGENTS.md: OpenCode auto-loads a global
   # ~/.config/opencode/AGENTS.md into *every* session, and "never bulk-decompile" is
   # noise in an ordinary coding session (and would then be included twice, once
   # globally and once via agent.re.prompt). A non-magic filename referenced explicitly
-  # from agent.re.prompt scopes it to RE work only.
-  home-manager.users.sheath.xdg.configFile."opencode/re-instructions.md".text = ''
-    # Reverse engineering with ReVa
-
-    You are driving Ghidra through the ReVa MCP server. ReVa acts on whichever program
-    Ghidra currently has open — you cannot switch programs, and you are not browsing a
-    filesystem.
-
-    ## Context budget
-
-    Retrieve functions **individually**. Never request bulk decompilation of a binary:
-    a single large function can consume tens of thousands of tokens, and decompiler
-    output is by far the dominant consumer of the context window. Locate first
-    (symbol/xref/string search), then decompile only the specific function you need.
-
-    If you catch yourself about to iterate over a function list decompiling each entry,
-    stop and narrow the search instead.
-
-    ## Arithmetic: shell out, never compute in your head
-
-    You are bad at hex arithmetic and you will get it wrong silently. Do not compute
-    address offsets, page boundaries, struct field offsets, or hex/decimal conversions
-    mentally or by "reasoning through" them. Shell out:
-
-        python3 -c 'print(hex(0x40000000 + 0x1a2b8))'
-
-    That exact form is pre-approved and will not prompt. Use it freely — one shell call is
-    vastly cheaper than a wrong address that sends you down a dead branch.
-
-    ReVa itself has **no calculator tool**, and its `run-script` tool cannot help: it
-    requires Ghidra to have been launched via PyGhidra, and this install uses the stock
-    launcher, so every call returns "Python is not available". Do not keep retrying it.
-
-    ## Prefer the tools that make arithmetic unnecessary
-
-    Most hex arithmetic in this workflow is avoidable — ReVa will compute it for you and
-    be right. Reach for these before doing any math at all:
-
-    - Struct field offsets — `get-structure-info`, `parse-c-structure`, `list-structures`.
-      Never hand-sum field sizes to find an offset.
-    - Vtable slots — `analyze-vtable`, `find-vtables-containing-function`,
-      `find-vtable-callers`. Never multiply an index by pointer size yourself.
-    - Branch and call targets — `find-cross-references`, `get-call-graph`, `get-call-tree`,
-      `get-callers-decompiled`, `get-referencers-decompiled`, `resolve-thunk`. Never decode
-      a relative branch displacement by hand.
-    - Where a value comes from or goes — `trace-data-flow-backward`,
-      `trace-data-flow-forward`, `find-variable-accesses`.
-    - Load addresses and segment bounds — `get-memory-blocks`. Never assume an image base;
-      on AArch64 firmware images it is frequently not what you would guess.
-    - A specific constant — `find-constant-uses`, `find-constants-in-range`,
-      `list-common-constants`. Search for it rather than deriving it.
-    - Bytes or data at an address — `read-memory`, `get-data`.
-
-    If you find yourself about to write out an addition in prose, that is the signal to
-    call one of the above instead.
-
-    ## Write operations
-
-    ReVa can rename symbols and set types in the **live** program — these are real edits
-    to the analyst's database, not a scratch buffer. Before applying a batch of renames,
-    confirm the open project is a copy rather than the primary one. Prefer one rename at
-    a time with a stated justification over speculative bulk renaming.
-
-    ## Single-program scope
-
-    Multi-binary work needs a separate session per binary (or headless Ghidra). Do not
-    assume symbols from one binary are visible while another is open.
-
-    ## Malformed tool calls
-
-    If your tool calls come back rejected, that is an inference-side problem (tool-call
-    parser or quantization on the vLLM host), not something to work around by pasting
-    JSON into prose. Report it and stop.
-  '';
-  home-manager.users.sheath.xdg.configFile."opencode/re-instructions.md".force = true;
+  # from agent.re.prompt scopes it to RE work only. The deployed path is unchanged, so
+  # agent.re.prompt's {file:…} reference below still resolves.
+  home-manager.users.sheath.xdg.configFile."opencode/re-instructions.md" = {
+    source = ../prompts/re-agent.md;
+    force = true;
+  };
 
   # ~/.config/opencode/opencode.json, rendered from sops at activation.
   #
@@ -211,9 +149,16 @@
           # environment.systemPackages via packages-desktop.nix, and OpenCode's bash tool
           # inherits the user's PATH, so it resolves.
           #
-          # Kept deliberately in step with the one command form in re-instructions.md: if
-          # you widen the prompt's advice, widen this too, or the model gets prompted and
+          # Kept deliberately in step with the command forms in prompts/re-agent.md: if you
+          # widen the prompt's advice, widen this too, or the model gets prompted and
           # starts improvising again.
+          #
+          # The pattern covers multi-statement forms too — `python3 -c 'import struct; …'`
+          # runs unprompted, because a semicolon inside the quoted -c argument does not
+          # split the command for matching. That matters: the bitwise/endianness/float
+          # guidance in prompts/re-agent.md needs `import struct`. Verified against a
+          # control (a bare `touch` under `opencode run` does block), so this is the rule
+          # matching and not non-interactive auto-approval.
           permission.bash = {
             "python3 -c *" = "allow";
             "*" = "ask";

@@ -1,6 +1,40 @@
 # Changelog
 
 ## [Unreleased]
+### Changed (agentic reverse engineering)
+- `prompts/re-agent.md` — the RE agent instructions are now a **single canonical file**,
+  deployed verbatim to both clients (`~/.config/opencode/re-instructions.md` via
+  `modules/opencode.nix`, `~/.qwen/QWEN.md` via `modules/qwen-code.nix`). Both modules
+  previously inlined their own copy with a comment asking future-us to keep them in step;
+  they had already drifted in two places within one session. No per-client templating was
+  needed — the only client-specific bit was a reference to the shell tool by name, which
+  the canonical text now avoids (OpenCode calls it `bash`, qwen-code
+  `run_shell_command`), so this is a plain shared file rather than a Nix function.
+- **Corrected a wrong claim in those instructions.** They asserted there is never a source
+  tree — but sessions are sometimes started inside source that is *representative* of the
+  binary (upstream project, SDK, vendor drop, a different version), deliberately provided
+  as a hint. New "Reference source" section: use it for names, struct/enum layouts,
+  constants and algorithm shape; do not trust it for anything checkable in the binary,
+  because the version may differ, the compiler rewrites structure (inlining, unrolling,
+  layout), and build config may exclude whole branches. Form the hypothesis from source,
+  confirm against the binary, attribute which is which, and when they disagree the binary
+  wins. Also folded into the context-budget rule (grepping source is much cheaper than
+  decompiling to get your bearings) and the write-operations rule (source is the best
+  source of names, but rename only on matched evidence — a wrong name gets believed later).
+- **Expanded the arithmetic section beyond hex addition.** It previously named only address
+  offsets, page boundaries, struct field offsets and hex/decimal conversion, which a model
+  will not read as covering "is bit 12 set". Now also covers masks and flag tests, shifts
+  and rotates, signed/unsigned reinterpretation and sign extension, endianness swaps, and
+  float/int bit reinterpretation, with a verified worked `python3 -c` one-liner for each of
+  the ones that are easiest to fake convincingly. The rationale is stated: these are *more*
+  dangerous than a wrong sum, because a bad sum yields an obviously out-of-range address
+  while a bad sign extension or byte swap yields a plausible value that survives review.
+- No permission changes were needed for the above. Both clients' existing `python3 -c *`
+  rules already admit multi-statement forms — a semicolon inside the quoted `-c` argument
+  does not split the command for rule matching, so `python3 -c 'import struct; …'` runs
+  unprompted on both. Control-tested on OpenCode (a bare `touch` under `opencode run` does
+  block), so this is genuinely the rule matching and not non-interactive auto-approval.
+
 ### Added (agentic reverse engineering)
 - `packages/qwen-code.nix` + `modules/qwen-code.nix` — qwen-code as a **second** RE client
   alongside OpenCode, pointed at the same vLLM endpoint and the same ReVa MCP server, so the
