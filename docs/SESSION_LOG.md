@@ -1,5 +1,56 @@
 # Session Log
 
+## Session: 2026-07-30
+
+### Changes Made
+- `modules/opencode.nix`: new. `pkgs.opencode` + a sops-templated
+  `~/.config/opencode/opencode.json` (provider `vllm`, `mcp.reva`, `agent.re`) + a plain
+  `~/.config/opencode/re-instructions.md` holding the RE system prompt.
+- `modules/workstation.nix`: imports `./opencode.nix`.
+- `home/sheath.nix`: pi's `contextWindow` 32768 → 262144, `maxTokens` 8192 → 32768.
+
+### Decisions
+- **Scoped the work to the client half.** The spec describes Ghidra+ReVa, OpenCode and
+  vLLM. ReVa landed 2026-07-29; vLLM is an existing *remote* endpoint. Only OpenCode was
+  actually missing from the repo.
+- **vLLM will never be a service here.** hydrogen's P4200 is Pascal (SM 6.1) and vLLM
+  requires compute capability >= 7.0; nixos-25.11 has no `services.vllm` module either.
+  sulfur's RTX 5080 has the capability but only 16 GB, and a CUDA `vllm` build is not in
+  the binary cache. Do not re-propose this.
+- **Reused the `openwebui-*` sops trio rather than adding `vllm-*` keys.** Sean's choice.
+  Worth knowing what those secrets actually point at: `openwebui-url` is
+  `https://<host>/api` — Open WebUI's OpenAI-compatible root — proxying to the vLLM host,
+  not vLLM's `/v1` directly. Provider id is still `vllm` since that is what serves tokens.
+- **Verified tool calling survives the Open WebUI proxy** before committing to that path,
+  since spec §6's headline failure is "model ignores tools" and a proxy that drops the
+  `tools` array would produce exactly that. A `/chat/completions` carrying a `tools` array
+  came back `finish_reason=tool_calls` with well-formed arguments. It works.
+- **Whole-file sops template, not `xdg.configFile` + env interpolation.** OpenCode does
+  support `{env:…}`/`{file:…}` substitution, so the token alone could have stayed out of
+  the store — but the base URL and the served model id are also secrets, and the model id
+  has to be a JSON *object key* (`provider.vllm.models.<id>`). Templating the whole file
+  handles all three uniformly; the id is emitted via a dynamic Nix attribute name and sops
+  substitutes every occurrence, including the two inside `model`/`small_model`.
+- **`re-instructions.md`, not `AGENTS.md`.** OpenCode auto-loads a global
+  `~/.config/opencode/AGENTS.md` into every session. Using that name would push
+  "never bulk-decompile" into ordinary coding sessions *and* double-include it alongside
+  `agent.re.prompt`. A non-magic filename referenced explicitly scopes it to RE work.
+- **`limit.output = 32768`, not 8192.** vLLM enforces only
+  `max_tokens <= max_model_len`, so output is a client-side reservation drawn from the same
+  262144 window rather than a discoverable server value. The served model reasons before
+  answering (a 74-character reply cost 384 completion tokens), so an 8k cap risks
+  truncating mid-tool-call — spec §6's "truncated / malformed tool calls". 32768 still
+  leaves ~229k for context.
+
+### Known Issues
+- Home-manager sops `templates.<n>.path` installs a **symlink** into
+  `~/.config/sops-nix/secrets/rendered/`, so `~/.config/opencode/opencode.json` is a
+  symlink, not a regular file. Fine for OpenCode (it only reads), but any tool that
+  rewrites the config in place would write through into the sops-managed store dir.
+- `{file:…}` interpolation in `agent.<name>.prompt` is present in opencode 1.1.14's bundle
+  but is not described in the JSON schema. If a future bump breaks it, inline the
+  instructions text into `prompt` directly.
+
 ## Session: 2026-07-29
 
 ### Changes Made

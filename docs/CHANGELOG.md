@@ -1,6 +1,39 @@
 # Changelog
 
 ## [Unreleased]
+### Added (agentic reverse engineering)
+- `modules/opencode.nix` — OpenCode on all workstations, wired to the remote vLLM and to
+  Ghidra's ReVa MCP server. Completes the client half of the ReVa + OpenCode + vLLM stack
+  whose server half (`packages/ghidra-reva.nix`) landed 2026-07-29. Imported from
+  `modules/workstation.nix`, which is also the host gate — hydrogen never evaluates it, so
+  unlike `home/sheath.nix`'s `enablePi` there is no hostname test to keep in sync.
+  - `~/.config/opencode/opencode.json` is a **sops template**, not an `xdg.configFile`: the
+    base URL, served model id and token are all secrets, and `sops.templates` renders whole
+    files. Same shape as the `pi-models.json` template. The model id is used as a dynamic
+    Nix attribute name so the secret can be a JSON *key*.
+  - Provider `vllm` uses `npm = "@ai-sdk/openai-compatible"`, which is already inside the
+    nixpkgs `opencode` closure (`lib/opencode/node_modules/.bun`), so it resolves offline —
+    no bun fetch on first run.
+  - `agent.re` (`mode = "primary"`, so `opencode --agent re`) takes its system prompt from
+    `~/.config/opencode/re-instructions.md` via `{file:…}`. Deliberately **not** named
+    `AGENTS.md`, which OpenCode auto-loads into every session — the RE constraints (never
+    bulk-decompile, ReVa writes to the live program) are noise outside RE work, and would
+    otherwise be included twice.
+  - MCP URL is `http://localhost:8080/mcp/message`, not the `/mcp` the upstream spec's
+    example shows. ReVa 7.3.0 serves at `/mcp/message`; it only responds while Ghidra has a
+    program open.
+- **vLLM is deliberately not a NixOS service in this flake, and cannot become one.** The
+  only always-on GPU box is hydrogen, whose Quadro P4200 is Pascal (SM 6.1); vLLM requires
+  compute capability >= 7.0 (vllm-project/vllm#1431, #963 — still enforced on mainline as of
+  2026-06), and nixos-25.11 ships no `services.vllm`. Inference stays remote.
+
+### Fixed (remote model limits)
+- `home/sheath.nix`: pi's `contextWindow` was a guessed 32768; the endpoint advertises
+  `max_model_len = 262144` (`GET /models`, verified 2026-07-30). Both that file and
+  `modules/opencode.nix` now state 262144 / 32768 output for the same endpoint — keep them
+  in step. Output is a client-side reservation out of the same window, not a server limit:
+  vLLM only enforces `max_tokens <= max_model_len` (262000 accepted, 300000 rejected).
+
 ### Changed (host rename)
 - `sulphur` is now `sulfur` everywhere: flake attribute, `hosts/sulfur.nix`,
   `hardware/sulfur.nix`, `networking.hostName`, and the sops keys `wg-pub-sulphur` /

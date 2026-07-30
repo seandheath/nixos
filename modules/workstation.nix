@@ -9,6 +9,7 @@
     ./bluetooth.nix
     ./printing.nix
     ./packages-desktop.nix
+    ./opencode.nix
   ];
 
   # Programs
