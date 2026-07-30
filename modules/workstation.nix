@@ -10,6 +10,7 @@
     ./printing.nix
     ./packages-desktop.nix
     ./opencode.nix
+    ./qwen-code.nix
   ];
 
   # Programs

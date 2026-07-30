@@ -8,6 +8,10 @@
   `~/.config/opencode/re-instructions.md` holding the RE system prompt.
 - `modules/workstation.nix`: imports `./opencode.nix`.
 - `home/sheath.nix`: pi's `contextWindow` 32768 → 262144, `maxTokens` 8192 → 32768.
+- `packages/qwen-code.nix`: new. qwen-code 0.21.1 repacked from the npm registry tarball.
+- `modules/qwen-code.nix`: new. That package + a plain `~/.qwen/settings.json`, a plain
+  `~/.qwen/QWEN.md` (RE instructions), and a sops-templated `~/.qwen/.env` (the secrets).
+- `modules/workstation.nix`: also imports `./qwen-code.nix`.
 
 ### Decisions
 - **Scoped the work to the client half.** The spec describes Ghidra+ReVa, OpenCode and
@@ -62,6 +66,48 @@
   document how to *build ReVa itself* (gradle, JUnit, Java 21 style rules), not how to
   drive it. Don't wire them in.
 
+- **qwen-code added as a second RE client, packaged out of nixpkgs.** `pkgs.qwen-code` is
+  **0.2.2**; upstream stable is **0.21.1**. Probing both bundles: 0.2.2 has no
+  `modelProviders`, no `permissions`, no `context.fileName`, and configures providers only
+  through `OPENAI_BASE_URL`/`OPENAI_MODEL` env vars. Every key this deployment needs
+  postdates it, so the nixpkgs version was not usable and `packages/qwen-code.nix` repacks
+  the npm tarball instead. That tarball is fully pre-bundled — zero runtime `dependencies`,
+  no native modules, a **static-pie** vendored ripgrep — so it is an unpack + `makeWrapper`
+  over `nodejs_22`, with no `npmDepsHash` to churn on bumps.
+- **Do not trust qwen-code's published settings docs; the binary disagrees.** Everything
+  below was established by round-tripping real config through 0.21.1, not from the docs
+  site, which is written against a schema the binary migrates *away from*:
+  - `modelProviders.<id>` is a bare **array** of model entries. The documented
+    `{ protocol, models: [...] }` wrapper is silently discarded on load.
+  - The SDK protocol comes from a separate top-level `providerProtocol` map
+    (`{ "vllm": "openai" }`). Omit it and the models are dropped with "provider … is not a
+    built-in protocol". A provider *named* `openai` would also work, since the id falls back
+    to itself as the protocol, but `vllm` + the explicit map is clearer.
+  - `generationConfig` (`contextWindowSize`, `samplingParams`) belongs on the **model
+    entry**. Under top-level `model` it is accepted and ignored, with a warning saying so.
+  - MCP transport is chosen by key name: `httpUrl` → `StreamableHTTPClientTransport`,
+    `url` → SSE. ReVa needs `httpUrl`.
+  - Permission rules must say `run_shell_command(...)`. The schema's own description
+    advertises `"Bash(git *)"` and `TOOL_NAME_ALIASES` maps `Bash` → `run_shell_command`,
+    but tested against the approval path, **every `Bash` form still prompts** — bare and
+    parenthesised alike — while `run_shell_command` and `ShellTool` both work. Scoping does
+    hold: under `run_shell_command(python3 -c *)`, a `touch` still prompts.
+- **Secrets go in `.env`, not the sops-templated config — the reverse of OpenCode/pi.**
+  qwen-code rewrites its own `settings.json` on startup (schema migration + a `$version`
+  stamp). Tested against a 0400 sops symlink, that write **replaces the symlink with a
+  regular 0644 file**, so a templated API key would be copied out of the tmpfs-backed sops
+  store into a world-readable file in `$HOME` on first run. This is exactly the hazard the
+  previous entry's Known Issues flagged in the abstract, now with a tool that triggers it.
+  Fix: `settings.json` ships secret-free with `$VAR` placeholders (resolved via
+  `resolveEnvVarsInObject`), and only `~/.qwen/.env` — the first candidate qwen-code's
+  `findEnvFiles()` checks, and a file it reads but never writes — comes from sops. Verified
+  the rewrite leaves the placeholders unresolved, so no secret reaches the rewritten file.
+- **`QWEN.md`, not `QWEN_SYSTEM_MD`.** The global context file is *appended* to
+  qwen-code's core system prompt as `userMemory`; `QWEN_SYSTEM_MD` **replaces** the base
+  prompt entirely and would throw away its tool-usage and safety scaffolding. Since this
+  install is RE-only (Sean's call), the RE prose can live in the always-loaded global
+  context file — no equivalent of OpenCode's `re-instructions.md` scoping trick is needed.
+
 ### Known Issues
 - `run-script` (and any future PyGhidra-dependent ReVa tool) is unavailable. Fixing it
   means making `packages/ghidra-reva.nix` launch through PyGhidra instead of
@@ -74,6 +120,15 @@
 - `{file:…}` interpolation in `agent.<name>.prompt` is present in opencode 1.1.14's bundle
   but is not described in the JSON schema. If a future bump breaks it, inline the
   instructions text into `prompt` directly.
+- `~/.qwen/settings.json` and `~/.qwen/QWEN.md` are home-manager files with `force = true`
+  because qwen-code writes to both (schema migration; `/memory add`). Expect them to churn:
+  qwen-code replaces the store symlink with a regular file between rebuilds, and activation
+  restores the canonical version. Runtime changes made through `/auth` or the model picker
+  therefore do not survive a `nixos-rebuild` — edit the module instead.
+- `packages/qwen-code.nix` pins a version by tarball hash with no update script. Bumping is
+  a version + `hash` edit, but **re-verify the settings schema after any bump**: the 0.2.2 →
+  0.21.1 gap shows this project migrates its config format aggressively, and a silently
+  dropped `providerProtocol` or `generationConfig` degrades quietly rather than erroring.
 
 ## Session: 2026-07-29
 
