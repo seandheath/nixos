@@ -22,6 +22,14 @@
   - MCP URL is `http://localhost:8080/mcp/message`, not the `/mcp` the upstream spec's
     example shows. ReVa 7.3.0 serves at `/mcp/message`; it only responds while Ghidra has a
     program open.
+  - The RE prompt forbids mental hex arithmetic and points at `python3 -c 'print(hex(…))'`
+    instead, with `agent.re.permission.bash` pre-approving exactly `python3 -c *` so that
+    advice isn't blocked by a confirmation prompt. ReVa exposes 88 tools and **none** of
+    them is a calculator; its `run-script` tool requires a PyGhidra launch and so always
+    fails on this package. The prompt also lists the ReVa tools that remove the need for
+    arithmetic entirely (`get-structure-info` for field offsets, `analyze-vtable` for
+    slots, `find-cross-references` for branch targets, `get-memory-blocks` for the image
+    base).
 - **vLLM is deliberately not a NixOS service in this flake, and cannot become one.** The
   only always-on GPU box is hydrogen, whose Quadro P4200 is Pascal (SM 6.1); vLLM requires
   compute capability >= 7.0 (vllm-project/vllm#1431, #963 — still enforced on mainline as of

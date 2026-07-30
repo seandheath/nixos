@@ -44,6 +44,44 @@
     If you catch yourself about to iterate over a function list decompiling each entry,
     stop and narrow the search instead.
 
+    ## Arithmetic: shell out, never compute in your head
+
+    You are bad at hex arithmetic and you will get it wrong silently. Do not compute
+    address offsets, page boundaries, struct field offsets, or hex/decimal conversions
+    mentally or by "reasoning through" them. Shell out:
+
+        python3 -c 'print(hex(0x40000000 + 0x1a2b8))'
+
+    That exact form is pre-approved and will not prompt. Use it freely — one shell call is
+    vastly cheaper than a wrong address that sends you down a dead branch.
+
+    ReVa itself has **no calculator tool**, and its `run-script` tool cannot help: it
+    requires Ghidra to have been launched via PyGhidra, and this install uses the stock
+    launcher, so every call returns "Python is not available". Do not keep retrying it.
+
+    ## Prefer the tools that make arithmetic unnecessary
+
+    Most hex arithmetic in this workflow is avoidable — ReVa will compute it for you and
+    be right. Reach for these before doing any math at all:
+
+    - Struct field offsets — `get-structure-info`, `parse-c-structure`, `list-structures`.
+      Never hand-sum field sizes to find an offset.
+    - Vtable slots — `analyze-vtable`, `find-vtables-containing-function`,
+      `find-vtable-callers`. Never multiply an index by pointer size yourself.
+    - Branch and call targets — `find-cross-references`, `get-call-graph`, `get-call-tree`,
+      `get-callers-decompiled`, `get-referencers-decompiled`, `resolve-thunk`. Never decode
+      a relative branch displacement by hand.
+    - Where a value comes from or goes — `trace-data-flow-backward`,
+      `trace-data-flow-forward`, `find-variable-accesses`.
+    - Load addresses and segment bounds — `get-memory-blocks`. Never assume an image base;
+      on AArch64 firmware images it is frequently not what you would guess.
+    - A specific constant — `find-constant-uses`, `find-constants-in-range`,
+      `list-common-constants`. Search for it rather than deriving it.
+    - Bytes or data at an address — `read-memory`, `get-data`.
+
+    If you find yourself about to write out an addition in prose, that is the signal to
+    call one of the above instead.
+
     ## Write operations
 
     ReVa can rename symbols and set types in the **live** program — these are real edits
@@ -163,6 +201,23 @@
           # opencode 1.1.14's bundle). Keeping the prose in its own file means it stays
           # greppable and diffable in this repo instead of being buried in a JSON string.
           prompt = "{file:${config.home.homeDirectory}/.config/opencode/re-instructions.md}";
+          # Pre-approve exactly the arithmetic escape hatch the prompt tells it to use, and
+          # nothing else. Telling the model to shell out for hex math is useless if every
+          # call stops for a confirmation — it learns to guess instead, which is the
+          # failure this is meant to fix.
+          #
+          # `permission.bash` takes a pattern -> action map (most specific pattern wins), so
+          # this stays a narrow allowance rather than blanket bash access. python3 is in
+          # environment.systemPackages via packages-desktop.nix, and OpenCode's bash tool
+          # inherits the user's PATH, so it resolves.
+          #
+          # Kept deliberately in step with the one command form in re-instructions.md: if
+          # you widen the prompt's advice, widen this too, or the model gets prompted and
+          # starts improvising again.
+          permission.bash = {
+            "python3 -c *" = "allow";
+            "*" = "ask";
+          };
         };
       };
     };

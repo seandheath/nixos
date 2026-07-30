@@ -42,7 +42,31 @@
   truncating mid-tool-call — spec §6's "truncated / malformed tool calls". 32768 still
   leaves ~229k for context.
 
+- **Hex arithmetic: no ReVa tool for it, so the agent shells out.** The `re` agent was
+  getting stuck computing hex offsets by hand (on `/bl31`, an AArch64 ATF dump — address
+  math everywhere). Enumerated ReVa 7.3.0's MCP surface against the live endpoint:
+  **88 tools, none of them a calculator**. `run-script` looked like the in-Ghidra escape
+  hatch, but it is **unavailable on this install** — it returns "Ghidra was not started
+  with PyGhidra. Python is not available", because `packages/ghidra-reva.nix` wraps the
+  stock `support/launch.sh` rather than `pyghidra-gui`. So the fix is two-part:
+  1. `re-instructions.md` tells the model to shell out to `python3 -c 'print(hex(…))'` and
+     never compute mentally, and states that `run-script` is dead so it stops retrying it.
+  2. `agent.re.permission.bash` pre-approves exactly `python3 -c *` (everything else stays
+     `ask`). Instructing the model to shell out is useless if each call blocks on a
+     confirmation — it would go back to guessing.
+  Also steers toward the tools that make the math unnecessary at all, which is the larger
+  win: `get-structure-info`/`parse-c-structure` for field offsets, `analyze-vtable` for
+  slots, `find-cross-references`/`get-call-graph` for branch targets, `trace-data-flow-*`
+  for provenance, `get-memory-blocks` for the real image base.
+- **ReVa's bundled `AGENTS.md`/`CLAUDE.md` are not usable as agent instructions.** They
+  document how to *build ReVa itself* (gradle, JUnit, Java 21 style rules), not how to
+  drive it. Don't wire them in.
+
 ### Known Issues
+- `run-script` (and any future PyGhidra-dependent ReVa tool) is unavailable. Fixing it
+  means making `packages/ghidra-reva.nix` launch through PyGhidra instead of
+  `support/launch.sh`, which pulls a Python runtime into the Ghidra wrapper. Not attempted
+  — `python3 -c` via OpenCode's bash tool covers the arithmetic case that motivated it.
 - Home-manager sops `templates.<n>.path` installs a **symlink** into
   `~/.config/sops-nix/secrets/rendered/`, so `~/.config/opencode/opencode.json` is a
   symlink, not a regular file. Fine for OpenCode (it only reads), but any tool that
