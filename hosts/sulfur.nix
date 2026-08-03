@@ -57,6 +57,12 @@ in
     file
     btrfs-progs
     (callPackage ../packages/jackify.nix {})
+
+    # Veloren client (veloren-voxygen), for hydrogen's server in
+    # modules/veloren-server.nix. Veloren refuses cross-version connections, so this must
+    # stay the same flake pin as hydrogen — that lock-step is why the client comes from
+    # nixpkgs and not from Airshipper, which self-updates to upstream weekly nightlies.
+    veloren
   ];
 
   # ASUS ROG services

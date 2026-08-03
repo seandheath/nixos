@@ -1,6 +1,44 @@
 # Changelog
 
 ## [Unreleased]
+### Added (Veloren server on hydrogen)
+- `modules/veloren-server.nix` — a persistent Veloren (open-source voxel RPG) server as a
+  system service, alongside the existing Minecraft one. **nixpkgs has no `services.veloren`**,
+  only `pkgs.veloren` 0.17.0 — one derivation shipping both `veloren-server-cli` and
+  `veloren-voxygen` — so the unit is hand-written. Cached on hydra, so this is a 301 MiB fetch
+  and not a Rust build. Documented in `docs/veloren.md`.
+  - Same security posture as Minecraft, for the same reason: `auth_server_address: None` (no
+    veloren.net accounts for the household) means no identity verification, so reachability is
+    the authentication boundary. 14004/tcp + 14006/udp are scoped to `br0` in
+    `hosts/hydrogen.nix` — LAN and WireGuard peers only, never the internet.
+  - **`world_seed` is the world.** Veloren does not store terrain; it regenerates it from the
+    seed on every start (~6 s) and `saves/` holds only player diffs plus the character SQLite
+    DB. Changing the seed replaces the world and orphans every player-made change. Pinned to
+    `20260803` with that warning in the module, the doc, and the changelog.
+  - `settings.ron` is declarative via `ExecStartPre` reinstalling it from the store each start
+    (the `services.minecraft-server.declarative = true` contract). A **copy, not a store
+    symlink**, which would break if a future version wrote the file back. Verified against
+    0.17.0 that the server reads and does not rewrite it, and that a *partial* RON is accepted
+    with unset fields defaulted — so only the values that matter are named.
+  - `VELOREN_USERDATA=/var/lib/veloren` overrides the compiled-in
+    `VELOREN_USERDATA_STRATEGY=system`, which would otherwise put state in the service user's
+    XDG data dir. Verified it wins at runtime. Static system user rather than `DynamicUser`,
+    which would relocate state behind `/var/lib/private/` and complicate the borg path.
+  - `--non-interactive` is mandatory under systemd — without it the server reads stdin and the
+    terminal driver sends it SIGTTIN.
+  - `max_view_distance: Some(30)` against an upstream default of 65: it is the dominant lever
+    on server CPU (as `view-distance` is for Minecraft) and this box also runs Minecraft,
+    immich and ollama on one 6c/12t Xeon E-2176M. Measured footprint: ~925 MiB peak RSS.
+- `pkgs.veloren` added to `hosts/hydrogen.nix` and `hosts/sulfur.nix` systemPackages.
+  **Version lock-step is the reason**: Veloren refuses cross-version connections, and client
+  and server are the same derivation, so both must come from one flake pin. Airshipper is not
+  a substitute — it self-updates to upstream *weekly nightlies*; nixpkgs' `airshipper` is
+  0.16.0 and no better. A `flake.lock` bump that moves `pkgs.veloren` is a flag day.
+- `modules/backup.nix` — `/var/lib/veloren` added to `backupPaths`. Unlike Minecraft there is
+  no console FIFO to checkpoint, so borg can catch `saves/db.sqlite` mid-write; left alone
+  rather than wrapped in a stop/start dance, since the world is not in the backup at all and
+  the only exposure is a torn character DB.
+
 ### Added (contained RE agents)
 - `packages/re-container.nix` + `modules/re-container.nix` — `cqwen` and `copencode` run the
   RE agents inside a rootless Podman sandbox, modelled on `cclaude` (flake input

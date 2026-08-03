@@ -29,6 +29,7 @@ let
     "/var/lib/calibre-web"
     "/var/lib/syncthing"       # synced folders + config.xml (device keys/IDs) + index DB
     "/var/lib/minecraft"       # the world (see minecraftFlush below) + server.properties
+    "/var/lib/veloren"         # characters + terrain diffs (see velorenCaveat below)
     "/var/backup/postgresql"   # consistent pg_dumps (nextcloud + immich)
   ];
   prune = { keep = { daily = 7; weekly = 16; monthly = 24; }; };
@@ -61,6 +62,14 @@ let
     ${pkgs.coreutils}/bin/sleep 5
   '';
   minecraftResume = pkgs.writeShellScript "minecraft-save-on" (mcConsole "save-on");
+
+  # velorenCaveat: unlike Minecraft, veloren-server-cli exposes no console FIFO, so there is
+  # no way to checkpoint it before the archive. Borg can therefore capture
+  # /var/lib/veloren/server/saves/db.sqlite mid-write. Deliberately left alone rather than
+  # wrapped in a stop/start dance: the world itself is not in the backup at all (it is
+  # regenerated from world_seed in modules/veloren-server.nix), so the only exposure is a
+  # torn character DB, recoverable from the previous night's archive. Revisit if Veloren
+  # ever grows a remote console.
 
   # Repo targets + transport, shared between the borg jobs and the CLI wrappers
   # so there is a single source of truth.
