@@ -49,10 +49,16 @@
       options = [ "subvol=@swap" ];
     };
 
+  # 0077, not the generated default 0022: vfat has no ownership of its own, so
+  # the mask is the only access control the ESP gets. systemd-boot-random-seed
+  # refuses to treat /boot/loader/random-seed as secret while the mount is
+  # world-readable and logs it as "a security hole" on every boot. Only root
+  # reads the ESP from Linux, and the firmware ignores unix permissions
+  # entirely, so tightening this costs nothing.
   fileSystems."/boot" =
     { device = "/dev/disk/by-uuid/CED8-DF10";
       fsType = "vfat";
-      options = [ "fmask=0022" "dmask=0022" ];
+      options = [ "fmask=0077" "dmask=0077" ];
     };
 
   # Big 5.5T btrfs data disk (RAID0 over sda+sdb). Holds Immich media

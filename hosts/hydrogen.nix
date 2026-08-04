@@ -82,6 +82,10 @@
     tree
     ripgrep
     srm
+    # SMART tooling. /data is RAID0 over sda+sdb with no redundancy, and both
+    # devices carry 4 btrfs corruption_errs, so drive health is worth being able
+    # to read -- btrfs can detect corruption there but never repair it.
+    smartmontools
     vlc
     p7zip
     neovim

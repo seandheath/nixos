@@ -1,6 +1,24 @@
 # Changelog
 
 ## [Unreleased]
+### Fixed (hydrogen journal audit)
+- `hardware/hydrogen.nix` — ESP mounted `fmask=0077,dmask=0077` instead of the generated
+  `0022`. vfat carries no ownership of its own, so the mask is the ESP's only access control,
+  and `systemd-boot-random-seed` was logging `/boot/loader/random-seed` as "a security hole" on
+  every boot. Only root reads the ESP from Linux and firmware ignores unix permissions, so the
+  tightening costs nothing. Takes effect on remount or reboot.
+- `hosts/hydrogen.nix` — added `smartmontools`. Drive health on `/data` was unreadable simply
+  because `smartctl` was not installed; that matters on a RAID0 pair where both members carry
+  4 btrfs `corruption_errs` and btrfs can detect corruption but never repair it.
+- Removed a stale home-manager `sops-nix.service` user unit (runtime, no config change). It
+  failed at every login with `cannot read keyfile ~/.config/sops/age/keys.txt` — hydrogen is
+  impermanent and has no user-level age key. The gate in `home/sheath.nix` is already correct
+  (`sops.secrets` evaluates to `{}` there); the unit was an orphaned symlink into a home-manager
+  generation from 2026-07-15 that HM never cleaned up.
+- Not fixable, recorded so it is not re-investigated: the ACPI BIOS errors (`_TZ.CHGZ._CRT`,
+  `_SB._OSC`) are ZBook firmware bugs, and `bap: BAP requires ISO Socket` is LE Audio only —
+  irrelevant to the couch gamepads.
+
 ### Removed (paperless-gpt)
 - `modules/paperless-gpt.nix` deleted, import dropped from `hosts/hydrogen.nix`,
   `/var/lib/paperless-gpt` removed from `backupPaths`, and the orphaned `paperless-gpt-token`
