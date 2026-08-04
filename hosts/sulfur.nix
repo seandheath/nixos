@@ -63,6 +63,16 @@ in
     # stay the same flake pin as hydrogen — that lock-step is why the client comes from
     # nixpkgs and not from Airshipper, which self-updates to upstream weekly nightlies.
     veloren
+
+    # Minecraft client for hydrogen's server (modules/minecraft-server.nix), reached at
+    # 10.0.0.10:25565 over the LAN or the tunnel. Same launcher hydrogen's couch setup uses
+    # (modules/minecraft-couch.nix) rather than a second one; the instance itself is
+    # stateful and created in the GUI — see docs/minecraft.md.
+    #
+    # The server is VANILLA, so this needs no mods: Controlify and Sodium exist only for the
+    # four tiled couch clients on the projector. Just a plain 1.21.10 instance matching
+    # `nix eval --raw ~/nixos#nixosConfigurations.hydrogen.pkgs.minecraft-server.version`.
+    prismlauncher
   ];
 
   # ASUS ROG services
