@@ -7,15 +7,29 @@
 #   - remote devices over the router's WireGuard tunnel, which reach hydrogen at
 #     its LAN address and therefore arrive on br0.
 #
-# THE SERVER IS DELIBERATELY VANILLA -- the stock jar, no mod loader. Every mod in
-# the client stack (packages/minecraft-client-mods.nix) is client-side, so a
-# phone/laptop/tablet joining from the tunnel needs no mod installation at all.
+# THE SERVER RUNS FABRIC (packages/fabric-server.nix), over the same vanilla jar.
+# It was deliberately loader-free until 2026-08-04; what changed and why:
 #
-# The datapacks installed below do not change that. A datapack is vanilla
-# data-driven content the server loads out of world/datapacks and pushes to clients
-# as needed -- no loader, no client install, no join-time requirement. Keep it that
-# way: anything that would need Fabric on the server breaks the unmodded-join
-# guarantee for every remote device at once.
+# Since Minecraft 1.21.2 the recipe list and container contents live server-side and
+# are no longer sent to clients. Two things follow, and neither has a client-side
+# answer:
+#   - no recipe viewer works. JEI says so in chat on every join, EMI never shipped
+#     past 1.21.1, and REI's local fallback is broken by our own Unlock All Recipes
+#     datapack (shedaniel/RoughlyEnoughItems#2063, fix merged but unreleased).
+#   - crafting from nearby chests can only be approximated, by a client mod that
+#     opens each chest over the network behind a held Ctrl -- a key the couch
+#     gamepads do not have, so on a pad the feature was unreachable.
+# Both are solved by a mod ON THE SERVER, and only there. See docs/minecraft.md.
+#
+# THE UNMODDED-JOIN GUARANTEE STILL HOLDS, and is the thing to re-verify after any
+# change to the server mod set: a phone/laptop/tablet must still join over the
+# tunnel with nothing installed. It holds because none of the server mods add
+# registry entries (Nearby Crafting is 7 classes and touches no registry; JEI adds
+# no content), so Fabric API's registry sync -- the mechanism that can actually
+# reject a vanilla client -- has nothing to synchronise. Test it, do not assume it.
+#
+# Datapacks are unaffected either way: vanilla data-driven content out of
+# world/datapacks, no loader and no client install involved.
 #
 # SECURITY: online-mode=false means the server performs NO identity verification --
 # anything that can reach 25565 may claim any username, and a whitelist does not
@@ -26,11 +40,17 @@
 # child can log in as a sibling. Known; not worth more machinery.
 let
   datapacks = import ../packages/minecraft-datapacks.nix { inherit pkgs; };
+  mods = import ../packages/minecraft-client-mods.nix { inherit pkgs; };
+  fabricServer = import ../packages/fabric-server.nix { inherit pkgs; };
 in
 {
   services.minecraft-server = {
     enable = true;
     eula = true;
+
+    # Fabric Loader over the same vanilla jar (packages/fabric-server.nix), NOT the
+    # stock package. See the header for why the server stopped being loader-free.
+    package = fabricServer;
 
     # Keep server.properties in Nix rather than letting the server rewrite it.
     # The module backs up any pre-existing stateful file as .stateful on the
@@ -117,7 +137,46 @@ in
     find world/datapacks -maxdepth 1 -name 'vt-*.zip' -delete
     cp ${datapacks}/vt-*.zip world/datapacks/
     chmod 0644 world/datapacks/vt-*.zip
+
+    # Server-side mods. Same delete-then-copy discipline as the datapacks: dropping a
+    # mod from Nix has to remove it from the server, or the set is merely additive.
+    # Everything here is a *.jar we put there, so unlike the datapacks there is no
+    # prefix to bound the delete -- which also means a jar dropped in by hand WILL be
+    # removed. Add mods to packages/minecraft-client-mods.nix instead.
+    #
+    # Copies rather than symlinks purely for consistency with the datapacks; Fabric
+    # would follow symlinks here (the mods dir is not inside the world).
+    mkdir -p mods
+    find mods -maxdepth 1 -name '*.jar' -delete
+    cp ${mods.server}/*.jar mods/
+    chmod 0644 mods/*.jar
   '';
+
+  # VERSION LOCKSTEP. Four things have to agree on the Minecraft version now, and the
+  # nightly auto-update moves the first of them without asking:
+  #   1. pkgs.minecraft-server        the game jar          (nixpkgs)
+  #   2. fabric-server.nix mcVersion  intermediary mappings (pinned by hash)
+  #   3. client mods mcVersion        Modrinth pins         (modules/minecraft-mods.nix)
+  #   4. the datapacks' format window (server log only, cannot be checked here)
+  #
+  # 2 is the dangerous one: intermediary maps obfuscated names for ONE game version,
+  # so a bumped jar against stale mappings fails at runtime, in the dark, at whatever
+  # hour the auto-update ran. Catch it at eval instead. (3 is asserted in
+  # modules/minecraft-mods.nix, which also covers sulfur.)
+  assertions = [
+    {
+      assertion = fabricServer.mcVersion == pkgs.minecraft-server.version;
+      message = ''
+        Minecraft version drift: nixpkgs ships minecraft-server ${pkgs.minecraft-server.version}
+        but packages/fabric-server.nix pins Fabric intermediary mappings for ${fabricServer.mcVersion}.
+
+        Re-transcribe the launch profile for the new version:
+          curl -s https://meta.fabricmc.net/v2/versions/loader/${pkgs.minecraft-server.version}/<loader>/server/json
+        then bump mcVersion and the intermediary hash. Check the server mods support
+        the new version first -- packages/minecraft-client-mods.nix.
+      '';
+    }
+  ];
 
   # /data is not involved, but the world lives on root which is always mounted --
   # no RequiresMountsFor needed here (unlike immich/borg, see modules/backup.nix).

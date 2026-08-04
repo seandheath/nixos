@@ -27,6 +27,11 @@ let
 
   # fetchurl needs an explicit `name`: Modrinth's CDN paths are URL-encoded (%2B for
   # the '+' in most version strings), and the derivation name would inherit that.
+  #
+  # `server = true` marks a jar that must ALSO be installed on the server
+  # (modules/minecraft-server.nix installs exactly that subset). Every server mod is
+  # already a client mod here, so the server set is a strict subset rather than a
+  # second list with duplicated URLs and hashes to drift apart.
   fetchMod =
     {
       pname,
@@ -34,9 +39,10 @@ let
       filename,
       url,
       hash,
+      server ? false,
     }:
     {
-      inherit pname version;
+      inherit pname version server;
       name = filename;
       path = pkgs.fetchurl {
         name = filename;
@@ -49,6 +55,7 @@ let
     {
       # Required by Xaero's Minimap, Controlify and Better Name Visibility.
       pname = "fabric-api";
+      server = true;
       version = "0.138.4+1.21.10";
       filename = "fabric-api-0.138.4+1.21.10.jar";
       url = "https://cdn.modrinth.com/data/P7dR8mSH/versions/tV4Gc0Zo/fabric-api-0.138.4%2B1.21.10.jar";
@@ -57,6 +64,7 @@ let
     {
       # Required by Controlify and Better Name Visibility -- the config-screen library.
       pname = "yet-another-config-lib";
+      server = true;
       version = "3.8.2+1.21.10-fabric";
       filename = "yet_another_config_lib_v3-3.8.2+1.21.10-fabric.jar";
       url = "https://cdn.modrinth.com/data/1eAoo2KR/versions/skcT0J9K/yet_another_config_lib_v3-3.8.2%2B1.21.10-fabric.jar";
@@ -67,20 +75,20 @@ let
       # Controlify and Better Name Visibility are configurable only by editing files
       # -- unworkable when the children are the ones adjusting nameplate size.
       pname = "modmenu";
+      server = true;
       version = "16.0.1";
       filename = "modmenu-16.0.1.jar";
       url = "https://cdn.modrinth.com/data/mOgUt4GM/versions/pYbFlVtR/modmenu-16.0.1.jar";
       hash = "sha512-vgG7WoCjn8USI+8UJxO6PLwsI2WPDIvTbO7X7NFjaEt9yAjy7yPc5/s1C9/QEN6Xh/IXfhFcrj6pG5aoO9bqFg==";
     }
     {
-      # Optional for Effortless Crafting, but it is what backs that mod's Mod Menu
-      # config screen -- same reasoning as Mod Menu itself: without it the settings
-      # exist only in a file. Client-only.
-      pname = "cloth-config";
-      version = "20.0.149+fabric";
-      filename = "cloth-config-20.0.149-fabric.jar";
-      url = "https://cdn.modrinth.com/data/9s6osm5g/versions/qMxkrrmq/cloth-config-20.0.149-fabric.jar";
-      hash = "sha512-3x2eA0ncZPwIWfF7ZbZ7DXdFomtJBeh/wUjd68AoXeUaMlWEhZnw1e4k9qqwD7rEhJ1Au5BSk26qRS0hbHraYg==";
+      # Required by Nearby Crafting -- exposes the server's recipe book to mods.
+      pname = "recipe-book-access-api";
+      server = true;
+      version = "1.1.1+1.21.11";
+      filename = "recipebookaccess-1.1.1.jar";
+      url = "https://cdn.modrinth.com/data/aWgs4SgO/versions/KecMVi52/recipebookaccess-1.1.1.jar";
+      hash = "sha512-wM1cfFGEjn+spx16EBxdHLvvLd0xTN+0f8ymM07rADxlJaoVwbTppSLn9ikWW3PKeVQpg6w3wDJYWXJNtfFWPA==";
     }
 
     # --- The couch design's own requirements --------------------------------
@@ -132,36 +140,46 @@ let
     }
 
     {
-      # Craft using items in reachable chests without hauling them to the table.
+      # Chest contents simply count as your inventory when crafting. No modifier key,
+      # no cache, nothing to press -- which is why it works on a gamepad, where
+      # Controlify has no Ctrl.
       #
-      # NOT "Nearby Crafting" (nearby-crafting), which is the better-known mod for
-      # this and was what was actually asked for: it is server_side REQUIRED, so it
-      # cannot work against a vanilla server. Effortless Crafting does the same job
-      # entirely client-side -- verified from the jar, not the Modrinth metadata:
-      # fabric.mod.json declares environment "client" (its mod id is "reachcrafting").
-      # Craft From Chests was the other candidate and is likewise server-required.
-      pname = "effortless-crafting";
-      version = "fabric-1.21.10-v1.3.0";
-      filename = "effortless-crafting-fabric-1.21.10-v1.3.0.jar";
-      url = "https://cdn.modrinth.com/data/iMFvPhVJ/versions/qpvBiLaT/effortless-crafting-fabric-1.21.10-v1.3.0.jar";
-      hash = "sha512-qnNdBqMcoglF4m4teCzheB8RuGzJO59ZjpQFqIqb556gqa9WIKikRLPXoxaDMMsY9zabAUvFbrGVYNfoCCdhkw==";
+      # This REPLACED Effortless Crafting, which was the client-only approximation
+      # used while the server was vanilla. Since 1.21.2 container contents live
+      # server-side, so a client-only mod has to physically open each chest and shuffle
+      # items over the network, gated behind a held Ctrl. Running both would be asking
+      # two mods to mixin the same recipe book.
+      #
+      # Its Modrinth entry lists no dependencies; the jar disagrees, and the jar wins:
+      # fabric-api, recipebookaccess, yacl AND modmenu are all hard `depends`. Mod Menu
+      # is environment=client, which looked like it would break a dedicated server --
+      # it does not. Fabric loads client-env jars on a server as dependency candidates;
+      # verified by running this exact set (52 mods, "Done").
+      pname = "nearby-crafting";
+      server = true;
+      version = "1.0.5";
+      filename = "nearbycrafting-1.0.5.jar";
+      url = "https://cdn.modrinth.com/data/DsjH66Cm/versions/jk2uvIzj/nearbycrafting-1.0.5.jar";
+      hash = "sha512-/veeu04wqPOS+f0uQmiqGXkGMi8HsmUrDC0g5IqIrJYV5yAwEApVHQGwcietGH77BstgRExXnkEbKwp1Znl+pw==";
     }
-
-    # NO RECIPE VIEWER, deliberately -- see docs/minecraft.md. Since 1.21.2 the recipe
-    # list lives on the server and is no longer sent to clients, so a client-only
-    # viewer cannot enumerate recipes against this vanilla server. JEI was tried and
-    # says so in chat on every join; EMI never shipped past 1.21.1; REI's client-side
-    # fallback is broken for any recipe unlocked in-game (shedaniel/RoughlyEnoughItems
-    # #2063) and our Unlock All Recipes datapack unlocks all of them -- that fix is
-    # merged (#2065, 2026-07-29) but unreleased on every branch as of 2026-08-04.
-    #
-    # The gap is smaller than it looks: Unlock All Recipes leaves every player's
-    # vanilla recipe book complete, so forward lookup is covered. What is missing is
-    # reverse lookup ("what is this ingredient for?") and the stations the recipe book
-    # ignores -- brewing and smithing.
-    #
-    # TO REVISIT: check for a REI release dated after 2026-07-29 that supports the
-    # server's version. If there is one, adding it here is the whole change.
+    {
+      # Recipe viewer. Only works because JEI is on the server too: since 1.21.2 the
+      # recipe list is server-side and is not sent to clients, so a client-only JEI
+      # reports "JEI is missing recipes" in chat on every join -- which is exactly what
+      # happened while the server was vanilla, and why this was removed once and is
+      # back now.
+      #
+      # EMI is still the nicer viewer but stopped at 1.21.1. REI's 1.21.10 build has a
+      # local fallback that our Unlock All Recipes datapack breaks
+      # (shedaniel/RoughlyEnoughItems#2063); its fix merged 2026-07-29 but is
+      # unreleased. JEI needs no such workaround now that the server can answer.
+      pname = "jei";
+      server = true;
+      version = "26.3.0.31";
+      filename = "jei-1.21.10-fabric-26.3.0.31.jar";
+      url = "https://cdn.modrinth.com/data/u6dRKJwZ/versions/8yGN172x/jei-1.21.10-fabric-26.3.0.31.jar";
+      hash = "sha512-5xdS8+RjJdLRGnugX93SGWotV1qEU/ivAoaNqzoy1MseFEh0ZOBmKpQryxiHby8aVnjUM66rv+Pf4K3BXiDtog==";
+    }
   ];
 
   # ---------------------------------------------------------------------------
@@ -173,28 +191,14 @@ let
   # Cloth Config deserializes into a default-constructed object, so unlisted fields
   # keep the mod's own defaults.
   # ---------------------------------------------------------------------------
-  configDefaults = pkgs.linkFarm "minecraft-client-mod-configs-${mcVersion}" [
-    {
-      # Effortless Crafting ships enableNearbyContainerUsage = CTRL_HELD, i.e. a
-      # craft only reaches into nearby chests while Ctrl is held. That is the wrong
-      # default here for a specific reason: the couch clients are played on
-      # gamepads through Controlify, which has no Ctrl. On a pad the mod would be
-      # inert -- exactly the feature that was asked for, unreachable.
-      #
-      # ALWAYS makes every craft able to pull from nearby chests with no modifier,
-      # so an ordinary recipe click does it. Field name and enum spelling are read
-      # from the jar (ReachCraftingConfig$StoredConfig / $NearbyContainerUsageMode),
-      # not guessed.
-      #
-      # Note the mod's own warning: automated chest access can trip anticheat on
-      # public servers. Ours is a vanilla server with none, but if this instance is
-      # ever pointed at someone else's server, set this back to CTRL_HELD.
-      name = "effortless-crafting.json";
-      path = pkgs.writeText "effortless-crafting.json" (
-        builtins.toJSON { enableNearbyContainerUsage = "ALWAYS"; }
-      );
-    }
-  ];
+  # Empty for now: Nearby Crafting's defaults (8-block reach for both the player and
+  # the crafting table) need no adjustment, and unlike the client-only mod it replaced
+  # there is no modifier key to turn off. Kept because the seeding machinery in
+  # minecraft-mods-link and minecraft-couch-sync is the awkward part to re-derive,
+  # and the next mod that needs a non-default setting will want it.
+  configDefaults = pkgs.linkFarm "minecraft-client-mod-configs-${mcVersion}" [ ];
+
+  serverMods = builtins.filter (m: m.server) mods;
 in
 # linkFarm rather than a copy: the jars stay shared in the store, and Fabric follows
 # symlinks out of the mods directory happily. (Note this is NOT true inside a world
@@ -203,6 +207,11 @@ in
   (old: {
     passthru = (old.passthru or { }) // {
       inherit mcVersion configDefaults;
+      # The subset that must also be installed on the server, consumed by
+      # modules/minecraft-server.nix. Derived from the same entries as the client set,
+      # so the two can never disagree on a version or a hash.
+      server = pkgs.linkFarm "minecraft-server-mods-${mcVersion}" serverMods;
+      serverModList = map (m: "${m.pname} ${m.version}") serverMods;
       # Consumed by docs and by anyone wondering what is actually in here.
       modList = map (m: "${m.pname} ${m.version}") mods;
     };

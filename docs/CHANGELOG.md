@@ -19,6 +19,41 @@
   `_SB._OSC`) are ZBook firmware bugs, and `bap: BAP requires ISO Socket` is LE Audio only —
   irrelevant to the couch gamepads.
 
+### Changed (the server now runs Fabric)
+- The server was deliberately loader-free. Since Minecraft **1.21.2** the recipe list and
+  container contents live server-side and are not sent to clients, so two things had no
+  client-side answer at all: no recipe viewer works, and crafting from nearby chests could
+  only be approximated by a client mod opening each chest behind a held `Ctrl` — a key the
+  couch gamepads do not have. Both are fixed by a mod on the server, and only there.
+- `packages/fabric-server.nix` — Fabric Loader as a drop-in `services.minecraft-server.package`,
+  exposing `bin/minecraft-server` with the same argument contract, so the nixpkgs module's
+  declarative `server.properties`, console FIFO and hardening are untouched. Built from the
+  launch profile at `meta.fabricmc.net/v2/versions/loader/<mc>/<loader>/server/json`: a main
+  class plus 8 hash-pinned jars (4.7 MB), over the vanilla jar from `pkgs.minecraft-server`.
+  **Not** the `/server/jar` installer, which downloads the game and its libraries into the
+  working directory on first run. Mirrors the vanilla package's runtime env exactly — same
+  openjdk 21 headless, same `udev` on `LD_LIBRARY_PATH`.
+- Server mods are a **strict subset** of the client list, derived from the same entries via a
+  `server = true` flag, so the two can never disagree on a version or hash. Installed into
+  `/var/lib/minecraft/mods` from `preStart` with the same delete-then-copy discipline as the
+  datapacks.
+- **Nearby Crafting** replaces Effortless Crafting: chest contents simply count as inventory,
+  with no modifier key, which is what makes it work on a gamepad. Its Modrinth entry lists no
+  dependencies; the jar disagrees and the jar wins — `fabric-api`, `recipebookaccess`, `yacl`
+  **and** `modmenu` are hard `depends`. Mod Menu is `environment=client`, which looked like it
+  would break a dedicated server; it does not — Fabric loads client-env jars on a server as
+  dependency candidates. Verified by running the exact set (53 mods, "Done"). `cloth-config`
+  and the Effortless Crafting config default go with it.
+- **JEI is back**, client and server, and now actually syncs recipes.
+- Version lockstep assertion: `fabric-server.nix`'s `mcVersion` must equal
+  `pkgs.minecraft-server.version`. Intermediary mappings are per-game-version, so a nightly
+  auto-update bumping the jar against stale mappings would fail at runtime in the dark; this
+  turns it into an eval error naming both versions.
+- **Unverified:** that an unmodded client can still join. It should — no server mod adds
+  registry entries (Nearby Crafting is 7 classes and touches no registry; JEI adds no content),
+  so Fabric API's registry sync has nothing to synchronise — but this is the guarantee that
+  protects every phone and tablet on the tunnel. Test before relying on it.
+
 ### Added (chest crafting)
 - `packages/minecraft-client-mods.nix` — **Effortless Crafting** (`fabric-1.21.10-v1.3.0`),
   which lets you craft from items in reachable chests without hauling them to the table, plus
