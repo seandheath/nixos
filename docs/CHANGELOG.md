@@ -1,6 +1,16 @@
 # Changelog
 
 ## [Unreleased]
+### Fixed
+- `packages/minecraft-mods-link.nix`, `modules/minecraft-couch.nix` — both hardcoded
+  `.minecraft` as the Prism game root. **Prism 11 uses a plain `minecraft/`**; the dotted name
+  is the MultiMC-era layout, kept only for inherited instances. The symptom was an empty Mods
+  tab: the link landed in a directory Prism never reads, and a stray `.minecraft/` was left
+  beside the real game root. In `minecraft-couch-sync` the same bug was worse but latent — the
+  rsync excludes would have matched nothing, flattening each child's `options.txt`, `config/`
+  and saves on every sync. Both now resolve the game root at runtime the way Prism does.
+  Nothing caught this earlier because no Prism instance existed when the code was written.
+
 ### Added (Minecraft mods: declarative client jars + Vanilla Tweaks datapacks)
 - `packages/minecraft-client-mods.nix` — nine pinned Modrinth jars for Fabric 1.21.10, built
   into a `linkFarm`. Requested: **Xaero's Minimap**, **Better Name Visibility**, **Jade**.
@@ -14,7 +24,7 @@
     works. REI was the other candidate but needs `architectury-api` and `cloth-config` on top.
     Revisit if EMI ever ships for 1.21.10.
 - `packages/minecraft-mods-link.nix` + `modules/minecraft-mods.nix` — `minecraft-mods-link
-  <instance>` points a Prism instance's `.minecraft/mods` at the store path; imported by both
+  <instance>` points a Prism instance's mods folder at the store path; imported by both
   hydrogen and sulfur so **one list drives both machines and they cannot drift**.
   `minecraft-couch-sync` calls it on every run, so a rebuild reaches all five couch players
   without a second step. A pre-existing non-empty `mods/` is stashed to `mods.stateful` once

@@ -38,8 +38,24 @@ pkgs.writeShellApplication {
       exit 1
     fi
 
-    dot="$prism/instances/$inst/.minecraft"
-    mkdir -p "$dot"
+    # The game root is NOT always .minecraft. Prism 11 creates instances with a
+    # plain "minecraft/" directory and only falls back to the dotted name for
+    # instances inherited from MultiMC. Guessing wrong is quiet and confusing: the
+    # link lands in a directory Prism never reads, the Mods tab shows an empty list,
+    # and a stray .minecraft/ is left behind next to the real game root. Resolve it
+    # the way Prism does instead. (modules/minecraft-couch.nix repeats this rule for
+    # its rsync excludes -- keep the two in step.)
+    root="$prism/instances/$inst"
+    if [ -d "$root/minecraft" ]; then
+      dot="$root/minecraft"
+    elif [ -d "$root/.minecraft" ]; then
+      dot="$root/.minecraft"
+    else
+      # Neither exists yet (instance created but never launched). Prism 11 would
+      # make the undotted one.
+      dot="$root/minecraft"
+      mkdir -p "$dot"
+    fi
     target="$dot/mods"
 
     if [ -L "$target" ]; then

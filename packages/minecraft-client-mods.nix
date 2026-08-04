@@ -2,7 +2,7 @@
 # The Fabric client mod set for hydrogen's Minecraft server (see docs/minecraft.md).
 #
 # One list, two machines: hydrogen's couch clients and sulfur's desktop client both
-# point their instance's .minecraft/mods at this directory via minecraft-mods-link
+# point their instance's mods folder at this directory via minecraft-mods-link
 # (modules/minecraft-mods.nix), so they cannot drift apart.
 #
 # EVERY MOD HERE IS CLIENT-SIDE. The server stays a plain vanilla jar with no loader

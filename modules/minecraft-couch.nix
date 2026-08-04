@@ -147,6 +147,18 @@
           # next sync -- there is no separate step to forget.
           minecraft-mods-link "$inst"
 
+          # The game root is NOT always .minecraft: Prism 11 creates instances with a
+          # plain "minecraft/" and only uses the dotted name for ones inherited from
+          # MultiMC. Resolve it the way Prism does, or the excludes below silently
+          # match nothing -- which would flatten each child's options.txt and config/
+          # on every sync. packages/minecraft-mods-link.nix repeats this rule; keep
+          # the two in step.
+          if [ -d "$canon/instances/$inst/minecraft" ]; then
+            mc="minecraft"
+          else
+            mc=".minecraft"
+          fi
+
           if [ "$#" -gt 0 ]; then
             names=("$@")
           else
@@ -183,15 +195,15 @@
             # player picks up a mod list change from one rebuild -- and the
             # video/controller settings belong to each child.
             rsync -a --delete \
-              --exclude "/$inst/.minecraft/mods" \
-              --exclude "/$inst/.minecraft/saves" \
-              --exclude "/$inst/.minecraft/options.txt" \
-              --exclude "/$inst/.minecraft/config" \
+              --exclude "/$inst/$mc/mods" \
+              --exclude "/$inst/$mc/saves" \
+              --exclude "/$inst/$mc/options.txt" \
+              --exclude "/$inst/$mc/config" \
               "$canon/instances/$inst" "$d/instances/"
 
-            mkdir -p "$d/instances/$inst/.minecraft"
-            ln -sfn "$canon/instances/$inst/.minecraft/mods" \
-                    "$d/instances/$inst/.minecraft/mods"
+            mkdir -p "$d/instances/$inst/$mc"
+            ln -sfn "$canon/instances/$inst/$mc/mods" \
+                    "$d/instances/$inst/$mc/mods"
           done
 
           echo "minecraft-couch-sync: ''${#names[@]} player director(ies) ready under $root"

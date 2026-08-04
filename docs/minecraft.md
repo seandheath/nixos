@@ -203,9 +203,17 @@ device at once.
 | JEI | recipe viewer |
 | Fabric API, YACL, Mod Menu | dependencies of the above |
 
-`minecraft-mods-link <instance>` makes an instance's `.minecraft/mods` a symlink to
-the store path holding all nine jars. Both machines point at the same list, so they
+`minecraft-mods-link <instance>` makes an instance's mods folder a symlink to the
+store path holding all nine jars. Both machines point at the same list, so they
 cannot drift.
+
+> **The game root is not always `.minecraft`.** Prism 11 creates instances with a
+> plain `minecraft/`; the dotted name is the MultiMC-era layout, kept only for
+> inherited instances. Both `minecraft-mods-link` and `minecraft-couch-sync` resolve
+> it at runtime. Getting this wrong fails *quietly* — the link lands where Prism
+> never looks, the Mods tab shows an empty list, and a stray `.minecraft/` appears
+> beside the real game root. If the Mods tab is empty, check which one the instance
+> actually uses before anything else.
 
 > **Prism's GUI can no longer install mods into a linked instance** — `mods/` is a
 > read-only store path. That is the trade for one list driving both machines. Add
@@ -286,9 +294,10 @@ sulfur, the couch cannot also be `LuckyObserver`.
                       └─ bwrap: tmpfs over /dev/input, one pad bound back
                           └─ prismlauncher -d …/<name> --offline <name> --server 127.0.0.1:25565
 
-mods, two symlink hops from every player:
-  …/minecraft-couch/<name>/instances/couch/.minecraft/mods
-    └─ …/PrismLauncher/instances/couch/.minecraft/mods   (minecraft-mods-link)
+mods, two symlink hops from every player ("minecraft" here is the instance's game
+root, resolved at runtime — Prism 11 uses that name, MultiMC-era ones ".minecraft"):
+  …/minecraft-couch/<name>/instances/couch/minecraft/mods
+    └─ …/PrismLauncher/instances/couch/minecraft/mods   (minecraft-mods-link)
         └─ /nix/store/…-minecraft-client-mods-1.21.10
 ```
 
@@ -402,6 +411,7 @@ base in it.
 | Client can't join: "Chat disabled due to missing profile public key" | `enforce-secure-profile` drifted back to true — it must be `false` alongside `online-mode=false` |
 | Mods updated but only player 1 has them | `minecraft-couch-sync` |
 | Prism won't install a mod ("read-only" / permission denied) | Expected — `mods/` is a store symlink. Add it to `packages/minecraft-client-mods.nix` instead |
+| Mods tab is empty right after linking | The link went to the wrong game root. `ls -la <instance>/` — if both `minecraft/` and `.minecraft/` exist, delete the one Prism is not using (its log says `Started watching …/mods`) and re-run `minecraft-mods-link` |
 | A mod is missing after a rebuild | The instance's `mods` still points at the old store path. `minecraft-couch-sync`, or `minecraft-mods-link <instance>` |
 | Datapacks not in effect | `echo "datapack list" \| sudo tee /run/minecraft-server.stdin`, then check the journal. If they are listed as incompatible, the server moved past 1.21.11 — regenerate the zips |
 | `minecraft-mods-link` refuses: "nowhere safe to stash it" | Both `mods/` and `mods.stateful` hold real files. Merge or delete one by hand |
