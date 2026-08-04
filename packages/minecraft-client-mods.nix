@@ -120,19 +120,22 @@ let
       url = "https://cdn.modrinth.com/data/nvQzSEkH/versions/nCbsPtPw/Jade-1.21.9-Fabric-20.1.0.jar";
       hash = "sha512-F6W/qMGITc+NUiYVigeev9favUNl9NiXShZel5wk633l0fTY1qPdQbF892RappIi3HkE26r0DqyFGLfGKiZmRg==";
     }
-    {
-      # Recipe viewer. EMI was asked for first and is NOT AVAILABLE: its newest
-      # Fabric build is 1.1.24+1.21.1 and the project's game_versions stops there.
-      # JEI is the closest substitute -- zero dependencies, and Jade declares JEI as
-      # an optional integration so tooltip-to-recipe lookup works. (REI was the other
-      # candidate; it needs architectury-api and cloth-config on top.)
-      # Revisit if EMI ever ships for 1.21.10.
-      pname = "jei";
-      version = "26.3.0.31";
-      filename = "jei-1.21.10-fabric-26.3.0.31.jar";
-      url = "https://cdn.modrinth.com/data/u6dRKJwZ/versions/8yGN172x/jei-1.21.10-fabric-26.3.0.31.jar";
-      hash = "sha512-5xdS8+RjJdLRGnugX93SGWotV1qEU/ivAoaNqzoy1MseFEh0ZOBmKpQryxiHby8aVnjUM66rv+Pf4K3BXiDtog==";
-    }
+
+    # NO RECIPE VIEWER, deliberately -- see docs/minecraft.md. Since 1.21.2 the recipe
+    # list lives on the server and is no longer sent to clients, so a client-only
+    # viewer cannot enumerate recipes against this vanilla server. JEI was tried and
+    # says so in chat on every join; EMI never shipped past 1.21.1; REI's client-side
+    # fallback is broken for any recipe unlocked in-game (shedaniel/RoughlyEnoughItems
+    # #2063) and our Unlock All Recipes datapack unlocks all of them -- that fix is
+    # merged (#2065, 2026-07-29) but unreleased on every branch as of 2026-08-04.
+    #
+    # The gap is smaller than it looks: Unlock All Recipes leaves every player's
+    # vanilla recipe book complete, so forward lookup is covered. What is missing is
+    # reverse lookup ("what is this ingredient for?") and the stations the recipe book
+    # ignores -- brewing and smithing.
+    #
+    # TO REVISIT: check for a REI release dated after 2026-07-29 that supports the
+    # server's version. If there is one, adding it here is the whole change.
   ];
 in
 # linkFarm rather than a copy: the jars stay shared in the store, and Fabric follows

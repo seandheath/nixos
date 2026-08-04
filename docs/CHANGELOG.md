@@ -12,17 +12,27 @@
   Nothing caught this earlier because no Prism instance existed when the code was written.
 
 ### Added (Minecraft mods: declarative client jars + Vanilla Tweaks datapacks)
-- `packages/minecraft-client-mods.nix` — nine pinned Modrinth jars for Fabric 1.21.10, built
+- `packages/minecraft-client-mods.nix` — eight pinned Modrinth jars for Fabric 1.21.10, built
   into a `linkFarm`. Requested: **Xaero's Minimap**, **Better Name Visibility**, **Jade**.
   Supporting: `fabric-api`, `yacl`, `modmenu` (vanilla's menu has no entry point for a YACL
   screen, so without it Controlify and Better Name Visibility are config-file-only). **Sodium
   and Controlify moved out of the Prism GUI into this list** — they were manual setup steps
   that were easy to get wrong.
-  - **EMI was requested and is not available.** Its newest Fabric build is `1.1.24+1.21.1` and
-    the Modrinth project's `game_versions` stops there. **JEI 26.3.0.31** stands in: zero
-    dependencies, and Jade declares JEI as an optional integration so tooltip→recipe lookup
-    works. REI was the other candidate but needs `architectury-api` and `cloth-config` on top.
-    Revisit if EMI ever ships for 1.21.10.
+  - **No recipe viewer, deliberately.** EMI was requested; since Minecraft **1.21.2** the
+    recipe list lives on the server and is no longer sent to clients, so no client-only viewer
+    can enumerate recipes against a vanilla server. JEI was shipped first and reported exactly
+    that in chat on every join. EMI never shipped past `1.1.24+1.21.1`, i.e. it stops right
+    before the change. REI's client-side fallback breaks for any recipe unlocked in-game
+    (shedaniel/RoughlyEnoughItems#2063), and Unlock All Recipes unlocks all of them; the fix
+    (#2065) merged 2026-07-29 and is unreleased on every branch. Unlock All Recipes leaves the
+    vanilla recipe book complete, so what is actually lost is reverse lookup and the brewing
+    and smithing stations. Revisit when a REI build published after 2026-07-29 supports the
+    server's version.
+  - Rejected: **Fabric + JEI on the server** (JEI needs Fabric API server-side, and the
+    unmodded-join guarantee would need re-verifying) and **downgrading to 1.21.1** (no world
+    downgrade path from `DataVersion` 4556, and 1.21.1's server jar was verified to lack
+    `pause-when-empty-seconds` — the only reason this always-on server idles at 0.10% of a
+    core rather than ticking continuously).
 - `packages/minecraft-mods-link.nix` + `modules/minecraft-mods.nix` — `minecraft-mods-link
   <instance>` points a Prism instance's mods folder at the store path; imported by both
   hydrogen and sulfur so **one list drives both machines and they cannot drift**.

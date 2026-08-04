@@ -200,11 +200,12 @@ device at once.
 | Xaero's Minimap | minimap and waypoints |
 | Better Name Visibility | legible nameplates at quarter-screen |
 | Jade | what am I looking at |
-| JEI | recipe viewer |
 | Fabric API, YACL, Mod Menu | dependencies of the above |
 
+There is **no recipe viewer**, and that is not an oversight — see below.
+
 `minecraft-mods-link <instance>` makes an instance's mods folder a symlink to the
-store path holding all nine jars. Both machines point at the same list, so they
+store path holding all eight jars. Both machines point at the same list, so they
 cannot drift.
 
 > **The game root is not always `.minecraft`.** Prism 11 creates instances with a
@@ -227,9 +228,40 @@ An assertion ties the pinned `mcVersion` to `pkgs.minecraft-server.version`, so 
 nixpkgs bump that moves the server off 1.21.10 fails the build instead of showing
 four children an incompatible-mod screen.
 
-**EMI is not available and JEI stands in for it.** EMI's newest Fabric build is
-`1.1.24+1.21.1`; its Modrinth `game_versions` stops there. JEI has no dependencies
-and Jade integrates with it. Revisit if EMI ever ships for 1.21.10.
+### Why there is no recipe viewer
+
+**Since Minecraft 1.21.2 the recipe list lives on the server and is no longer sent to
+clients.** A client-only viewer therefore cannot enumerate recipes against a vanilla
+server. This is a vanilla protocol change, not a property of any particular mod, so
+all three candidates are affected:
+
+| | Status on 1.21.10 |
+|---|---|
+| **JEI** | Works, but every join prints *"JEI is missing recipes. Please install JEI on the server"*. Item list fine, recipe lookup dead. |
+| **EMI** | Never shipped past `1.1.24+1.21.1`, i.e. it stops right before the change. |
+| **REI** | Has a client-side fallback, but it breaks for any recipe **unlocked in-game** ([#2063](https://github.com/shedaniel/RoughlyEnoughItems/issues/2063)) — and Unlock All Recipes unlocks all of them, so it would fail on nearly every item. |
+
+JEI was installed first and removed once the chat error made the cause clear.
+
+**The gap is narrower than it sounds.** Unlock All Recipes leaves every player's
+vanilla recipe book complete and searchable, so *"how do I make X"* is covered. What
+is missing is reverse lookup — *"what is this ingredient for?"* — and the stations the
+recipe book ignores, namely brewing and smithing.
+
+**To revisit:** REI's fix ([#2065](https://github.com/shedaniel/RoughlyEnoughItems/pull/2065))
+merged 2026-07-29 but is unreleased on every branch as of 2026-08-04. Check for a REI
+build published after that date supporting the server's version; if one exists, adding
+it to the mod list is the entire change.
+
+Two alternatives were considered and rejected. **Running Fabric plus JEI on the
+server** would fix it properly, but the server would stop being the stock jar and the
+"any unmodded device can join over the tunnel" guarantee would need re-verifying —
+JEI's jar requires Fabric API server-side, not just the loader. **Downgrading to
+1.21.1**, the last version before the change, would let EMI work fully client-side,
+but the world cannot be downgraded (no path back from `DataVersion` 4556) and 1.21.1
+predates `pause-when-empty-seconds` — verified absent from its server jar — which is
+the only reason this always-on server idles at 0.10% of a core instead of ticking
+continuously.
 
 ### Datapacks
 
