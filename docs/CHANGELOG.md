@@ -19,6 +19,17 @@
   `_SB._OSC`) are ZBook firmware bugs, and `bap: BAP requires ISO Socket` is LE Audio only —
   irrelevant to the couch gamepads.
 
+### Added (chest crafting)
+- `packages/minecraft-client-mods.nix` — **Effortless Crafting** (`fabric-1.21.10-v1.3.0`),
+  which lets you craft from items in reachable chests without hauling them to the table, plus
+  `cloth-config` which backs its Mod Menu settings screen (same reasoning as Mod Menu itself).
+  - **Not "Nearby Crafting"**, which is the better-known mod for this and what was asked for:
+    it is `server_side: required`, so it cannot work against a vanilla server. Craft From
+    Chests is server-required too. Effortless Crafting does the same job entirely client-side
+    — verified from the jar rather than the Modrinth metadata, since that field is
+    author-declared: its `fabric.mod.json` declares `environment: "client"` (mod id
+    `reachcrafting`).
+
 ### Removed (paperless-gpt)
 - `modules/paperless-gpt.nix` deleted, import dropped from `hosts/hydrogen.nix`,
   `/var/lib/paperless-gpt` removed from `backupPaths`, and the orphaned `paperless-gpt-token`

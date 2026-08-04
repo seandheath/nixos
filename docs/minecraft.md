@@ -200,12 +200,13 @@ device at once.
 | Xaero's Minimap | minimap and waypoints |
 | Better Name Visibility | legible nameplates at quarter-screen |
 | Jade | what am I looking at |
-| Fabric API, YACL, Mod Menu | dependencies of the above |
+| Effortless Crafting | craft using items in reachable chests, no hauling |
+| Fabric API, YACL, Mod Menu, Cloth Config | dependencies of the above |
 
 There is **no recipe viewer**, and that is not an oversight — see below.
 
 `minecraft-mods-link <instance>` makes an instance's mods folder a symlink to the
-store path holding all eight jars. Both machines point at the same list, so they
+store path holding all ten jars. Both machines point at the same list, so they
 cannot drift.
 
 **This runs itself.** `minecraft-mods-link.service` re-links on boot and on any switch

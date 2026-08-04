@@ -72,6 +72,16 @@ let
       url = "https://cdn.modrinth.com/data/mOgUt4GM/versions/pYbFlVtR/modmenu-16.0.1.jar";
       hash = "sha512-vgG7WoCjn8USI+8UJxO6PLwsI2WPDIvTbO7X7NFjaEt9yAjy7yPc5/s1C9/QEN6Xh/IXfhFcrj6pG5aoO9bqFg==";
     }
+    {
+      # Optional for Effortless Crafting, but it is what backs that mod's Mod Menu
+      # config screen -- same reasoning as Mod Menu itself: without it the settings
+      # exist only in a file. Client-only.
+      pname = "cloth-config";
+      version = "20.0.149+fabric";
+      filename = "cloth-config-20.0.149-fabric.jar";
+      url = "https://cdn.modrinth.com/data/9s6osm5g/versions/qMxkrrmq/cloth-config-20.0.149-fabric.jar";
+      hash = "sha512-3x2eA0ncZPwIWfF7ZbZ7DXdFomtJBeh/wUjd68AoXeUaMlWEhZnw1e4k9qqwD7rEhJ1Au5BSk26qRS0hbHraYg==";
+    }
 
     # --- The couch design's own requirements --------------------------------
     {
@@ -119,6 +129,22 @@ let
       filename = "Jade-1.21.9-Fabric-20.1.0.jar";
       url = "https://cdn.modrinth.com/data/nvQzSEkH/versions/nCbsPtPw/Jade-1.21.9-Fabric-20.1.0.jar";
       hash = "sha512-F6W/qMGITc+NUiYVigeev9favUNl9NiXShZel5wk633l0fTY1qPdQbF892RappIi3HkE26r0DqyFGLfGKiZmRg==";
+    }
+
+    {
+      # Craft using items in reachable chests without hauling them to the table.
+      #
+      # NOT "Nearby Crafting" (nearby-crafting), which is the better-known mod for
+      # this and was what was actually asked for: it is server_side REQUIRED, so it
+      # cannot work against a vanilla server. Effortless Crafting does the same job
+      # entirely client-side -- verified from the jar, not the Modrinth metadata:
+      # fabric.mod.json declares environment "client" (its mod id is "reachcrafting").
+      # Craft From Chests was the other candidate and is likewise server-required.
+      pname = "effortless-crafting";
+      version = "fabric-1.21.10-v1.3.0";
+      filename = "effortless-crafting-fabric-1.21.10-v1.3.0.jar";
+      url = "https://cdn.modrinth.com/data/iMFvPhVJ/versions/qpvBiLaT/effortless-crafting-fabric-1.21.10-v1.3.0.jar";
+      hash = "sha512-qnNdBqMcoglF4m4teCzheB8RuGzJO59ZjpQFqIqb556gqa9WIKikRLPXoxaDMMsY9zabAUvFbrGVYNfoCCdhkw==";
     }
 
     # NO RECIPE VIEWER, deliberately -- see docs/minecraft.md. Since 1.21.2 the recipe
