@@ -1,6 +1,19 @@
 # Changelog
 
 ## [Unreleased]
+### Removed (paperless-gpt)
+- `modules/paperless-gpt.nix` deleted, import dropped from `hosts/hydrogen.nix`,
+  `/var/lib/paperless-gpt` removed from `backupPaths`, and the orphaned `paperless-gpt-token`
+  removed from `secrets/secrets.yaml`. Not wanted; it was also the only source of errors in
+  hydrogen's journal (13 `connection refused` against paperless at boot — it starts before
+  paperless is listening despite the soft ordering, since `After=` waits for the unit to start,
+  not for the socket).
+- **podman leaves hydrogen with it.** `virtualisation.podman.enable` was set by that module and
+  nothing else on the server used a container, so the server is back to no container runtime.
+- paperless and ollama are untouched. `/var/lib/paperless-gpt` is left on disk — no longer
+  backed up, delete by hand if wanted. The pulled image is still in podman's store; it goes
+  when podman does, or `podman system prune -a` before the switch.
+
 ### Fixed (hydrogen: systemd-logind suspend livelock)
 - `hosts/hydrogen.nix` — `systemd-logind` was wedged in a tight retry loop: *"Suspending…"* →
   *"Unit suspend.target is masked, refusing operation."* → *"Permission denied"*, roughly **240

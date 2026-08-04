@@ -76,11 +76,27 @@ pkgs.dockerTools.buildLayeredImage {
     pkgs.python3
 
     # Reading a reference source tree (see the "Reference source" section of the prompt).
+    # Both agents have ripgrep-backed search tools of their own, but they also shell out to
+    # ordinary text utilities, and a missing grep surfaces as a confusing tool failure rather
+    # than a clear "not installed". These are read/transform tools; coreutils is already here,
+    # so they do not meaningfully widen what a rogue agent can do.
     pkgs.git
     pkgs.ripgrep
+    pkgs.gnugrep
+    pkgs.gnused
+    pkgs.gawk
+    pkgs.findutils
+    pkgs.less
 
     pkgs.bashInteractive
     pkgs.coreutils
+
+    # ncurses is here for its **terminfo database**, not for tput. A dockerTools image ships
+    # no terminfo at all (cclaude gets one free from debian's ncurses-base), so TERM=
+    # xterm-256color resolves to nothing, both TUIs lose cursor addressing, and they fall
+    # back to clearing and repainting the whole screen every frame — which reads as violent
+    # flicker in ptyxis. See TERMINFO_DIRS in config.Env below; both halves are required.
+    pkgs.ncurses
     # HTTPS to the vLLM endpoint. Without this every model call fails cert verification.
     pkgs.cacert
     pkgs.dockerTools.usrBinEnv
@@ -115,6 +131,11 @@ pkgs.dockerTools.buildLayeredImage {
       "NIX_SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
       "PATH=/bin"
       "LANG=C.UTF-8"
+      # dockerTools unpacks package outputs at the image root, so ncurses' terminfo tree
+      # lands at /share/terminfo rather than the /usr/share/terminfo that ncurses compiles
+      # in as its default search path. Without this the database above is present but never
+      # found, which looks identical to not having it. TERM itself comes from the launcher.
+      "TERMINFO_DIRS=/share/terminfo"
     ];
   };
 }
