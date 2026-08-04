@@ -119,6 +119,10 @@
       # Points the canonical instance's mods folder at the Nix-managed jar set. See
       # packages/minecraft-mods-link.nix; the same binary is in systemPackages on both
       # hosts via modules/minecraft-mods.nix.
+      # The jar set, for its configDefaults (seeded per player below). The mods
+      # themselves reach players through the symlink chain, not from here.
+      clientMods = import ../packages/minecraft-client-mods.nix { inherit pkgs; };
+
       modsLink = import ../packages/minecraft-mods-link.nix {
         inherit pkgs;
         prismRoot = canonicalPrism;
@@ -204,6 +208,19 @@
             mkdir -p "$d/instances/$inst/$mc"
             ln -sfn "$canon/instances/$inst/$mc/mods" \
                     "$d/instances/$inst/$mc/mods"
+
+            # Seed default mod configs into THIS player's config dir. config/ is
+            # excluded from the rsync above because it is per-player state, so the
+            # canonical instance's copy never reaches them -- without this the kids
+            # would each get the mods' own defaults. Never overwrites: whatever a
+            # child changes in Mod Menu is theirs. See configDefaults in
+            # packages/minecraft-client-mods.nix.
+            mkdir -p "$d/instances/$inst/$mc/config"
+            for src in ${clientMods.configDefaults}/*; do
+              [ -e "$src" ] || continue
+              dst="$d/instances/$inst/$mc/config/$(basename "$src")"
+              [ -e "$dst" ] || install -m0644 "$src" "$dst"
+            done
           done
 
           echo "minecraft-couch-sync: ''${#names[@]} player director(ies) ready under $root"

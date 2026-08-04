@@ -201,6 +201,13 @@ device at once.
 | Better Name Visibility | legible nameplates at quarter-screen |
 | Jade | what am I looking at |
 | Effortless Crafting | craft using items in reachable chests, no hauling |
+
+Effortless Crafting is seeded with `enableNearbyContainerUsage: ALWAYS` rather than
+its own `CTRL_HELD` default, because the couch clients are played on gamepads and
+Controlify has no Ctrl — with the stock default the feature would be unreachable on
+a pad. Defaults live in `configDefaults` in `packages/minecraft-client-mods.nix` and
+are seeded **once** into each game directory's `config/`; anything changed in Mod
+Menu afterwards is kept. An instance that already has the file keeps it.
 | Fabric API, YACL, Mod Menu, Cloth Config | dependencies of the above |
 
 There is **no recipe viewer**, and that is not an oversight — see below.

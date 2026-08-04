@@ -163,6 +163,38 @@ let
     # TO REVISIT: check for a REI release dated after 2026-07-29 that supports the
     # server's version. If there is one, adding it here is the whole change.
   ];
+
+  # ---------------------------------------------------------------------------
+  # Default mod configs, SEEDED ONCE into a game directory's config/ when the file
+  # is not already there (minecraft-mods-link, and per player minecraft-couch-sync).
+  #
+  # Seed-once, never overwrite: these are starting points, and anything a player
+  # changes in Mod Menu afterwards is theirs to keep. Partial files are fine --
+  # Cloth Config deserializes into a default-constructed object, so unlisted fields
+  # keep the mod's own defaults.
+  # ---------------------------------------------------------------------------
+  configDefaults = pkgs.linkFarm "minecraft-client-mod-configs-${mcVersion}" [
+    {
+      # Effortless Crafting ships enableNearbyContainerUsage = CTRL_HELD, i.e. a
+      # craft only reaches into nearby chests while Ctrl is held. That is the wrong
+      # default here for a specific reason: the couch clients are played on
+      # gamepads through Controlify, which has no Ctrl. On a pad the mod would be
+      # inert -- exactly the feature that was asked for, unreachable.
+      #
+      # ALWAYS makes every craft able to pull from nearby chests with no modifier,
+      # so an ordinary recipe click does it. Field name and enum spelling are read
+      # from the jar (ReachCraftingConfig$StoredConfig / $NearbyContainerUsageMode),
+      # not guessed.
+      #
+      # Note the mod's own warning: automated chest access can trip anticheat on
+      # public servers. Ours is a vanilla server with none, but if this instance is
+      # ever pointed at someone else's server, set this back to CTRL_HELD.
+      name = "effortless-crafting.json";
+      path = pkgs.writeText "effortless-crafting.json" (
+        builtins.toJSON { enableNearbyContainerUsage = "ALWAYS"; }
+      );
+    }
+  ];
 in
 # linkFarm rather than a copy: the jars stay shared in the store, and Fabric follows
 # symlinks out of the mods directory happily. (Note this is NOT true inside a world
@@ -170,7 +202,7 @@ in
 (pkgs.linkFarm "minecraft-client-mods-${mcVersion}" mods).overrideAttrs
   (old: {
     passthru = (old.passthru or { }) // {
-      inherit mcVersion;
+      inherit mcVersion configDefaults;
       # Consumed by docs and by anyone wondering what is actually in here.
       modList = map (m: "${m.pname} ${m.version}") mods;
     };

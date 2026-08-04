@@ -32,6 +32,7 @@ pkgs.writeShellApplication {
   ];
   text = ''
     mods="${clientMods}"
+    defaults="${clientMods.configDefaults}"
     prism="${prismRoot}"
 
     # --if-present: a missing instance is a skip, not an error. The service uses this
@@ -81,8 +82,24 @@ pkgs.writeShellApplication {
     fi
     target="$dot/mods"
 
-    # Already correct -- do nothing. Keeps the boot-time run silent and makes an
-    # unnecessary switch a no-op rather than a churn of rm/ln on the user's instance.
+    # Seed default mod configs, never overwriting. See configDefaults in
+    # packages/minecraft-client-mods.nix for why each one is there.
+    # minecraft-couch-sync does the same for each player's own config dir.
+    #
+    # Deliberately BEFORE the up-to-date early exit below: adding a new default to
+    # an unchanged mod set must still reach an instance that is already linked.
+    mkdir -p "$dot/config"
+    for src in "$defaults"/*; do
+      [ -e "$src" ] || continue
+      dst="$dot/config/$(basename "$src")"
+      if [ ! -e "$dst" ]; then
+        install -m0644 "$src" "$dst"
+        echo "minecraft-mods-link: seeded config/$(basename "$src")"
+      fi
+    done
+
+    # Already correct -- do nothing further. Keeps the boot-time run silent and makes
+    # an unnecessary switch a no-op rather than a churn of rm/ln on the user's instance.
     if [ "$(readlink "$target" 2>/dev/null || true)" = "$mods" ]; then
       echo "minecraft-mods-link: $inst already up to date."
       exit 0
