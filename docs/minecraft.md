@@ -23,7 +23,7 @@ The design spec this was built from is `~/Downloads/specification.md`.
 | Leave the game | `SUPER`+`SHIFT`+`Q` (returns to GNOME) |
 | Get back to GNOME if something wedges | `sudo chvt 2`, or from another machine `ssh hydrogen 'sudo systemctl stop minecraft-couch'` |
 | Add a player, or pair a controller | In the pre-launcher, before **Start playing** |
-| Add or update a mod | Edit `packages/minecraft-client-mods.nix`, rebuild, then `minecraft-couch-sync` (hydrogen) / `minecraft-mods-link Hydrogen` (sulfur) |
+| Add or update a mod | Edit `packages/minecraft-client-mods.nix` and rebuild — the re-link is automatic |
 | Add or update a datapack | Regenerate the zips into `packages/minecraft-datapacks/`, rebuild, restart the server |
 | See what mods are installed | `minecraft-mods-link <instance>` prints the list |
 | Check what a new controller sends | `minecraft-couch-menu --probe` |
@@ -208,6 +208,17 @@ There is **no recipe viewer**, and that is not an oversight — see below.
 store path holding all eight jars. Both machines point at the same list, so they
 cannot drift.
 
+**This runs itself.** `minecraft-mods-link.service` re-links on boot and on any switch
+that changes the jar set — the store path is baked into `ExecStart`, so a changed mod
+list changes the unit and switch restarts it. Instances are named per host in
+`services.minecraftClientMods.instances`. It is idempotent (a correct link is reported
+and left alone) and an instance that does not exist yet is skipped, not an error.
+
+The one case it does *not* cover: **creating a new instance** under an otherwise
+unchanged configuration. Nothing changed, so nothing restarts. Run
+`minecraft-mods-link <instance>` by hand once, or `systemctl restart
+minecraft-mods-link`.
+
 > **The game root is not always `.minecraft`.** Prism 11 creates instances with a
 > plain `minecraft/`; the dotted name is the MultiMC-era layout, kept only for
 > inherited instances. Both `minecraft-mods-link` and `minecraft-couch-sync` resolve
@@ -305,8 +316,8 @@ the LAN or the tunnel. One-time setup:
    $ minecraft-mods-link Hydrogen
    minecraft-mods-link: Hydrogen -> /nix/store/…-minecraft-client-mods-1.21.10
    ```
-3. Re-run that after any rebuild that changes the mod list. There is no equivalent of
-   `minecraft-couch-sync` here to do it for you.
+   Only needed this once, because the instance did not exist when the service last
+   ran. After that `minecraft-mods-link.service` keeps it current on every rebuild.
 
 Note the one-login-per-username rule: if sheath is playing `LuckyObserver` from
 sulfur, the couch cannot also be `LuckyObserver`.
@@ -444,7 +455,7 @@ base in it.
 | Mods updated but only player 1 has them | `minecraft-couch-sync` |
 | Prism won't install a mod ("read-only" / permission denied) | Expected — `mods/` is a store symlink. Add it to `packages/minecraft-client-mods.nix` instead |
 | Mods tab is empty right after linking | The link went to the wrong game root. `ls -la <instance>/` — if both `minecraft/` and `.minecraft/` exist, delete the one Prism is not using (its log says `Started watching …/mods`) and re-run `minecraft-mods-link` |
-| A mod is missing after a rebuild | The instance's `mods` still points at the old store path. `minecraft-couch-sync`, or `minecraft-mods-link <instance>` |
+| A mod is missing after a rebuild | `systemctl status minecraft-mods-link` — it should have re-linked. If the instance was created since the last switch, run `minecraft-mods-link <instance>` once |
 | Datapacks not in effect | `echo "datapack list" \| sudo tee /run/minecraft-server.stdin`, then check the journal. If they are listed as incompatible, the server moved past 1.21.11 — regenerate the zips |
 | `minecraft-mods-link` refuses: "nowhere safe to stash it" | Both `mods/` and `mods.stateful` hold real files. Merge or delete one by hand |
 | Session exits but GNOME doesn't come back | `sudo chvt 2`. `ExecStopPost` should do this automatically; check `/run/minecraft-couch.prev-vt` was written |

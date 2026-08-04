@@ -36,6 +36,11 @@
   # diagnose the transient btrfs csum failures (RAM the prime suspect).
   boot.loader.systemd-boot.memtest86.enable = true;
 
+  # Keep the couch Prism instance's mods folder pointed at the current jar set.
+  # minecraft-couch-sync also does this, but the service covers the case where the
+  # mod list changes and nobody re-syncs before the next couch session.
+  services.minecraftClientMods.instances = [ "couch" ];
+
   networking.hostName = "hydrogen"; # Define your hostname.
 
   # Enable networking. Plain `false` (not mkDefault) to override the mkDefault true

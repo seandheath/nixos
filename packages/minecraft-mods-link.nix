@@ -2,10 +2,20 @@
 # minecraft-mods-link <instance> -- point a Prism instance's mods folder at the
 # Nix-managed jar set in packages/minecraft-client-mods.nix.
 #
-# Used two ways:
-#   - by hand on sulfur, once per instance (docs/minecraft.md), and
-#   - from minecraft-couch-sync on hydrogen, which re-runs it on every sync so the
-#     couch instance cannot fall behind a rebuild.
+# Used three ways:
+#   - automatically, from the minecraft-mods-link.service oneshot in
+#     modules/minecraft-mods.nix, which re-runs on boot and on any switch that
+#     changes the jar set (the store path is baked into the unit, so a changed mod
+#     list changes the unit and switch restarts it),
+#   - from minecraft-couch-sync on hydrogen, which re-links before fanning the
+#     instance out to each player, and
+#   - by hand, which is what you want right after creating an instance -- the
+#     service only re-runs on boot or on a *change*, so it will not notice a new
+#     instance appearing under an otherwise unchanged configuration.
+#
+# Idempotent and cheap: if the link already points at the current store path it
+# reports that and exits without touching anything, which is what makes it safe to
+# run unconditionally on every boot.
 #
 # CONSEQUENCE, deliberate: mods/ becomes a read-only store path, so Prism's GUI can
 # no longer install a mod into this instance. That is the trade for having one list
@@ -24,15 +34,28 @@ pkgs.writeShellApplication {
     mods="${clientMods}"
     prism="${prismRoot}"
 
+    # --if-present: a missing instance is a skip, not an error. The service uses this
+    # so a host that has not had its Prism instance created yet (hydrogen's "couch",
+    # for most of this setup's life) does not show a failed unit after every switch.
+    optional=0
+    if [ "''${1:-}" = "--if-present" ]; then
+      optional=1
+      shift
+    fi
+
     inst="''${1:-}"
     if [ -z "$inst" ] || [ "$#" -gt 1 ]; then
-      echo "usage: minecraft-mods-link <prism-instance-name>" >&2
+      echo "usage: minecraft-mods-link [--if-present] <prism-instance-name>" >&2
       echo "  e.g. minecraft-mods-link couch      (hydrogen)" >&2
       echo "       minecraft-mods-link Hydrogen   (sulfur)" >&2
       exit 2
     fi
 
     if [ ! -d "$prism/instances/$inst" ]; then
+      if [ "$optional" -eq 1 ]; then
+        echo "minecraft-mods-link: no Prism instance '$inst' yet, nothing to link."
+        exit 0
+      fi
       echo "minecraft-mods-link: no Prism instance '$inst' in $prism." >&2
       echo "Create it in Prism first -- see docs/minecraft.md." >&2
       exit 1
@@ -57,6 +80,13 @@ pkgs.writeShellApplication {
       mkdir -p "$dot"
     fi
     target="$dot/mods"
+
+    # Already correct -- do nothing. Keeps the boot-time run silent and makes an
+    # unnecessary switch a no-op rather than a churn of rm/ln on the user's instance.
+    if [ "$(readlink "$target" 2>/dev/null || true)" = "$mods" ]; then
+      echo "minecraft-mods-link: $inst already up to date."
+      exit 0
+    fi
 
     if [ -L "$target" ]; then
       # Ours from a previous run (or an older store path). Just re-point it.

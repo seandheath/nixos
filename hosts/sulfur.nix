@@ -18,6 +18,10 @@ in
     ../modules/minecraft-mods.nix     # declarative Fabric client mods, shared with hydrogen
   ];
 
+  # Keep the desktop Prism instance's mods folder pointed at the current jar set.
+  # Instance name is whatever it is called in Prism; see docs/minecraft.md.
+  services.minecraftClientMods.instances = [ "Hydrogen" ];
+
   # Boot
   boot.loader.systemd-boot.enable = true;
   boot.loader.systemd-boot.configurationLimit = 20;

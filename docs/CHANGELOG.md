@@ -1,6 +1,21 @@
 # Changelog
 
 ## [Unreleased]
+### Added
+- `minecraft-mods-link.service` — re-links the configured Prism instances on boot and on any
+  switch that changes the jar set. The store path is baked into `ExecStart`, so a changed mod
+  list changes the unit and `switch-to-configuration` restarts it; previously a rebuild that
+  added a mod left both machines silently stale until someone remembered the command.
+  `Type=oneshot` + `RemainAfterExit` so it counts as active and therefore gets restarted;
+  runs as `sheath` rather than root, since everything it touches is under that user's home.
+  Instances are named per host via `services.minecraftClientMods.instances`.
+  - `minecraft-mods-link` gained `--if-present` (a missing instance is a skip, not an error —
+    hydrogen's `couch` does not exist yet and must not fail the switch) and an idempotence
+    check that exits early when the link is already correct, so the boot-time run is silent
+    and an unrelated switch does not churn `rm`/`ln` on the user's instance.
+  - Does **not** cover creating a new instance under an otherwise unchanged configuration —
+    nothing changed, so nothing restarts. One manual run, or `systemctl restart`.
+
 ### Fixed
 - `packages/minecraft-mods-link.nix`, `modules/minecraft-couch.nix` — both hardcoded
   `.minecraft` as the Prism game root. **Prism 11 uses a plain `minecraft/`**; the dotted name
