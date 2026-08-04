@@ -1,6 +1,21 @@
 # Changelog
 
 ## [Unreleased]
+### Changed (Veloren server disabled)
+- `hosts/hydrogen.nix` — `modules/veloren-server.nix` import commented out, and 14004/tcp +
+  14006/udp closed with it. **Veloren's rtsim never idles.** Measured on hydrogen with zero
+  players connected: **20.7% of a core, continuously** (steady over two windows, 41 threads),
+  driven by the 1867 rtsim NPCs across 196 sites and 16 factions that keep simulating whether
+  or not anyone is watching. That is by design upstream and there is no equivalent of
+  Minecraft's `pause-when-empty-seconds` — the Minecraft server measured **0.10%** idle under
+  the same conditions, since 1.21.2+ defaults that setting to 60.
+  Nobody is playing it, so a permanent ~0.2 cores + ~700 MiB on a 24/7 box is not worth it.
+  `modules/veloren-server.nix`, `docs/veloren.md` and `/var/lib/veloren` are all left intact;
+  re-enabling is uncommenting the import and the two ports. The world is reproducible from the
+  pinned `world_seed` regardless.
+  The `veloren` client stays installed on hydrogen and sulfur — it has a singleplayer mode and
+  costs nothing at runtime.
+
 ### Added (Veloren server on hydrogen)
 - `modules/veloren-server.nix` — a persistent Veloren (open-source voxel RPG) server as a
   system service, alongside the existing Minecraft one. **nixpkgs has no `services.veloren`**,

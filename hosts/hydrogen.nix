@@ -17,7 +17,17 @@
     ../modules/fleet-vpn.nix          # on-demand WireGuard tunnel to the Jellyfin fleet (manual switch)
     ../modules/minecraft-server.nix   # persistent vanilla world (system service, no session needed)
     ../modules/minecraft-couch.nix    # 1-4 player split-screen launcher on the projector
-    ../modules/veloren-server.nix     # persistent Veloren world (hand-written unit; no nixpkgs module)
+    # ../modules/veloren-server.nix   # DISABLED 2026-08-03 -- see below
+    #
+    # Veloren's rtsim (1867 NPCs across 196 sites) never idles: measured 20.7% of a core
+    # continuously with ZERO players connected, versus 0.10% for the Minecraft server, which
+    # does pause when empty (pause-when-empty-seconds, vanilla default 60). Nobody is playing
+    # Veloren, so that is a permanent ~0.2 cores and ~700 MiB for nothing.
+    #
+    # To re-enable: uncomment the import above and the two ports in the br0 firewall lists
+    # below. /var/lib/veloren is left in place, so characters and terrain diffs survive; even
+    # if it were deleted the world regenerates identically from the pinned world_seed.
+    # modules/veloren-server.nix and docs/veloren.md are unchanged.
   ];
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
@@ -152,14 +162,15 @@
     # router change — it is the single most important check for this service.
     25565
 
-    # Veloren game port (modules/veloren-server.nix). Scoped to br0 for exactly the
-    # reason spelled out for 25565 above: the server runs with auth_server_address:
-    # None and verifies no identity, so reachability IS the authentication boundary.
-    14004
+    # Veloren game port (modules/veloren-server.nix). Closed alongside the disabled
+    # import above; re-open with it. Scoped to br0 for exactly the reason spelled out
+    # for 25565: the server runs with auth_server_address: None and verifies no
+    # identity, so reachability IS the authentication boundary.
+    # 14004
   ];
   networking.firewall.interfaces."br0".allowedUDPPorts = [
     21116   # RustDesk
-    14006   # Veloren server-browser query (player count / MOTD)
+    # 14006 # Veloren server-browser query — closed with the disabled import above
   ];
 
   # Auto-start the RustDesk host with the (autologin) graphical session, so the box
