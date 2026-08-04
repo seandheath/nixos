@@ -15,6 +15,7 @@ in
     ../modules/impermanence.nix
     ../modules/wivrn.nix
     ../modules/fleet-vpn.nix
+    ../modules/minecraft-mods.nix     # declarative Fabric client mods, shared with hydrogen
   ];
 
   # Boot
@@ -69,9 +70,10 @@ in
     # (modules/minecraft-couch.nix) rather than a second one; the instance itself is
     # stateful and created in the GUI — see docs/minecraft.md.
     #
-    # The server is VANILLA, so this needs no mods: Controlify and Sodium exist only for the
-    # four tiled couch clients on the projector. Just a plain 1.21.10 instance matching
-    # `nix eval --raw ~/nixos#nixosConfigurations.hydrogen.pkgs.minecraft-server.version`.
+    # The server is VANILLA, so mods here are purely a client-side choice. The set is
+    # declarative and shared with hydrogen (packages/minecraft-client-mods.nix): make the
+    # instance Fabric 1.21.10, then run `minecraft-mods-link Hydrogen` once. The version
+    # must match `nix eval --raw ~/nixos#nixosConfigurations.hydrogen.pkgs.minecraft-server.version`.
     prismlauncher
   ];
 

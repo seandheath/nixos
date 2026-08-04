@@ -1,11 +1,15 @@
 # Minecraft on hydrogen — persistent server + couch split-screen
 
-Two independent things, both on hydrogen (the ZBook next to the projector):
+Three parts:
 
-- **`modules/minecraft-server.nix`** — a vanilla server running as a system service.
-  Always on, survives reboots, no login needed, backed up by borg.
-- **`modules/minecraft-couch.nix`** — 1–4 GNOME icons that put that many tiled
-  Minecraft clients on the projector, one gamepad each.
+- **`modules/minecraft-server.nix`** — a vanilla server on hydrogen (the ZBook next to
+  the projector), running as a system service. Always on, survives reboots, no login
+  needed, backed up by borg. Carries the Vanilla Tweaks datapacks.
+- **`modules/minecraft-couch.nix`** — one GNOME icon on hydrogen that opens a
+  pre-launcher and then tiles up to four Minecraft clients on the projector, one
+  gamepad each.
+- **`packages/minecraft-client-mods.nix`** — the Fabric client mod set, shared by the
+  couch clients and sulfur's desktop client.
 
 The design spec this was built from is `~/Downloads/specification.md`.
 
@@ -19,7 +23,9 @@ The design spec this was built from is `~/Downloads/specification.md`.
 | Leave the game | `SUPER`+`SHIFT`+`Q` (returns to GNOME) |
 | Get back to GNOME if something wedges | `sudo chvt 2`, or from another machine `ssh hydrogen 'sudo systemctl stop minecraft-couch'` |
 | Add a player, or pair a controller | In the pre-launcher, before **Start playing** |
-| Add or update a mod | Edit the `couch` instance in Prism, then run `minecraft-couch-sync` |
+| Add or update a mod | Edit `packages/minecraft-client-mods.nix`, rebuild, then `minecraft-couch-sync` (hydrogen) / `minecraft-mods-link Hydrogen` (sulfur) |
+| Add or update a datapack | Regenerate the zips into `packages/minecraft-datapacks/`, rebuild, restart the server |
+| See what mods are installed | `minecraft-mods-link <instance>` prints the list |
 | Check what a new controller sends | `minecraft-couch-menu --probe` |
 | See who is connected | `sudo journalctl -u minecraft-server -f` |
 | Run a server command | `echo "time set day" \| sudo tee /run/minecraft-server.stdin` |
@@ -76,13 +82,9 @@ Open **Prism Launcher** on hydrogen (it is in the app grid).
    ```console
    $ nix eval --raw ~/nixos#nixosConfigurations.hydrogen.pkgs.minecraft-server.version
    ```
-3. *Edit Instance* → *Mods* → *Download mods*, and install:
-   - **Controlify** — gamepad support and controller-driven menus
-   - **Sodium** — renderer; the reason four clients are comfortable at all
-
-   No AuthMe (it exists to let an *online* account log into an offline launcher —
-   irrelevant here) and no Splitscreen Support (window placement is the
-   compositor's job now).
+3. **Do not install any mods here.** Nix supplies the whole set — including Controlify
+   and Sodium, which used to be manual steps. `minecraft-couch-sync` (next step) wires
+   it up. See [Mods and datapacks](#mods-and-datapacks).
 4. *Edit Instance* → *Settings*:
    - **Memory:** 3 GB max. Not more — a bigger heap only lengthens GC pauses,
      which show up as stutter. 4 × 3 GB + the server's 6 GB fits the 31 GiB
@@ -109,6 +111,10 @@ is keyed on that path), so each player gets their own under
 `libraries`, `meta`, `assets`, `java` and the instance's `mods` folder are
 symlinks back to `~/.local/share/PrismLauncher`. You keep editing exactly one
 instance in the GUI.
+
+The sync also runs `minecraft-mods-link couch`, which points that one instance's
+`mods` at the Nix store — so the chain is *player → canonical instance → store*,
+and a rebuild that changes the mod list reaches everybody on the next sync.
 
 **Re-run `minecraft-couch-sync` after any mod change or Minecraft update.** Each
 player's `options.txt`, `config/` and saves are excluded from the sync, so their
@@ -171,6 +177,102 @@ duplicate login of the same username.
 
 ---
 
+## Mods and datapacks
+
+Two different mechanisms, and the difference matters:
+
+| | Where it runs | Where it lives | Who has to install it |
+|---|---|---|---|
+| **Client mods** | the client, Fabric | `packages/minecraft-client-mods.nix` | every client, separately |
+| **Datapacks** | the server, vanilla | `packages/minecraft-datapacks/` | nobody — the server pushes them |
+
+**The server has no mod loader and is never getting one.** Datapacks are vanilla
+data-driven content; a phone or laptop joining over the tunnel still installs
+nothing. Anything that would need Fabric on the server breaks that for every remote
+device at once.
+
+### Client mods
+
+| Mod | What it is for |
+|---|---|
+| Sodium | the renderer — the reason four clients on one GPU are comfortable |
+| Controlify | gamepad support and controller-driven menus |
+| Xaero's Minimap | minimap and waypoints |
+| Better Name Visibility | legible nameplates at quarter-screen |
+| Jade | what am I looking at |
+| JEI | recipe viewer |
+| Fabric API, YACL, Mod Menu | dependencies of the above |
+
+`minecraft-mods-link <instance>` makes an instance's `.minecraft/mods` a symlink to
+the store path holding all nine jars. Both machines point at the same list, so they
+cannot drift.
+
+> **Prism's GUI can no longer install mods into a linked instance** — `mods/` is a
+> read-only store path. That is the trade for one list driving both machines. Add
+> mods in Nix instead. Browsing the *Mods* tab still works; only installing does not.
+
+To add or update one: find the version on Modrinth for `loader=fabric,
+game_version=1.21.10`, add an entry to `packages/minecraft-client-mods.nix` (the
+header has the API query and the hash-conversion one-liner), rebuild, then re-link.
+
+An assertion ties the pinned `mcVersion` to `pkgs.minecraft-server.version`, so a
+nixpkgs bump that moves the server off 1.21.10 fails the build instead of showing
+four children an incompatible-mod screen.
+
+**EMI is not available and JEI stands in for it.** EMI's newest Fabric build is
+`1.1.24+1.21.1`; its Modrinth `game_versions` stops there. JEI has no dependencies
+and Jade integrates with it. Revisit if EMI ever ships for 1.21.10.
+
+### Datapacks
+
+Four Vanilla Tweaks packs: **CoordinatesHUD** (XYZ and a clock in the actionbar),
+**Unlock All Recipes**, **Graves** (death drops go in a grave block) and
+**Multiplayer Sleep** (night skips without everyone asleep; `/trigger mpSleep` for
+settings).
+
+`minecraft-server.nix`'s `preStart` deletes `world/datapacks/vt-*.zip` and re-copies
+the current set on every start, so dropping a pack from Nix removes it from the world
+too. The `vt-` prefix bounds what Nix will delete — a datapack you drop in by hand is
+never touched. Vanilla auto-enables packs it finds at world load, so a restart is all
+it takes.
+
+Two non-obvious constraints, both learned the hard way and worth not re-deriving:
+
+- **The zips are vendored in the repo, not fetched.** vanillatweaks.net builds a
+  bundle per request and hands back a single-use URL — POSTing the identical
+  selection twice returns two different links. There is nothing stable for `fetchurl`
+  to pin, and a link that 404s later would break the nightly auto-update.
+  The regeneration `curl` is in the header of `packages/minecraft-datapacks.nix`.
+- **They are copied into the world, not symlinked.** Since 1.19.4 Minecraft refuses
+  to follow symlinks inside a world directory unless they are listed in
+  `allowed_symlinks.txt`, so the obvious `systemd.tmpfiles` `L+` rule yields a world
+  with silently zero datapacks.
+
+Every pack declares `supported_formats` 48–94, i.e. MC 1.21 through 1.21.11. Nothing
+in Nix checks this; a server past 1.21.11 will just log them as incompatible and skip
+them, so regenerate at the next major version bump.
+
+---
+
+## Playing from sulfur
+
+sulfur has its own Prism instance, `Hydrogen`, and joins at `10.0.0.10:25565` over
+the LAN or the tunnel. One-time setup:
+
+1. *Edit Instance* → *Version* → install **Fabric** (the instance started out
+   vanilla, which cannot load any of the mods above).
+2. ```console
+   $ minecraft-mods-link Hydrogen
+   minecraft-mods-link: Hydrogen -> /nix/store/…-minecraft-client-mods-1.21.10
+   ```
+3. Re-run that after any rebuild that changes the mod list. There is no equivalent of
+   `minecraft-couch-sync` here to do it for you.
+
+Note the one-login-per-username rule: if sheath is playing `LuckyObserver` from
+sulfur, the couch cannot also be `LuckyObserver`.
+
+---
+
 ## How the launcher works
 
 ```
@@ -183,6 +285,11 @@ duplicate login of the same username.
                   └─ minecraft-couch-player <name> <event node>
                       └─ bwrap: tmpfs over /dev/input, one pad bound back
                           └─ prismlauncher -d …/<name> --offline <name> --server 127.0.0.1:25565
+
+mods, two symlink hops from every player:
+  …/minecraft-couch/<name>/instances/couch/.minecraft/mods
+    └─ …/PrismLauncher/instances/couch/.minecraft/mods   (minecraft-mods-link)
+        └─ /nix/store/…-minecraft-client-mods-1.21.10
 ```
 
 Four decisions worth knowing when debugging:
@@ -294,6 +401,10 @@ base in it.
 | Only one window, or windows stacked | `minecraft-couch-spawn` could not match the window class. `hyprctl clients` during a session and check the class really contains "minecraft" |
 | Client can't join: "Chat disabled due to missing profile public key" | `enforce-secure-profile` drifted back to true — it must be `false` alongside `online-mode=false` |
 | Mods updated but only player 1 has them | `minecraft-couch-sync` |
+| Prism won't install a mod ("read-only" / permission denied) | Expected — `mods/` is a store symlink. Add it to `packages/minecraft-client-mods.nix` instead |
+| A mod is missing after a rebuild | The instance's `mods` still points at the old store path. `minecraft-couch-sync`, or `minecraft-mods-link <instance>` |
+| Datapacks not in effect | `echo "datapack list" \| sudo tee /run/minecraft-server.stdin`, then check the journal. If they are listed as incompatible, the server moved past 1.21.11 — regenerate the zips |
+| `minecraft-mods-link` refuses: "nowhere safe to stash it" | Both `mods/` and `mods.stateful` hold real files. Merge or delete one by hand |
 | Session exits but GNOME doesn't come back | `sudo chvt 2`. `ExecStopPost` should do this automatically; check `/run/minecraft-couch.prev-vt` was written |
 
 ### Fallback if the VT handoff proves unreliable
@@ -324,9 +435,11 @@ are all unaffected. It costs one extra compositing pass.
   change than it looks, and was deliberately not attempted.
 - **One login per username.** If sheath is playing `LuckyObserver` from sulfur,
   the couch cannot also be `LuckyObserver` — the server rejects the duplicate.
-- **Everyone is Steve or Alex.** Offline mode cannot fetch skins. With four kids
-  on one screen this is a genuine usability problem, not a cosmetic one — make
-  sure nameplates are legible at quarter-screen, or add a skin mod.
+- **Everyone is Steve or Alex.** Offline mode cannot fetch skins, so four kids on one
+  screen look identical. Better Name Visibility (in the mod set) answers the half of
+  this that actually matters — telling each other apart at quarter-screen — by making
+  nameplates legible. The skins themselves would need a separate mod; nobody has
+  asked yet.
 - **No terrain pre-generation.** Vanilla has no pregen command, and the spec rates
   it polish rather than a requirement on this hardware. If concurrent exploration
   stutters, lowering Sodium's chunk-build thread count per client is the first

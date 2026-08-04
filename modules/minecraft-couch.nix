@@ -49,8 +49,9 @@
 # spawn the game OUTSIDE the second sandbox and every character would move in
 # unison. Distinct `-d` directories give distinct application IDs. They are not
 # full copies: minecraft-couch-sync symlinks the heavy shared trees (and the mods
-# folder) back to the canonical install, so mods are still installed once, in the
-# GUI, in one place.
+# folder) back to the canonical install, so mods are installed once in one place --
+# which since the mod set went declarative means the Nix store
+# (packages/minecraft-client-mods.nix), two hops along the same symlink chain.
 #
 # WHY BUBBLEWRAP. Gamepad input is read straight from /dev/input via evdev and
 # never touches the display server, so by default every client sees every pad.
@@ -115,9 +116,17 @@
       # With no arguments it syncs every player in the roster; with arguments,
       # only those (which is how the menu materializes a newly added player).
       # ---------------------------------------------------------------------
+      # Points the canonical instance's mods folder at the Nix-managed jar set. See
+      # packages/minecraft-mods-link.nix; the same binary is in systemPackages on both
+      # hosts via modules/minecraft-mods.nix.
+      modsLink = import ../packages/minecraft-mods-link.nix {
+        inherit pkgs;
+        prismRoot = canonicalPrism;
+      };
+
       couchSync = pkgs.writeShellApplication {
         name = "minecraft-couch-sync";
-        runtimeInputs = with pkgs; [ coreutils rsync jq ];
+        runtimeInputs = (with pkgs; [ coreutils rsync jq ]) ++ [ modsLink ];
         text = ''
           canon="${canonicalPrism}"
           root="${couchRoot}"
@@ -131,6 +140,12 @@
           }
 
           mkdir -p "$root"
+
+          # Re-point the canonical instance's mods at the current store path before
+          # fanning out. Every player's mods is a symlink to this one, so doing it
+          # here means a rebuild that changes the mod set reaches all of them on the
+          # next sync -- there is no separate step to forget.
+          minecraft-mods-link "$inst"
 
           if [ "$#" -gt 0 ]; then
             names=("$@")
@@ -164,7 +179,8 @@
 
             # The instance itself. Excluded paths are per-player state that must
             # NOT be flattened by a re-sync: the mods folder is a symlink to the
-            # canonical one (install a mod once, all players get it), and the
+            # canonical one -- which is itself a symlink into the store, so every
+            # player picks up a mod list change from one rebuild -- and the
             # video/controller settings belong to each child.
             rsync -a --delete \
               --exclude "/$inst/.minecraft/mods" \

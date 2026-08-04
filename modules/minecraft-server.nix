@@ -1,4 +1,4 @@
-{ ... }:
+{ pkgs, lib, ... }:
 # Persistent vanilla Minecraft server for hydrogen (see docs/minecraft.md).
 #
 # Runs as a system service independent of any graphical session, so the world is
@@ -7,9 +7,15 @@
 #   - remote devices over the router's WireGuard tunnel, which reach hydrogen at
 #     its LAN address and therefore arrive on br0.
 #
-# THE SERVER IS DELIBERATELY VANILLA. Every mod in the couch client stack
-# (Controlify, Sodium) is client-side, so a phone/laptop/tablet joining from the
-# tunnel needs no mod installation at all.
+# THE SERVER IS DELIBERATELY VANILLA -- the stock jar, no mod loader. Every mod in
+# the client stack (packages/minecraft-client-mods.nix) is client-side, so a
+# phone/laptop/tablet joining from the tunnel needs no mod installation at all.
+#
+# The datapacks installed below do not change that. A datapack is vanilla
+# data-driven content the server loads out of world/datapacks and pushes to clients
+# as needed -- no loader, no client install, no join-time requirement. Keep it that
+# way: anything that would need Fabric on the server breaks the unmodded-join
+# guarantee for every remote device at once.
 #
 # SECURITY: online-mode=false means the server performs NO identity verification --
 # anything that can reach 25565 may claim any username, and a whitelist does not
@@ -18,6 +24,9 @@
 # here and the port is scoped to br0 in hosts/hydrogen.nix (LAN + tunnel peers,
 # never the internet -- the router forwards only 51820/udp). Residual risk: one
 # child can log in as a sibling. Known; not worth more machinery.
+let
+  datapacks = import ../packages/minecraft-datapacks.nix { inherit pkgs; };
+in
 {
   services.minecraft-server = {
     enable = true;
@@ -83,6 +92,32 @@
       # the firewall's job.
     };
   };
+
+  # ---------------------------------------------------------------------------
+  # Datapacks (packages/minecraft-datapacks.nix).
+  #
+  # Appended to the nixpkgs module's own preStart, which is a plain string option --
+  # it runs as User=minecraft with WorkingDirectory=dataDir, which is why the stock
+  # body can say `ln -sf ... eula.txt` unqualified and why the relative paths below
+  # are correct.
+  #
+  # DELETE-THEN-COPY, NOT JUST COPY. Dropping a pack from Nix has to remove it from
+  # the world too, or the set is merely additive and drifts. The vt- prefix bounds
+  # what this will delete, so a datapack dropped in by hand is never touched.
+  #
+  # COPY, NOT SYMLINK. Since 1.19.4 Minecraft refuses to follow symlinks inside a
+  # world directory unless they are listed in allowed_symlinks.txt, so the obvious
+  # systemd.tmpfiles "L+" approach yields a world with silently zero datapacks. This
+  # also matches how modules/veloren-server.nix installs its settings.ron.
+  #
+  # No /datapack enable is needed: vanilla auto-enables packs it finds at world load,
+  # and changing the unit means switch restarts the server anyway.
+  systemd.services.minecraft-server.preStart = lib.mkAfter ''
+    mkdir -p world/datapacks
+    find world/datapacks -maxdepth 1 -name 'vt-*.zip' -delete
+    cp ${datapacks}/vt-*.zip world/datapacks/
+    chmod 0644 world/datapacks/vt-*.zip
+  '';
 
   # /data is not involved, but the world lives on root which is always mounted --
   # no RequiresMountsFor needed here (unlike immich/borg, see modules/backup.nix).

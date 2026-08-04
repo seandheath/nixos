@@ -17,6 +17,7 @@
     ../modules/fleet-vpn.nix          # on-demand WireGuard tunnel to the Jellyfin fleet (manual switch)
     ../modules/minecraft-server.nix   # persistent vanilla world (system service, no session needed)
     ../modules/minecraft-couch.nix    # 1-4 player split-screen launcher on the projector
+    ../modules/minecraft-mods.nix     # declarative Fabric client mods, shared with sulfur
     # ../modules/veloren-server.nix   # DISABLED 2026-08-03 -- see below
     #
     # Veloren's rtsim (1867 NPCs across 196 sites) never idles: measured 20.7% of a core

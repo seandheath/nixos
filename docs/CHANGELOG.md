@@ -1,6 +1,42 @@
 # Changelog
 
 ## [Unreleased]
+### Added (Minecraft mods: declarative client jars + Vanilla Tweaks datapacks)
+- `packages/minecraft-client-mods.nix` — nine pinned Modrinth jars for Fabric 1.21.10, built
+  into a `linkFarm`. Requested: **Xaero's Minimap**, **Better Name Visibility**, **Jade**.
+  Supporting: `fabric-api`, `yacl`, `modmenu` (vanilla's menu has no entry point for a YACL
+  screen, so without it Controlify and Better Name Visibility are config-file-only). **Sodium
+  and Controlify moved out of the Prism GUI into this list** — they were manual setup steps
+  that were easy to get wrong.
+  - **EMI was requested and is not available.** Its newest Fabric build is `1.1.24+1.21.1` and
+    the Modrinth project's `game_versions` stops there. **JEI 26.3.0.31** stands in: zero
+    dependencies, and Jade declares JEI as an optional integration so tooltip→recipe lookup
+    works. REI was the other candidate but needs `architectury-api` and `cloth-config` on top.
+    Revisit if EMI ever ships for 1.21.10.
+- `packages/minecraft-mods-link.nix` + `modules/minecraft-mods.nix` — `minecraft-mods-link
+  <instance>` points a Prism instance's `.minecraft/mods` at the store path; imported by both
+  hydrogen and sulfur so **one list drives both machines and they cannot drift**.
+  `minecraft-couch-sync` calls it on every run, so a rebuild reaches all five couch players
+  without a second step. A pre-existing non-empty `mods/` is stashed to `mods.stateful` once
+  rather than deleted, matching the convention the nixpkgs minecraft-server module uses for
+  `server.properties`. **Consequence, deliberate: Prism's GUI can no longer install mods.**
+  - Guarded by an assertion that `pkgs.minecraft-server.version` equals the pinned
+    `mcVersion`. Without it, a nixpkgs bump past 1.21.10 builds fine and the symptom is four
+    children staring at an incompatible-mod screen.
+- `packages/minecraft-datapacks{,.nix}` — **CoordinatesHUD**, **Unlock All Recipes**, **Graves**
+  and **Multiplayer Sleep** (Vanilla Tweaks), installed into `world/datapacks` from
+  `minecraft-server.nix`'s `preStart`. Datapacks are vanilla data, not mods: no loader on the
+  server, so the "a phone joining over the tunnel installs nothing" guarantee is untouched.
+  - **The zips are vendored** (~146 KB) because vanillatweaks.net builds a bundle per request
+    and returns a single-use URL — POSTing the identical selection twice gave
+    `VanillaTweaks_d377131_UNZIP_ME.zip` then `…d860034…`. There is nothing stable for
+    `fetchurl` to pin, and a link that 404s later would break the nightly auto-update.
+  - Delete-then-copy, not just copy, so dropping a pack from Nix removes it from the world;
+    the `vt-` prefix bounds what will be deleted, so a hand-dropped pack is untouched.
+  - **Copied, not symlinked.** Since 1.19.4 Minecraft refuses to follow symlinks inside a world
+    directory unless they are in `allowed_symlinks.txt`, so the obvious `systemd.tmpfiles`
+    `L+` approach would have produced a world with silently zero datapacks.
+
 ### Changed (couch Minecraft: a pre-launcher instead of pinned controllers)
 - `modules/minecraft-couch.nix` — identity was a property of the HARDWARE: a udev rule keyed
   each seat to a controller's Bluetooth MAC, so picking up a sibling's pad logged you in as
