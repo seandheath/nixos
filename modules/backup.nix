@@ -21,6 +21,8 @@
 #                      it the backups are unrecoverable.
 #   borg-ssh-key     - private SSH key whose public half is registered in BorgBase.
 let
+  home = config.users.users.sheath.home;
+
   backupPaths = [
     "/var/lib/nextcloud"
     "/data/immich"             # media moved off root SSD to the big /data disk
@@ -31,6 +33,37 @@ let
     "/var/lib/minecraft"       # the world (see minecraftFlush below) + server.properties
     "/var/lib/veloren"         # characters + terrain diffs (see velorenCaveat below)
     "/var/backup/postgresql"   # consistent pg_dumps (nextcloud + immich)
+
+    # The couch Minecraft client state (see couchCaveat below). This is the only
+    # thing under sheath's home that is backed up -- /home is otherwise not in
+    # this list at all.
+    "${home}/.local/share/minecraft-couch"
+    "${home}/.local/share/PrismLauncher"
+  ];
+
+  # couchCaveat: the world itself is server-side and already covered by
+  # /var/lib/minecraft, so losing these costs nobody their character or their
+  # builds. What they hold is the state that is NOT reproducible from the flake
+  # and is tedious to rebuild by hand:
+  #   - players.json, the roster. Seeded once from seedPlayers and authoritative
+  #     thereafter, so anyone added from the couch exists only here.
+  #   - each player's options.txt and config/ -- their video settings and their
+  #     Controlify button bindings, redone per child if lost.
+  #   - the canonical Prism instance and accounts.json (the Microsoft account
+  #     that is what unlocks offline launching at all).
+  #
+  # Excluded below: Prism's re-downloadable trees. assets alone is ~1 GB of game
+  # resources fetched from Mojang, and libraries/meta/java are the same story --
+  # Prism refetches all of it on first launch. The per-player directories point
+  # at these via symlinks, which borg stores as symlinks rather than following,
+  # so they cost nothing there either.
+  backupExclude = [
+    "${home}/.local/share/PrismLauncher/assets"
+    "${home}/.local/share/PrismLauncher/libraries"
+    "${home}/.local/share/PrismLauncher/meta"
+    "${home}/.local/share/PrismLauncher/java"
+    "${home}/.local/share/PrismLauncher/cache"
+    "${home}/.local/share/PrismLauncher/logs"
   ];
   prune = { keep = { daily = 7; weekly = 16; monthly = 24; }; };
   passCommand = "cat ${config.sops.secrets.borg-passphrase.path}";
@@ -117,6 +150,7 @@ in
 
   services.borgbackup.jobs.local = {
     paths = backupPaths;
+    exclude = backupExclude;
     repo = localRepo;
     encryption = { mode = "repokey-blake2"; inherit passCommand; };
     compression = "zstd";
@@ -127,6 +161,7 @@ in
 
   services.borgbackup.jobs.remote = {
     paths = backupPaths;
+    exclude = backupExclude;
     repo = remoteRepo;
     encryption = { mode = "repokey-blake2"; inherit passCommand; };
     environment.BORG_RSH = remoteRsh;
@@ -142,4 +177,20 @@ in
 
   # The local job writes to /data — don't run it before the disk is mounted.
   systemd.services.borgbackup-job-local.unitConfig.RequiresMountsFor = "/data";
+
+  # These two exist only after Prism has been opened and minecraft-couch-sync has
+  # run, which on a fresh install is never. That matters because the borgbackup
+  # module sets failOnWarnings = true: borg treats a missing source path as a
+  # warning, exits 1, and the whole nightly job FAILS -- not just for Minecraft,
+  # for Nextcloud and Immich too. Pre-creating them keeps an empty couch setup
+  # from taking the backups down with it. Prism and minecraft-couch-sync are both
+  # happy to find the directory already there.
+  systemd.tmpfiles.rules =
+    let
+      inherit (config.users.users.sheath) group;
+    in
+    [
+      "d ${home}/.local/share/minecraft-couch 0755 sheath ${group} -"
+      "d ${home}/.local/share/PrismLauncher 0755 sheath ${group} -"
+    ];
 }

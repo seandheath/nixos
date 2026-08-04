@@ -417,7 +417,30 @@ this whole section goes away.
 ## Backups
 
 `/var/lib/minecraft` is in `backupPaths` in `modules/backup.nix`, so it goes to
-both the local repo (`/data/borg`) and BorgBase nightly at 03:00.
+both the local repo (`/data/borg`) and BorgBase nightly at 03:00. That covers the
+world, `playerdata/`, `ops.json` and `server.properties` — everything needed to
+bring the server back.
+
+The couch **client** state is backed up separately and for a different reason:
+
+```
+~/.local/share/minecraft-couch      roster + each player's settings
+~/.local/share/PrismLauncher        the canonical instance + accounts.json
+```
+
+Nobody loses a character or a build if these go — the world is server-side. What
+they hold is what the flake *cannot* rebuild: `players.json` (authoritative once
+created, so anyone added from the couch exists only there), each child's
+`options.txt` and Controlify bindings, and the Microsoft account that unlocks
+offline launching. Prism's `assets`, `libraries`, `meta`, `java` and `cache` are
+excluded — about a gigabyte that Prism refetches on first launch.
+
+> **Both directories are pre-created by `systemd.tmpfiles`, deliberately.** The
+> borg jobs run with `failOnWarnings = true`, and borg treats a missing source
+> path as a warning and exits 1 — so on a machine where Prism had never been
+> opened, adding these paths would have failed the *entire* nightly backup,
+> Nextcloud and Immich included. Do not remove the tmpfiles rules without also
+> removing the paths.
 
 Because the server writes region files continuously, both jobs flush first:
 `preHook` sends `save-off` then `save-all flush` through the server console FIFO

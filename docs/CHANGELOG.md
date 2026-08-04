@@ -1,6 +1,39 @@
 # Changelog
 
 ## [Unreleased]
+### Fixed (hydrogen: systemd-logind suspend livelock)
+- `hosts/hydrogen.nix` — `systemd-logind` was wedged in a tight retry loop: *"Suspending…"* →
+  *"Unit suspend.target is masked, refusing operation."* → *"Permission denied"*, roughly **240
+  times a second**, burning **75% of a core**. It had emitted ~7M journal lines in four hours,
+  which blew past journald's retention and **evicted the rest of the day — including the 03:00
+  backup window**, so the nightly borg run had no diagnosable record. Found while auditing
+  whether the Minecraft backup was complete.
+  - Not caused by anything asking it to suspend: a `busctl monitor` capture contained **zero**
+    messages addressed to `login1`. logind was re-querying `suspend.target`'s `LoadState` from
+    PID 1 on its own and never clearing the pending operation. Ruled out on evidence: no input
+    events on the Sleep/Power/Lid devices, battery healthy at 97% fully-charged, `gsd-power` at
+    0.0% CPU, `sleep-inactive-{ac,battery}-type` both `'nothing'`.
+  - The four masked sleep targets are what turn a refusal into a livelock, but they **stay** —
+    an unnoticed suspend would take Minecraft, Nextcloud, Immich, Paperless and the backups
+    offline at once, which is worse than a failed attempt. The fix instead stops logind from
+    ever initiating one: `SleepOperation=` (empty, systemd ≥256) leaves it no candidate
+    operation, and `HandleSuspendKey`/`HandleHibernateKey` (+ LongPress) block a stray event.
+  - **A switch does not apply this.** NixOS sets `restartIfChanged = false` on
+    `systemd-logind` because restarting it breaks X11, so the new `logind.conf` is written but
+    not loaded until `systemctl reload systemd-logind` (or a reboot).
+
+### Added
+- `modules/backup.nix` — the couch Minecraft client state is now backed up:
+  `~/.local/share/minecraft-couch` (roster + each player's `options.txt` and Controlify
+  bindings) and `~/.local/share/PrismLauncher` (canonical instance + `accounts.json`). These
+  are the only paths under `/home` in `backupPaths`. The world is server-side and already
+  covered, so this is about state the flake cannot rebuild, not about characters or builds.
+  Prism's `assets`/`libraries`/`meta`/`java`/`cache` are excluded — ~1 GB it refetches anyway.
+  - Both directories are pre-created via `systemd.tmpfiles`, because the jobs run with
+    `failOnWarnings = true` and borg exits 1 on a missing source path — on hydrogen, where
+    Prism has never been opened, adding these paths would otherwise have failed the **entire**
+    nightly backup, Nextcloud and Immich included.
+
 ### Added
 - `minecraft-mods-link.service` — re-links the configured Prism instances on boot and on any
   switch that changes the jar set. The store path is baked into `ExecStart`, so a changed mod

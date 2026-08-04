@@ -220,20 +220,44 @@
   systemd.services."getty@tty1".enable = false;
   systemd.services."autovt@tty1".enable = false;
 
-  # Disable suspend
+  # Disable suspend. The masks are the last line of defence and stay: an
+  # unnoticed suspend would take Minecraft, Nextcloud, Immich, Paperless and the
+  # nightly backups offline at once, which is far worse than a failed attempt.
   systemd.targets.sleep.enable = false;
   systemd.targets.suspend.enable = false;
   systemd.targets.hibernate.enable = false;
   systemd.targets.hybrid-sleep.enable = false;
-  # Don't let logind suspend/shut down on idle either (belt-and-suspenders).
-  # The machine is also a server that happens to have a lid: closing it must not
-  # interrupt a remote Minecraft session. The sleep targets above already make
-  # suspend impossible; these stop logind from trying.
+
+  # ...but logind must never TRY, because a masked target is not a graceful "no".
+  #
+  # 2026-08-04: systemd-logind wedged in a tight retry loop -- "Suspending..." ->
+  # "Unit suspend.target is masked, refusing operation." -> "Permission denied",
+  # roughly 240 times a second, burning 75% of a core. A bus capture showed ZERO
+  # messages addressed to login1: nothing asked it to suspend, it was re-querying
+  # suspend.target's LoadState from PID 1 on its own and never clearing the
+  # pending operation. It produced ~7M journal lines in four hours, which blew
+  # past journald's retention and evicted the rest of the day -- including the
+  # 03:00 backup window, so the nightly borg run had no diagnosable record.
+  #
+  # The masks are what turn a refusal into a livelock, so the fix is to make
+  # logind never initiate a sleep operation in the first place. SleepOperation=
+  # (empty) leaves it no candidate operation at all; the Handle*Key entries stop
+  # a stray ACPI/keyboard event from starting one. IdleAction and the lid
+  # switches were already covered.
+  #
+  # If this ever recurs, it is one command to confirm:
+  #   journalctl -u systemd-logind | grep -c "refusing operation"
+  # and `systemctl restart systemd-logind` clears the wedged state.
   services.logind.settings.Login = {
     IdleAction = "ignore";
     HandleLidSwitch = "ignore";
     HandleLidSwitchDocked = "ignore";
     HandleLidSwitchExternalPower = "ignore";
+    HandleSuspendKey = "ignore";
+    HandleSuspendKeyLongPress = "ignore";
+    HandleHibernateKey = "ignore";
+    HandleHibernateKeyLongPress = "ignore";
+    SleepOperation = "";
   };
 
   # Xeon E-2176M with HWP. The default balanced energy-performance preference
