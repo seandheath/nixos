@@ -1,6 +1,46 @@
 # Changelog
 
 ## [Unreleased]
+### Changed (couch Minecraft: a pre-launcher instead of pinned controllers)
+- `modules/minecraft-couch.nix` — identity was a property of the HARDWARE: a udev rule keyed
+  each seat to a controller's Bluetooth MAC, so picking up a sibling's pad logged you in as
+  your sibling, the "2 Players" icon always launched seats 1 and 2 (the third and fourth
+  child's pads did nothing), and four MACs had to be collected by hand before anything worked
+  at all — they were still `00:00:00:00:00:00`, so `/dev/input/p1..p4` never appeared.
+  Replaced with `minecraft-couch-menu`, a pre-launcher that asks who is holding each pad.
+  The question the MAC answered — *which event node is seat N's?* — is now never asked.
+  - Four MAC-keyed udev rules collapse to one:
+    `SUBSYSTEM=="input", ENV{ID_INPUT_JOYSTICK}=="1", SYMLINK+="input/couchpad-%k"`.
+    The `ID_INPUT_JOYSTICK` filter is kept — pads expose extra nodes for motion sensors and
+    force feedback that must not be offered as controllers.
+  - **The roster is runtime state**, `~/.local/share/minecraft-couch/players.json`, seeded once
+    from `seedPlayers` and authoritative thereafter (documented footgun: editing the Nix list
+    later does nothing; delete the JSON to re-seed). Add/remove players from the couch, no
+    rebuild. Seeded with the four kids plus `LuckyObserver`, so sheath can play from the couch
+    or from sulfur. Data dirs re-key from `p<index>` to `<name>` so client settings follow the
+    child, not the seat — free to do now, since nothing stateful existed yet.
+  - **Pairing moved in-app** because it had to: the couch session is Hyprland on tty7 with GNOME
+    inactive, so GNOME's Bluetooth panel is unreachable from it. BlueZ allows this without root
+    (`<policy context="default"><allow send_destination="org.bluez"/></policy>`).
+  - **Keyboard and gamepad drive every screen.** That resolves the chicken-and-egg: with no pad
+    paired there would otherwise be no way to reach the pairing screen. hydrogen has a wired
+    Dell KB216.
+  - Gamepad input is deliberately permissive, because `hid-nintendo` (3× Switch Pro) and
+    `xpadneo` (Xbox Elite) disagree on D-pad reporting — hat axis `ABS_HAT0X/Y` vs discrete
+    `BTN_DPAD_*`, varying by driver version. All of those move the cursor and any *other* button
+    confirms, so only two gamepad actions must work; there is no back button, every screen
+    carries a `Back` entry instead. `--probe` dumps raw events to check a new pad against real
+    hardware.
+  - Count plumbing collapses: four "N Players" icons → one **Minecraft (Couch)**,
+    `minecraft-couch@<count>.service` → plain `minecraft-couch.service`, and `COUCH_PLAYERS` is
+    gone. The `PAMName`/`TTYPath` pair, VT stash/restore and `Restart=no` are untouched.
+  - `minecraft-couch-sync` now loops the roster (or named players) rather than `p1..pN`.
+  - Menu is `pkgs.writers.writePython3Bin`, so flake8 runs at build time — it caught four style
+    errors before anything was deployed. Driven headlessly through a pty to verify navigation,
+    roster seeding, name validation (too-short and duplicate) and the sync-failure path.
+  - Known limitations, stated rather than half-built: no late join (a kid arriving after the
+    assignment screen needs a session restart), and one login per username.
+
 ### Changed (Veloren server disabled)
 - `hosts/hydrogen.nix` — `modules/veloren-server.nix` import commented out, and 14004/tcp +
   14006/udp closed with it. **Veloren's rtsim never idles.** Measured on hydrogen with zero

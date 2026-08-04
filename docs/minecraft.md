@@ -15,10 +15,12 @@ The design spec this was built from is `~/Downloads/specification.md`.
 
 | I want to… | Do this |
 |---|---|
-| Play on the couch | Click **Minecraft — N Players** in the GNOME app grid |
+| Play on the couch | Click **Minecraft (Couch)** in the GNOME app grid |
 | Leave the game | `SUPER`+`SHIFT`+`Q` (returns to GNOME) |
-| Get back to GNOME if something wedges | `sudo chvt 2`, or from another machine `ssh hydrogen 'sudo systemctl stop minecraft-couch@*'` |
+| Get back to GNOME if something wedges | `sudo chvt 2`, or from another machine `ssh hydrogen 'sudo systemctl stop minecraft-couch'` |
+| Add a player, or pair a controller | In the pre-launcher, before **Start playing** |
 | Add or update a mod | Edit the `couch` instance in Prism, then run `minecraft-couch-sync` |
+| Check what a new controller sends | `minecraft-couch-menu --probe` |
 | See who is connected | `sudo journalctl -u minecraft-server -f` |
 | Run a server command | `echo "time set day" \| sudo tee /run/minecraft-server.stdin` |
 | Restart the server | `sudo systemctl restart minecraft-server` |
@@ -91,69 +93,81 @@ Open **Prism Launcher** on hydrogen (it is in the app grid).
    *"pauseOnLostFocus: false"* so background windows keep rendering. Set video
    settings while you are there (render distance 8 is plenty).
 
-### 2. Fan the instance out to four data directories
+### 2. Fan the instance out into one data directory per player
 
 ```console
 $ minecraft-couch-sync
-minecraft-couch-sync: 4 player directories ready under /home/sheath/.local/share/minecraft-couch
+minecraft-couch-sync: 5 player director(ies) ready under /home/sheath/.local/share/minecraft-couch
 ```
+
+With no arguments it syncs every player in the roster; with names, only those
+(which is how the pre-launcher sets up a player you add from the couch).
 
 Prism refuses to run twice from the same data directory (its single-instance lock
 is keyed on that path), so each player gets their own under
-`~/.local/share/minecraft-couch/pN`. These are **not** four copies: `libraries`,
-`meta`, `assets`, `java` and the instance's `mods` folder are symlinks back to
-`~/.local/share/PrismLauncher`. You keep editing exactly one instance in the GUI.
+`~/.local/share/minecraft-couch/<name>`. These are **not** full copies:
+`libraries`, `meta`, `assets`, `java` and the instance's `mods` folder are
+symlinks back to `~/.local/share/PrismLauncher`. You keep editing exactly one
+instance in the GUI.
 
 **Re-run `minecraft-couch-sync` after any mod change or Minecraft update.** Each
 player's `options.txt`, `config/` and saves are excluded from the sync, so their
 video and controller settings survive it.
 
-### 3. Pair the controllers and record their MACs
+### 3. Pair the controllers
 
-Bluetooth event device numbers are handed out in connection order, and three
-identical Switch Pro Controllers also collide on `by-id` — so without this step
-"player 1" would mean "whoever powered on first".
+Nothing needs recording. Pair them from the pre-launcher itself: click
+**Minecraft (Couch)**, choose **Pair a controller**, hold the pad's SYNC/PAIR
+button until its lights flash, and pick it out of the scan results.
 
-Pair all four (GNOME Settings → Bluetooth), then:
+There is no chicken-and-egg problem with an unpaired first pad — every screen
+also accepts the keyboard (hydrogen has a wired Dell KB216), so you can reach the
+pairing screen with no controller at all.
 
-```console
-$ bluetoothctl devices
-Device 98:B6:E9:11:22:33 Pro Controller
-Device 98:B6:E9:44:55:66 Pro Controller
-Device 98:B6:E9:77:88:99 Pro Controller
-Device 44:16:22:AA:BB:CC Xbox Wireless Controller
-```
-
-Put them in the `players` list at the top of `modules/minecraft-couch.nix`, in
-the order you want the quadrants assigned, and change the names to the kids'
-names while you are there:
-
-```nix
-players = [
-  { name = "Ada";  mac = "98:B6:E9:11:22:33"; comment = "Switch Pro, blue grip"; }
-  …
-];
-```
-
-> **The names are load-bearing.** An offline UUID is a hash of the username, so
-> renaming a player *after* they have played orphans that character's inventory,
-> advancements and ender chest. Pick them once.
-
-Rebuild (`nr`), then confirm:
+Confirm afterwards:
 
 ```console
-$ ls -l /dev/input/p*
-lrwxrwxrwx 1 root root 6 … /dev/input/p1 -> event19
+$ ls -l /dev/input/couchpad-*
+lrwxrwxrwx 1 root root 6 … /dev/input/couchpad-event19 -> event19
 ```
 
-Until real MACs are filled in, the build prints a warning and the symlinks never
-appear — deliberately a warning and not an assertion, so the server half of this
-still deploys while you are pairing.
+One symlink per connected pad. It does not matter which is which — players say
+who they are at session start.
 
 ### 4. Play
 
-Click **Minecraft — 4 Players**. Expect roughly 30–60 s before all four are in
-the world; the launcher staggers them and places each window as it appears.
+Click **Minecraft (Couch)**. Choose **Start playing**, and for each pad in turn
+the player holding it picks their name (or **Nobody (sit out)**, or **Start now**
+to skip the remaining pads). Expect roughly 30–60 s before everyone is in the
+world; the launcher staggers them and places each window as it appears.
+
+---
+
+## Players
+
+The roster lives in `~/.local/share/minecraft-couch/players.json` and is managed
+from the pre-launcher — **Add a player** and **Remove a player**. It is seeded on
+first run from `seedPlayers` in `modules/minecraft-couch.nix`.
+
+> **Editing `seedPlayers` later does nothing.** Once the JSON exists it is
+> authoritative. To re-seed from Nix, delete the file. This is the price of a
+> roster you can change from the couch without a rebuild.
+
+> **The names are load-bearing in one direction.** An offline UUID is a hash of
+> the username, so *renaming* a player after they have played orphans that
+> character's inventory, advancements and ender chest. *Removing* and re-adding
+> the identical name is safe and returns the same character — the roster is only
+> a list of names, and the server keeps the characters.
+
+Names must be 3–16 characters of `[A-Za-z0-9_]`. The 16-character cap is not a
+style rule: Minecraft enforces it on the wire, and an over-long name fails to
+encode its login packet, so the client cannot connect at all. The pre-launcher
+rejects bad names as you type, and a Nix assertion catches a bad seed at build
+time.
+
+`LuckyObserver` is seeded alongside the kids so sheath can play from the couch as
+well as from sulfur — though not from both at once, since the server rejects a
+duplicate login of the same username.
 
 ---
 
@@ -161,16 +175,34 @@ the world; the launcher staggers them and places each window as it appears.
 
 ```
 .desktop icon
-  └─ minecraft-couch N                    runs inside the GNOME session
-      └─ systemd  minecraft-couch@N       a REAL logind session on tty7
+  └─ minecraft-couch                      runs inside the GNOME session
+      └─ systemd  minecraft-couch         a REAL logind session on tty7
           └─ Hyprland (generated config)  tiles; no bars, idle or lock
               └─ minecraft-couch-spawn    places N windows by hyprctl address
-                  └─ minecraft-couch-player i
+                  ├─ minecraft-couch-menu the pre-launcher, in a fullscreen foot
+                  └─ minecraft-couch-player <name> <event node>
                       └─ bwrap: tmpfs over /dev/input, one pad bound back
-                          └─ prismlauncher -d …/pN --offline <name> --server 127.0.0.1:25565
+                          └─ prismlauncher -d …/<name> --offline <name> --server 127.0.0.1:25565
 ```
 
-Three decisions worth knowing when debugging:
+Four decisions worth knowing when debugging:
+
+**Identity is asked, not wired.** This used to key each seat to a controller's
+Bluetooth MAC in a udev rule, which made identity a property of the *hardware*:
+pick up a sibling's pad and you were your sibling, "2 players" always meant seats
+1 and 2 (so the third and fourth child's pads did nothing), and four MACs had to
+be collected by hand before anything worked. Now one generic udev rule symlinks
+every joystick node, and the pre-launcher asks who is holding each pad. The
+question the MAC answered — *which node is seat N's?* — is simply never asked.
+
+The pre-launcher takes gamepad **and** keyboard input on every screen, and needs
+only two gamepad actions: move and confirm. There is deliberately no "back"
+button — every screen carries a `Back` entry instead. That matters because the
+three Switch Pro pads (`hid-nintendo`) and the Xbox Elite (`xpadneo`) disagree on
+how a D-pad is reported: it can arrive as a hat axis (`ABS_HAT0X/Y`) or as
+discrete buttons (`BTN_DPAD_*`). Rather than guess, all of those move the cursor,
+and any *other* button confirms. `minecraft-couch-menu --probe` dumps raw events
+from a pad if you ever need to check what a new controller actually sends.
 
 **A separate VT, not a nested compositor.** GNOME has to keep running — RustDesk's
 screen capture depends on that session, and it is the only remote desktop that
@@ -193,9 +225,9 @@ assumption baked in.
 evdev and never touches the display server, so by default every client sees every
 pad and all four characters move in unison. Each client therefore runs with a
 tmpfs over `/dev/input` and only its own player's event node bound back in. Note
-the wrapper binds the *resolved* node (`event19`), not the `p1` symlink — SDL
-enumerates `/dev/input/event*`, so a sandbox holding only `p1` would show the game
-no gamepad at all.
+the wrapper binds the *resolved* node (`event19`), not the `couchpad-*` symlink —
+SDL enumerates `/dev/input/event*`, so a sandbox holding only the symlink would
+show the game no gamepad at all.
 
 ---
 
@@ -253,10 +285,12 @@ base in it.
 | Symptom | Cause / fix |
 |---|---|
 | Icon does nothing, notification says the server is not running | `sudo systemctl status minecraft-server`; check `journalctl -u minecraft-server` |
-| "Controller N is not connected" | Pad is asleep or unpaired. Wake it; `ls -l /dev/input/p*` to confirm |
-| "Player N is not set up yet" | Run `minecraft-couch-sync` |
-| Projector goes black and stays there | DRM master handoff failed. `sudo chvt 2` to return to GNOME; `journalctl -u minecraft-couch@4` for the Hyprland log |
-| All characters move together | The bwrap isolation is not taking. Check `/dev/input/pN` are distinct event nodes — if two rules matched the same MAC, `bluetoothctl devices` and fix the `players` list |
+| "No controllers are connected" | Pad is asleep or unpaired. Wake it, or use **Pair a controller**; `ls -l /dev/input/couchpad-*` to confirm |
+| A player is missing from the list | Add them with **Add a player** — the roster is `~/.local/share/minecraft-couch/players.json`, not Nix |
+| "its game folder could not be created" after adding a player | The Prism `couch` instance does not exist yet (step 1). Create it, then `minecraft-couch-sync` |
+| Pad cannot move the cursor in the pre-launcher | Its D-pad reports codes not in the accepted set. `minecraft-couch-menu --probe`, press the D-pad, and widen the list in `modules/minecraft-couch.nix`. The left stick and the keyboard both work meanwhile |
+| Projector goes black and stays there | DRM master handoff failed. `sudo chvt 2` to return to GNOME; `journalctl -u minecraft-couch` for the Hyprland log |
+| All characters move together | The bwrap isolation is not taking. Check the nodes handed to each `minecraft-couch-player` are distinct — `ls -l /dev/input/couchpad-*` should show one symlink per pad, each resolving to a different `eventN` |
 | Only one window, or windows stacked | `minecraft-couch-spawn` could not match the window class. `hyprctl clients` during a session and check the class really contains "minecraft" |
 | Client can't join: "Chat disabled due to missing profile public key" | `enforce-secure-profile` drifted back to true — it must be `false` alongside `online-mode=false` |
 | Mods updated but only player 1 has them | `minecraft-couch-sync` |
@@ -276,14 +310,20 @@ cannot request fullscreen for itself; gamescope can):
 exec gamescope -f -W 1920 -H 1080 -- Hyprland --config <conf>
 ```
 
-That is a change to `minecraft-couch-session` and the unit only — the udev rules,
-bubblewrap wrapper, window placement, sync script and desktop entries are all
-unaffected. It costs one extra compositing pass.
+That is a change to `minecraft-couch-session` and the unit only — the udev rule,
+pre-launcher, bubblewrap wrapper, window placement, sync script and desktop entry
+are all unaffected. It costs one extra compositing pass.
 
 ---
 
 ## Known limitations
 
+- **No late join.** Whoever is not at the pre-launcher when you press *Start now*
+  is not in that session; a kid arriving later needs the session restarted.
+  Re-tiling live windows and spawning into an existing layout is a much larger
+  change than it looks, and was deliberately not attempted.
+- **One login per username.** If sheath is playing `LuckyObserver` from sulfur,
+  the couch cannot also be `LuckyObserver` — the server rejects the duplicate.
 - **Everyone is Steve or Alex.** Offline mode cannot fetch skins. With four kids
   on one screen this is a genuine usability problem, not a cosmetic one — make
   sure nameplates are legible at quarter-screen, or add a skin mod.
