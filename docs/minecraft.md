@@ -70,7 +70,7 @@ Pinning makes the client rebuildable from the flake — but only for as long as 
 Modrinth and `maven.fabricmc.net` keep serving these exact versions. So hydrogen keeps
 a copy: `minecraft-archive.service` mirrors the client and server closures into a
 local Nix binary cache at `/var/lib/minecraft-archive` (~1.6 GB), and
-`modules/backup.nix` sends that to both borg repos nightly. The unit has the store
+`modules/backup.nix` sends that to all three borg repos nightly. The unit has the store
 paths baked into its `ExecStart`, so a switch that changes the payload re-runs it and
 one that does not is a no-op.
 
@@ -439,10 +439,10 @@ this whole section goes away.
 
 ## Backups
 
-`/var/lib/minecraft` is in `backupPaths` in `modules/backup.nix`, so it goes to
-both the local repo (`/data/borg`) and BorgBase nightly at 03:00. That covers the
-world, `playerdata/`, `ops.json` and `server.properties` — everything needed to
-bring the server back.
+`/var/lib/minecraft` is in `backupPaths` in `modules/backup.nix`, so it goes to all
+three repos nightly — `/data/borg` and BorgBase at 03:00, and `/var/backup/borg` on
+the root SSD at 04:30. That covers the world, `playerdata/`, `ops.json` and
+`server.properties` — everything needed to bring the server back.
 
 Two more paths, for different reasons:
 

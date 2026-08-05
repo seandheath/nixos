@@ -1,19 +1,32 @@
 { config, pkgs, lib, ... }:
 # Backups for hydrogen's service data.
 #
-# Service data now lives on the root SSD (/var/lib/*). We protect it with Borg:
-#   - a LOCAL repo on /data (the big btrfs disk) for fast restores, and
-#   - a REMOTE repo on BorgBase (offsite, the real safety net since /data is RAID0).
+# Service data now lives on the root SSD (/var/lib/*). We protect it with Borg, in three
+# repos that each answer a different failure:
+#   - LOCAL, /data/borg      -- fast restores. Same disk as the immich media it archives.
+#   - REMOTE, BorgBase       -- offsite. The only copy that survives losing the machine.
+#   - ROOTFS, /var/backup/borg -- survives /data failing. See below.
+#
+# WHY THE THIRD ONE. /data is btrfs RAID0 across two USB-attached rotational disks, so
+# either member dying takes the array -- and the array holds BOTH the live /data/immich
+# media (180 G) and the local repo. Before this, a /data failure left exactly one copy,
+# offsite, and a 180 G restore over WAN. The rootfs repo is a complete local restore point
+# that does not live on the array.
+#
+# It is a THIRD JOB, not an rsync mirror of /data/borg. An independent repo has its own
+# chunk index and can be `borg check`ed on its own terms; a mirror would faithfully copy
+# any damage in the source and would carry the same Repository ID, which then collides
+# with the original in /root/.cache/borg.
 #
 # Nextcloud + Immich share the main PostgreSQL instance, so we take consistent
 # pg_dumps with services.postgresqlBackup (just before Borg runs) and archive the
 # dumps. paperless + calibre-web use SQLite inside their data dirs, which Borg
 # captures directly. Redis is cache-only and is not backed up.
 #
-# CLI: `borg-local` and `borg-remote` (run as root) wrap the borg binary with the
-# matching repo + credentials preset, so e.g. `sudo borg-local list` or
+# CLI: `borg-local`, `borg-remote` and `borg-rootfs` (run as root) wrap the borg binary
+# with the matching repo + credentials preset, so e.g. `sudo borg-local list` or
 # `sudo borg-remote extract ::ARCHIVE path` just work. The synthetic subcommand
-# `sudo borg-<local|remote> backup` runs an on-demand backup: it refreshes the
+# `sudo borg-<local|remote|rootfs> backup` runs an on-demand backup: it refreshes the
 # pg_dumps, then triggers that repo's borg job (archive + prune).
 #
 # SECRETS (add to secrets/secrets.yaml via sops):
@@ -31,7 +44,11 @@ let
     "/var/lib/syncthing"       # synced folders + config.xml (device keys/IDs) + index DB
     "/var/lib/minecraft"       # the world (see minecraftFlush below) + server.properties
     "/var/lib/veloren"         # characters + terrain diffs (see velorenCaveat below)
-    "/var/backup/postgresql"   # consistent pg_dumps (nextcloud + immich)
+    # Consistent pg_dumps (nextcloud + immich). NOTE the path is the postgresql
+    # subdirectory, NOT /var/backup -- widening it to the parent would sweep the rootfs
+    # repo (rootRepo below, /var/backup/borg) into every job, i.e. each backup would
+    # archive a copy of the backups. Keep this specific.
+    "/var/backup/postgresql"
 
     # Everything the Minecraft clients need in order to exist at all: the game jar,
     # 115 libraries, 424 MiB of assets, the JVM, the mod jars and the server, as a
@@ -108,6 +125,10 @@ let
   localRepo = "/data/borg";   # parent /data is the mount; borg init creates the repo
   # BorgBase repo (an identifier, not a credential — access needs borg-ssh-key + passphrase).
   remoteRepo = "ssh://hl4nxm2t@hl4nxm2t.repo.borgbase.com/./repo";
+  # On the root SSD, so it survives /data (see the header). Deliberately NOT under any
+  # backupPaths entry -- /var/backup/postgresql is listed, /var/backup is not, and that
+  # distinction is what keeps the jobs from archiving this repo into themselves.
+  rootRepo = "/var/backup/borg";
   remoteRsh =
     "ssh -i ${config.sops.secrets.borg-ssh-key.path} -o StrictHostKeyChecking=accept-new";
 
@@ -137,6 +158,7 @@ in
   environment.systemPackages = [
     (mkBorgCli { name = "local"; repo = localRepo; })
     (mkBorgCli { name = "remote"; repo = remoteRepo; rsh = remoteRsh; })
+    (mkBorgCli { name = "rootfs"; repo = rootRepo; })
   ];
 
   # Consistent Postgres dumps at 02:45, before the 03:00 Borg runs.
@@ -170,12 +192,45 @@ in
     preHook = minecraftFlush;
   };
 
+  # The third copy, on the root SSD. Same paths, same retention, same everything as the
+  # other two -- the point is that it is the same mechanism, so there is nothing extra to
+  # understand at restore time and `borg-rootfs` behaves exactly like `borg-local`.
+  #
+  # 04:30 RATHER THAN 03:00, for two reasons. The existing pair already fire together and
+  # already race over the Minecraft autosave: each wraps its run in save-off/flush … and
+  # re-enables autosave from ExecStopPost, so whichever finishes first turns saving back
+  # on while the other is still archiving. A third concurrent job would widen that window
+  # and add a third reader to the same two USB spindles. Staggering sidesteps both without
+  # disturbing the pre-existing pair.
+  #
+  # Everything else a local repo needs is handled by the nixpkgs module: it creates the
+  # repo directory via tmpfiles, runs `borg init` on first use (doInit), adds
+  # RequiresMountsFor and ReadWritePaths for the repo path, and already runs the job at
+  # idle CPU and I/O priority.
+  services.borgbackup.jobs.rootfs = {
+    paths = backupPaths;
+    exclude = backupExclude;
+    repo = rootRepo;
+    encryption = { mode = "repokey-blake2"; inherit passCommand; };
+    compression = "zstd";
+    inherit prune;
+    startAt = "*-*-* 04:30:00";
+    preHook = minecraftFlush;
+  };
+
   # Always re-enable the world autosave, even if borg failed. See minecraftFlush.
   systemd.services.borgbackup-job-local.serviceConfig.ExecStopPost = [ "${minecraftResume}" ];
   systemd.services.borgbackup-job-remote.serviceConfig.ExecStopPost = [ "${minecraftResume}" ];
+  systemd.services.borgbackup-job-rootfs.serviceConfig.ExecStopPost = [ "${minecraftResume}" ];
 
   # The local job writes to /data — don't run it before the disk is mounted.
   systemd.services.borgbackup-job-local.unitConfig.RequiresMountsFor = "/data";
+
+  # The rootfs job WRITES to root but READS /data/immich, and the module only derives
+  # RequiresMountsFor from the repo path. Without this, a boot with the array absent runs
+  # the job against a missing source: borg warns, failOnWarnings turns that into exit 1,
+  # and the unit fails for a reason that has nothing to do with its own repo.
+  systemd.services.borgbackup-job-rootfs.unitConfig.RequiresMountsFor = "/data";
 
   # The couch directory exists only once somebody has actually played, which on a
   # fresh install is never. That matters because the borgbackup module sets

@@ -1,6 +1,41 @@
 # Changelog
 
 ## [Unreleased]
+### Added (a third Borg repo, on hydrogen's root SSD)
+- **The exposure.** `/data` is btrfs **RAID0** across two USB-attached rotational disks, so
+  either member dying takes the array — and the array held two of the three copies of
+  everything: the live `/data/immich` media (180 G) *and* the local repo `/data/borg`
+  (191 G). A `/data` failure left exactly one copy, offsite, and a 180 G restore over WAN.
+- `modules/backup.nix` — `services.borgbackup.jobs.rootfs`, repo `/var/backup/borg`, same
+  `backupPaths`, `prune`, `passCommand` and Minecraft flush hooks as the other two. The
+  `borg-rootfs` CLI falls out of the existing `mkBorgCli` helper, so `sudo borg-rootfs
+  list|check|backup` behaves exactly like `borg-local`.
+- **A third job, not an rsync mirror of `/data/borg`.** An independent repo has its own
+  chunk index and can be `borg check`ed on its own terms. A mirror would faithfully
+  reproduce any damage in the source repo, and would carry the same Repository ID — which
+  then collides with the original's cache in `/root/.cache/borg`.
+- **04:30, not 03:00.** `local` and `remote` already fire together and already race over the
+  Minecraft autosave: each wraps its run in `save-off`/`save-all flush` and re-enables
+  saving from `ExecStopPost`, so whichever finishes first turns it back on while the other
+  is still archiving. A third concurrent job would widen that window and add a third reader
+  to the same two spindles.
+- `RequiresMountsFor=/data` is set explicitly: the job writes to root but *reads*
+  `/data/immich`, and the nixpkgs module only derives that from the repo path. Without it a
+  boot with the array absent runs borg against a missing source, which `failOnWarnings`
+  turns into a failed unit for a reason unrelated to its own repo.
+- The repo path is deliberately outside `backupPaths` — that list names
+  `/var/backup/postgresql`, not `/var/backup`. Widening it would make every job archive the
+  backups into themselves; commented at both sites.
+- Integrity needs no new unit: `services.btrfs.autoScrub` already scrubs monthly, and btrfs
+  scrub is **filesystem-wide, not per-subvolume**, so pointing it at `/persist` covers every
+  subvolume on `nvme0n1p2` including `@root`. A one-off `borg check` after the first run
+  covers what a scrub cannot (a torn archive).
+- **Prerequisite, now cleared:** the 2026-07 silent corruption was bad RAM, since pulled;
+  memtest and the deferred `btrfs scrub /data` are both clean as of 2026-08-05. The four
+  `corruption_errs` per member are stale counters from that era.
+- Space: ~186 G for the first archive (one copy of immich dominates; ~11 G is everything
+  else), leaving ~207 G free on root. Immich growth eats that — watch `df -h /`.
+
 ### Changed (Prism Launcher replaced by an offline, Nix-pinned client)
 - **The problem.** Prism kept everything the game needs to *run* as undeclared state and
   refetched it from Mojang: the client jar, 115 libraries, 424 MiB of assets, a JVM, and
