@@ -33,37 +33,37 @@ let
     "/var/lib/veloren"         # characters + terrain diffs (see velorenCaveat below)
     "/var/backup/postgresql"   # consistent pg_dumps (nextcloud + immich)
 
+    # Everything the Minecraft clients need in order to exist at all: the game jar,
+    # 115 libraries, 424 MiB of assets, the JVM, the mod jars and the server, as a
+    # local Nix binary cache (services.minecraftClient.archiveDir, hosts/hydrogen.nix).
+    # ~1.6 GB, and borg dedups it to nothing on the nights when the pins have not
+    # moved -- which is most nights, because store paths only change when they do.
+    #
+    # WHY BACK UP SOMETHING THE FLAKE CAN REBUILD. It can rebuild it from Mojang,
+    # Modrinth and maven.fabricmc.net -- while those keep serving these exact versions.
+    # Mojang has removed old releases before and Modrinth projects get deleted by their
+    # authors. With this directory, `nix copy --from` plus the flake is enough.
+    "/var/lib/minecraft-archive"
+
     # The couch Minecraft client state (see couchCaveat below). This is the only
     # thing under sheath's home that is backed up -- /home is otherwise not in
     # this list at all.
     "${home}/.local/share/minecraft-couch"
-    "${home}/.local/share/PrismLauncher"
   ];
 
   # couchCaveat: the world itself is server-side and already covered by
-  # /var/lib/minecraft, so losing these costs nobody their character or their
-  # builds. What they hold is the state that is NOT reproducible from the flake
+  # /var/lib/minecraft, so losing this costs nobody their character or their
+  # builds. What it holds is the state that is NOT reproducible from the flake
   # and is tedious to rebuild by hand:
   #   - players.json, the roster. Seeded once from seedPlayers and authoritative
   #     thereafter, so anyone added from the couch exists only here.
   #   - each player's options.txt and config/ -- their video settings and their
   #     Controlify button bindings, redone per child if lost.
-  #   - the canonical Prism instance and accounts.json (the Microsoft account
-  #     that is what unlocks offline launching at all).
-  #
-  # Excluded below: Prism's re-downloadable trees. assets alone is ~1 GB of game
-  # resources fetched from Mojang, and libraries/meta/java are the same story --
-  # Prism refetches all of it on first launch. The per-player directories point
-  # at these via symlinks, which borg stores as symlinks rather than following,
-  # so they cost nothing there either.
-  backupExclude = [
-    "${home}/.local/share/PrismLauncher/assets"
-    "${home}/.local/share/PrismLauncher/libraries"
-    "${home}/.local/share/PrismLauncher/meta"
-    "${home}/.local/share/PrismLauncher/java"
-    "${home}/.local/share/PrismLauncher/cache"
-    "${home}/.local/share/PrismLauncher/logs"
-  ];
+  # It is kilobytes per player. The game itself is not in there: since the move off
+  # Prism (2026-08-05) it is a read-only store path every player shares, archived
+  # once as /var/lib/minecraft-archive above, and each player's mods/ is a symlink
+  # into it -- which borg stores as a symlink rather than following.
+  backupExclude = [ ];
   prune = { keep = { daily = 7; weekly = 16; monthly = 24; }; };
   passCommand = "cat ${config.sops.secrets.borg-passphrase.path}";
 
@@ -177,19 +177,20 @@ in
   # The local job writes to /data — don't run it before the disk is mounted.
   systemd.services.borgbackup-job-local.unitConfig.RequiresMountsFor = "/data";
 
-  # These two exist only after Prism has been opened and minecraft-couch-sync has
-  # run, which on a fresh install is never. That matters because the borgbackup
-  # module sets failOnWarnings = true: borg treats a missing source path as a
-  # warning, exits 1, and the whole nightly job FAILS -- not just for Minecraft,
-  # for Nextcloud and Immich too. Pre-creating them keeps an empty couch setup
-  # from taking the backups down with it. Prism and minecraft-couch-sync are both
-  # happy to find the directory already there.
+  # The couch directory exists only once somebody has actually played, which on a
+  # fresh install is never. That matters because the borgbackup module sets
+  # failOnWarnings = true: borg treats a missing source path as a warning, exits 1,
+  # and the whole nightly job FAILS -- not just for Minecraft, for Nextcloud and
+  # Immich too. Pre-creating it keeps an empty couch setup from taking the backups
+  # down with it, and minecraft-client is happy to find the directory already there.
+  #
+  # /var/lib/minecraft-archive needs no rule: minecraft-archive.service creates it on
+  # the first switch, long before the 03:00 borg run.
   systemd.tmpfiles.rules =
     let
       inherit (config.users.users.sheath) group;
     in
     [
       "d ${home}/.local/share/minecraft-couch 0755 sheath ${group} -"
-      "d ${home}/.local/share/PrismLauncher 0755 sheath ${group} -"
     ];
 }

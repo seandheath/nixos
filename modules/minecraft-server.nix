@@ -152,17 +152,18 @@ in
     chmod 0644 mods/*.jar
   '';
 
-  # VERSION LOCKSTEP. Four things have to agree on the Minecraft version now, and the
+  # VERSION LOCKSTEP. Five things have to agree on the Minecraft version now, and the
   # nightly auto-update moves the first of them without asking:
   #   1. pkgs.minecraft-server        the game jar          (nixpkgs)
   #   2. fabric-server.nix mcVersion  intermediary mappings (pinned by hash)
-  #   3. client mods mcVersion        Modrinth pins         (modules/minecraft-mods.nix)
-  #   4. the datapacks' format window (server log only, cannot be checked here)
+  #   3. client mods mcVersion        Modrinth pins         (modules/minecraft-client.nix)
+  #   4. the pinned client payload    Mojang manifest pins  (packages/minecraft-client)
+  #   5. the datapacks' format window (server log only, cannot be checked here)
   #
   # 2 is the dangerous one: intermediary maps obfuscated names for ONE game version,
   # so a bumped jar against stale mappings fails at runtime, in the dark, at whatever
-  # hour the auto-update ran. Catch it at eval instead. (3 is asserted in
-  # modules/minecraft-mods.nix, which also covers sulfur.)
+  # hour the auto-update ran. Catch it at eval instead. (3 and 4 are asserted in
+  # modules/minecraft-client.nix, which also covers sulfur.)
   assertions = [
     {
       assertion = fabricServer.mcVersion == pkgs.minecraft-server.version;

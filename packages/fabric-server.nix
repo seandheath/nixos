@@ -35,48 +35,71 @@ let
   # net.fabricmc.loader.impl.launch.knot.KnotServer, per the profile above.
   mainClass = "net.fabricmc.loader.impl.launch.knot.KnotServer";
 
-  libs = map pkgs.fetchurl [
+  # Each entry carries its maven coordinate as well as the jar, because the CLIENT
+  # profile needs the identical eight jars laid out at their maven paths under
+  # libraries/ -- see loaderLibs in passthru and packages/minecraft-client. `path` is
+  # the on-disk maven path, which is NOT the URL: '+' is percent-encoded in one and
+  # literal in the other.
+  loaderLibs = map (l: l // { jar = pkgs.fetchurl (removeAttrs l [ "spec" "path" ]); }) [
     {
+      spec = "org.ow2.asm:asm:9.10.1";
+      path = "org/ow2/asm/asm/9.10.1/asm-9.10.1.jar";
       name = "asm-9.10.1.jar";
       url = "https://maven.fabricmc.net/org/ow2/asm/asm/9.10.1/asm-9.10.1.jar";
       hash = "sha256-7YJdEKsTmcjAy2aeaIzwyMgmKbTIOZtYNSto6SyhD8s=";
     }
     {
+      spec = "org.ow2.asm:asm-analysis:9.10.1";
+      path = "org/ow2/asm/asm-analysis/9.10.1/asm-analysis-9.10.1.jar";
       name = "asm-analysis-9.10.1.jar";
       url = "https://maven.fabricmc.net/org/ow2/asm/asm-analysis/9.10.1/asm-analysis-9.10.1.jar";
       hash = "sha256-3t51ohMGtll07Nj4cRT/aXDwn7eUFXpMoJqyXIiMK/w=";
     }
     {
+      spec = "org.ow2.asm:asm-commons:9.10.1";
+      path = "org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.jar";
       name = "asm-commons-9.10.1.jar";
       url = "https://maven.fabricmc.net/org/ow2/asm/asm-commons/9.10.1/asm-commons-9.10.1.jar";
       hash = "sha256-bQq++3y/ly6hbts37BSDU3JQUGOkX5dqt+qIntlJeJU=";
     }
     {
+      spec = "org.ow2.asm:asm-tree:9.10.1";
+      path = "org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.jar";
       name = "asm-tree-9.10.1.jar";
       url = "https://maven.fabricmc.net/org/ow2/asm/asm-tree/9.10.1/asm-tree-9.10.1.jar";
       hash = "sha256-PfsNW2oQbNQLWyUOOZNfvy+Sf0R3VGpTaaOsYJzwUGs=";
     }
     {
+      spec = "org.ow2.asm:asm-util:9.10.1";
+      path = "org/ow2/asm/asm-util/9.10.1/asm-util-9.10.1.jar";
       name = "asm-util-9.10.1.jar";
       url = "https://maven.fabricmc.net/org/ow2/asm/asm-util/9.10.1/asm-util-9.10.1.jar";
       hash = "sha256-G7mdCR+6JZfcbVEZPpu88NhEfn7Za9jwGYsYFS8JZVw=";
     }
     {
+      spec = "net.fabricmc:sponge-mixin:0.17.3+mixin.0.8.7";
+      path = "net/fabricmc/sponge-mixin/0.17.3+mixin.0.8.7/sponge-mixin-0.17.3+mixin.0.8.7.jar";
       name = "sponge-mixin-0.17.3+mixin.0.8.7.jar";
       url = "https://maven.fabricmc.net/net/fabricmc/sponge-mixin/0.17.3%2Bmixin.0.8.7/sponge-mixin-0.17.3%2Bmixin.0.8.7.jar";
       hash = "sha256-npDv7HHSutW5bJCJ8BnRSoYDIn08X0CNEvU/ronZnUE=";
     }
     {
+      spec = "net.fabricmc:intermediary:${mcVersion}";
+      path = "net/fabricmc/intermediary/${mcVersion}/intermediary-${mcVersion}.jar";
       name = "intermediary-${mcVersion}.jar";
       url = "https://maven.fabricmc.net/net/fabricmc/intermediary/${mcVersion}/intermediary-${mcVersion}.jar";
       hash = "sha256-0R7NJKk10G1dhN5s6gaAJI9P2wrwHGNWU39lTTCxedM=";
     }
     {
+      spec = "net.fabricmc:fabric-loader:${loaderVersion}";
+      path = "net/fabricmc/fabric-loader/${loaderVersion}/fabric-loader-${loaderVersion}.jar";
       name = "fabric-loader-${loaderVersion}.jar";
       url = "https://maven.fabricmc.net/net/fabricmc/fabric-loader/${loaderVersion}/fabric-loader-${loaderVersion}.jar";
       hash = "sha256-c+7Yw0u60DIKKjy6U0Y1HoIvdPgrPzwGBXQGhHQTKVg=";
     }
   ];
+
+  libs = map (l: l.jar) loaderLibs;
 
   vanilla = pkgs.minecraft-server;
 
@@ -126,6 +149,12 @@ pkgs.stdenv.mkDerivation {
     version = vanilla.version;
     inherit mcVersion loaderVersion;
     vanillaPackage = vanilla;
+
+    # The loader's jars with their maven coordinates. packages/minecraft-client builds
+    # the CLIENT profile from exactly this list -- Fabric ships the same eight jars for
+    # both sides and only the main class differs -- so a loader bump here reaches the
+    # clients without a second set of hashes drifting out of step.
+    inherit loaderLibs;
   };
 
   meta = {

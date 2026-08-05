@@ -1,7 +1,8 @@
 { config, pkgs, lib, ... }:
 # Couch Minecraft on hydrogen: 1-4 Bluetooth gamepads driving 1-4 tiled Minecraft
-# clients on the projector, launched from a single GNOME icon. Full runbook
-# (creating the Prism instance, installing mods) is docs/minecraft.md.
+# clients on the projector, launched from a single GNOME icon. Full runbook is
+# docs/minecraft.md. There is no setup step: the game itself is a pinned Nix payload
+# (packages/minecraft-client), so a fresh hydrogen boots straight into playable.
 #
 # ARCHITECTURE, and why each layer exists:
 #
@@ -11,7 +12,7 @@
 #         -> minecraft-couch-spawn              (places N windows via hyprctl)
 #           -> minecraft-couch-menu             (the pre-launcher; see below)
 #           -> minecraft-couch-player NAME NODE (bubblewrap: exactly one gamepad)
-#             -> prismlauncher -d <per-player data dir> -s 127.0.0.1:25565
+#             -> minecraft-client --name NAME --game-dir <per-player> -s 127.0.0.1
 #
 # WHY A PRE-LAUNCHER RATHER THAN PINNED CONTROLLERS. This used to key each seat to a
 # controller's Bluetooth MAC in a udev rule, which made identity a property of the
@@ -43,15 +44,19 @@
 # reactivates GNOME. `PAMName=login` + `TTYPath` is what makes logind register the
 # unit as a real session; without it Hyprland cannot take DRM master.
 #
-# WHY ONE PRISM DATA DIR PER PLAYER. Prism refuses to run twice, keyed on
-# ApplicationId::fromPathAndVersion(dataPath, version) -- a second
-# `prismlauncher --launch` would just message the first process, which would then
-# spawn the game OUTSIDE the second sandbox and every character would move in
-# unison. Distinct `-d` directories give distinct application IDs. They are not
-# full copies: minecraft-couch-sync symlinks the heavy shared trees (and the mods
-# folder) back to the canonical install, so mods are installed once in one place --
-# which since the mod set went declarative means the Nix store
-# (packages/minecraft-client-mods.nix), two hops along the same symlink chain.
+# WHY ONE GAME DIRECTORY PER PLAYER. Each child's video settings, key bindings and mod
+# configuration are theirs, and Minecraft keeps all of it in the game directory. The
+# heavy, identical parts -- the client jar, 115 libraries, 424 MiB of assets -- are NOT
+# in there: they live in one read-only store path that every client shares
+# (packages/minecraft-client), so a player directory holds only kilobytes of options
+# and a symlink to the mod set.
+#
+# This used to be a much bigger deal. Under Prism the per-player directories existed
+# because Prism refuses to run twice keyed on its data path, so a second `--launch`
+# would message the first process and spawn the game outside the second sandbox, moving
+# every character in unison; minecraft-couch-sync then had to rsync the instance and
+# symlink seven shared trees into each copy to stop that costing four copies of the
+# game. None of that machinery survives the move to a launcher that is just a process.
 #
 # WHY BUBBLEWRAP. Gamepad input is read straight from /dev/input via evdev and
 # never touches the display server, so by default every client sees every pad.
@@ -101,131 +106,13 @@
 
       user = "sheath";
       home = config.users.users.${user}.home;
-      # Prism's default data directory -- the one you actually open in the GUI.
-      canonicalPrism = "${home}/.local/share/PrismLauncher";
-      # Per-player data directories, materialized by minecraft-couch-sync.
+      # Per-player game directories. Only each child's own state lives here -- their
+      # options, mod configs and screenshots; the game itself is one shared read-only
+      # store path (see WHY ONE GAME DIRECTORY PER PLAYER in the header). Created on
+      # demand by minecraft-client, so there is nothing to materialize in advance.
       couchRoot = "${home}/.local/share/minecraft-couch";
       # The live roster. Sits beside the player directories it describes.
       rosterFile = "${couchRoot}/players.json";
-      # The Prism instance ID every player launches. Must exist in the canonical
-      # directory before the first launch (docs/minecraft.md step 1).
-      instanceId = "couch";
-
-      # ---------------------------------------------------------------------
-      # Per-player Prism data directories. Idempotent; re-run after any mod change.
-      # With no arguments it syncs every player in the roster; with arguments,
-      # only those (which is how the menu materializes a newly added player).
-      # ---------------------------------------------------------------------
-      # Points the canonical instance's mods folder at the Nix-managed jar set. See
-      # packages/minecraft-mods-link.nix; the same binary is in systemPackages on both
-      # hosts via modules/minecraft-mods.nix.
-      # The jar set, for its configDefaults (seeded per player below). The mods
-      # themselves reach players through the symlink chain, not from here.
-      clientMods = import ../packages/minecraft-client-mods.nix { inherit pkgs; };
-
-      modsLink = import ../packages/minecraft-mods-link.nix {
-        inherit pkgs;
-        prismRoot = canonicalPrism;
-      };
-
-      couchSync = pkgs.writeShellApplication {
-        name = "minecraft-couch-sync";
-        runtimeInputs = (with pkgs; [ coreutils rsync jq ]) ++ [ modsLink ];
-        text = ''
-          canon="${canonicalPrism}"
-          root="${couchRoot}"
-          inst="${instanceId}"
-          roster="${rosterFile}"
-
-          [ -d "$canon/instances/$inst" ] || {
-            echo "minecraft-couch-sync: no Prism instance '$inst' in $canon." >&2
-            echo "Create it in Prism first -- see docs/minecraft.md." >&2
-            exit 1
-          }
-
-          mkdir -p "$root"
-
-          # Re-point the canonical instance's mods at the current store path before
-          # fanning out. Every player's mods is a symlink to this one, so doing it
-          # here means a rebuild that changes the mod set reaches all of them on the
-          # next sync -- there is no separate step to forget.
-          minecraft-mods-link "$inst"
-
-          # The game root is NOT always .minecraft: Prism 11 creates instances with a
-          # plain "minecraft/" and only uses the dotted name for ones inherited from
-          # MultiMC. Resolve it the way Prism does, or the excludes below silently
-          # match nothing -- which would flatten each child's options.txt and config/
-          # on every sync. packages/minecraft-mods-link.nix repeats this rule; keep
-          # the two in step.
-          if [ -d "$canon/instances/$inst/minecraft" ]; then
-            mc="minecraft"
-          else
-            mc=".minecraft"
-          fi
-
-          if [ "$#" -gt 0 ]; then
-            names=("$@")
-          else
-            [ -e "$roster" ] || {
-              echo "minecraft-couch-sync: no roster at $roster yet." >&2
-              echo "Start the couch launcher once to create it." >&2
-              exit 1
-            }
-            mapfile -t names < <(jq -r '.players[]' "$roster")
-          fi
-
-          for name in "''${names[@]}"; do
-            d="$root/$name"
-            mkdir -p "$d/instances"
-
-            # Big, read-mostly, identical for everyone: share one copy on disk.
-            for shared in libraries meta assets java icons themes translations; do
-              [ -e "$canon/$shared" ] || continue
-              rm -rf "''${d:?}/$shared"
-              ln -sfn "$canon/$shared" "$d/$shared"
-            done
-
-            # Launcher settings and the Microsoft account (which is what unlocks
-            # offline launching at all): seed once, then leave each player's own.
-            for f in prismlauncher.cfg accounts.json; do
-              if [ -e "$canon/$f" ] && [ ! -e "$d/$f" ]; then
-                cp "$canon/$f" "$d/$f"
-              fi
-            done
-
-            # The instance itself. Excluded paths are per-player state that must
-            # NOT be flattened by a re-sync: the mods folder is a symlink to the
-            # canonical one -- which is itself a symlink into the store, so every
-            # player picks up a mod list change from one rebuild -- and the
-            # video/controller settings belong to each child.
-            rsync -a --delete \
-              --exclude "/$inst/$mc/mods" \
-              --exclude "/$inst/$mc/saves" \
-              --exclude "/$inst/$mc/options.txt" \
-              --exclude "/$inst/$mc/config" \
-              "$canon/instances/$inst" "$d/instances/"
-
-            mkdir -p "$d/instances/$inst/$mc"
-            ln -sfn "$canon/instances/$inst/$mc/mods" \
-                    "$d/instances/$inst/$mc/mods"
-
-            # Seed default mod configs into THIS player's config dir. config/ is
-            # excluded from the rsync above because it is per-player state, so the
-            # canonical instance's copy never reaches them -- without this the kids
-            # would each get the mods' own defaults. Never overwrites: whatever a
-            # child changes in Mod Menu is theirs. See configDefaults in
-            # packages/minecraft-client-mods.nix.
-            mkdir -p "$d/instances/$inst/$mc/config"
-            for src in ${clientMods.configDefaults}/*; do
-              [ -e "$src" ] || continue
-              dst="$d/instances/$inst/$mc/config/$(basename "$src")"
-              [ -e "$dst" ] || install -m0644 "$src" "$dst"
-            done
-          done
-
-          echo "minecraft-couch-sync: ''${#names[@]} player director(ies) ready under $root"
-        '';
-      };
 
       # ---------------------------------------------------------------------
       # Layer 6: the pre-launcher.
@@ -270,7 +157,7 @@
 
           SEED = [${lib.concatMapStringsSep ", " (n: "\"${n}\"") seedPlayers}]
           ROSTER = "${rosterFile}"
-          SYNC = "${couchSync}/bin/minecraft-couch-sync"
+          COUCH_ROOT = "${couchRoot}"
           BLUETOOTHCTL = "${pkgs.bluez}/bin/bluetoothctl"
           NAME_RE = re.compile("${nameRe}")
 
@@ -606,15 +493,18 @@
                   return roster
               roster = roster + [name]
               save_roster(roster)
-              draw("Add a player", ["     Setting up %s..." % name], "")
-              done = subprocess.run([SYNC, name], capture_output=True, text=True)
-              if done.returncode != 0:
-                  why = done.stderr.strip().splitlines() or ["(no output)"]
-                  body = ["%s is on the list, but its game folder could not" % name,
-                          "be created yet:", ""] + why
-                  message(inp, "Add a player", body)
-              else:
-                  message(inp, "Add a player", ["%s is ready to play." % name])
+              # The game folder is just a directory: minecraft-client fills in the mods
+              # symlink and the default mod configs on the first launch. Creating it
+              # here only makes the failure (a read-only or full home) visible now
+              # rather than to a child staring at a window that never opened.
+              try:
+                  os.makedirs(os.path.join(COUCH_ROOT, name), exist_ok=True)
+              except OSError as exc:
+                  message(inp, "Add a player",
+                          ["%s is on the list, but its game folder could not" % name,
+                           "be created:", "", str(exc)])
+                  return roster
+              message(inp, "Add a player", ["%s is ready to play." % name])
               return roster
 
 
@@ -749,7 +639,8 @@
       # ---------------------------------------------------------------------
       couchPlayer = pkgs.writeShellApplication {
         name = "minecraft-couch-player";
-        runtimeInputs = with pkgs; [ bubblewrap coreutils prismlauncher ];
+        runtimeInputs = (with pkgs; [ bubblewrap coreutils ])
+          ++ [ config.services.minecraftClient.package ];
         text = ''
           # usage: minecraft-couch-player <player name> <event node>
           name="''${1:?usage: minecraft-couch-player <name> <event node>}"
@@ -776,10 +667,9 @@
             --tmpfs /dev/input \
             --dev-bind "$node" "$node" \
             --die-with-parent \
-            -- prismlauncher \
-                 --dir ${couchRoot}/"$name" \
-                 --launch ${instanceId} \
-                 --offline "$name" \
+            -- minecraft-client \
+                 --name "$name" \
+                 --game-dir ${couchRoot}/"$name" \
                  --server 127.0.0.1:25565
         '';
       };
@@ -838,8 +728,10 @@
             esac
           }
 
-          # Addresses of mapped Minecraft windows. Prism's own launcher window (if
-          # it ever shows) has class PrismLauncher and is filtered out here.
+          # Addresses of mapped Minecraft windows. The launcher is a CLI, so the only
+          # windows on this compositor are the games themselves -- but match on the
+          # class anyway rather than taking every window, because the menu's terminal
+          # is still around when the first client maps.
           mcWindows() {
             hyprctl -j clients | jq -r '.[] | select(.class | test("minecraft"; "i")) | .address'
           }
@@ -997,11 +889,10 @@
             fail "The Minecraft server is not running. Try: sudo systemctl start minecraft-server"
           fi
 
-          # Controllers and players are handled by the pre-launcher, so the only
-          # thing worth checking here is the one piece Nix cannot create: the
-          # Prism instance the whole thing launches.
-          [ -d "${canonicalPrism}/instances/${instanceId}" ] || \
-            fail "No Prism instance '${instanceId}' yet. See docs/minecraft.md."
+          # Nothing else is worth checking. Controllers and players are the
+          # pre-launcher's business, and the game itself is a store path that either
+          # built or the host did not switch -- there is no hand-created instance left
+          # to be missing, which is the whole point of the payload being in Nix.
 
           # Already running (someone clicked twice): just go to it.
           if systemctl is-active --quiet "$unit"; then
@@ -1047,18 +938,27 @@
 
       # The menu enforces this on names typed at runtime; catch a bad seed name
       # at build time rather than when a child cannot log in.
-      assertions = [{
-        assertion = lib.all (n: builtins.match "[A-Za-z0-9_]{3,16}" n != null) seedPlayers;
-        message =
-          "modules/minecraft-couch.nix: every seed player name must be 3-16 "
-          + "characters of [A-Za-z0-9_]. Minecraft enforces this on the wire — "
-          + "an over-long name cannot encode its login packet at all.";
-      }];
+      assertions = [
+        {
+          assertion = lib.all (n: builtins.match "[A-Za-z0-9_]{3,16}" n != null) seedPlayers;
+          message =
+            "modules/minecraft-couch.nix: every seed player name must be 3-16 "
+            + "characters of [A-Za-z0-9_]. Minecraft enforces this on the wire — "
+            + "an over-long name cannot encode its login packet at all.";
+        }
+        {
+          # couchPlayer runs config.services.minecraftClient.package, which is only
+          # meaningful once that module is enabled. Without this the failure is a
+          # per-player launcher that is silently the wrong build.
+          assertion = config.services.minecraftClient.enable;
+          message =
+            "modules/minecraft-couch.nix needs services.minecraftClient.enable "
+            + "(modules/minecraft-client.nix) -- that is what provides the game.";
+        }
+      ];
 
       environment.systemPackages = [
-        pkgs.prismlauncher
         couchLauncher
-        couchSync
         couchMenu
         couchPlayer
         couchSpawn

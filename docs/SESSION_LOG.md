@@ -1,5 +1,63 @@
 # Session Log
 
+## Session: 2026-08-05
+
+### Changes Made
+- `packages/minecraft-client/`: new (`update.sh`, `libraries.json`, `default.nix`). The whole
+  game for MC 1.21.10, pinned by hash and laid out as a launcher main dir.
+- `packages/minecraft-client-launcher.nix`: new. `minecraft-client`, wrapping `portablemc`.
+- `packages/fabric-server.nix`: `libs` restructured to carry maven coordinates, exposed as
+  `passthru.loaderLibs`; the client profile is built from the same eight jars.
+- `modules/minecraft-client.nix`: new, replaces `modules/minecraft-mods.nix`.
+  `services.minecraftClient.{enable,playerName,server,desktopEntry,archiveDir,package}`.
+- `modules/minecraft-couch.nix`: `minecraft-couch-sync` deleted; `minecraft-couch-player` runs
+  `minecraft-client`; the "no Prism instance" precondition and `pkgs.prismlauncher` dropped.
+- `hosts/{sulfur,hydrogen}.nix`, `modules/backup.nix`: option swap, archive path, Prism paths
+  and exclusions removed.
+- `docs/minecraft.md`: rewritten. `packages/minecraft-client-mods.nix`: header corrected.
+- Deleted: `modules/minecraft-mods.nix`, `packages/minecraft-mods-link.nix`.
+
+### Decisions
+- **portablemc rather than a bare `java -cp`.** `packages/fabric-server.nix` transcribes the
+  server launch by hand, and doing the same for the client was the alternative considered. It
+  was rejected because the client's contract is much larger and moves: 115 libraries with
+  platform rules, `--assetIndex`, quick-play arguments, the log4j config. portablemc reads all
+  of that out of the pinned metadata, so a version bump is a re-run of `update.sh` rather than
+  a re-derivation of the launch contract. The payload is ours either way.
+- **The main dir can be a read-only store path.** This is the load-bearing discovery. The only
+  file portablemc writes at launch is its version-manifest cache, and that goes in the *work*
+  dir (`cli/__init__.py:85`). So all four couch clients share one 538 MiB payload, and the
+  entire per-player fan-out that `minecraft-couch-sync` existed to maintain disappears.
+- **The Fabric profile is generated, not fetched.** `meta.fabricmc.net/…/profile/json` stamps
+  `releaseTime`/`time` with the request time, so `fetchurl` on it churns its hash on every
+  refetch. Discovered by fetching it twice.
+- **All 115 libraries are pinned, not the ~55 Linux needs.** 82 MB vs 55 MB, and a superset
+  cannot go wrong if portablemc's rule evaluation ever disagrees with ours about this platform.
+- **One fixed-output derivation for the assets, not 4403 `fetchurl`s.** The objects are
+  content-addressed upstream, so one recursive hash pins the lot; 4403 store paths and the eval
+  to match them buys nothing. Builds in 48 s with `curl --parallel`.
+- **The mods re-link moved from a systemd oneshot into the launcher.** The oneshot only re-ran
+  when the configuration changed, which left a game directory created since the last switch
+  silently unlinked — the failure `docs/minecraft.md` had a whole paragraph of workaround for.
+  Doing it at launch has no such window.
+- **The archive is a Nix binary cache, not a tarball.** Incremental, deduplicated, hash-verified
+  on the way back in, and `nix copy --from` is the whole restore. A self-contained tarball with
+  a bundled JRE was considered as a no-Nix escape hatch and rejected as a second thing to keep
+  correct.
+- **The offline UUID is computed in the launcher.** portablemc's offline session derives one
+  from a private `uuid5` namespace. It makes no practical difference — an offline-mode server
+  derives the UUID from the name it is given — but matching the game's own algorithm removes
+  the question.
+
+### Known Issues
+- The migration of each player's `options.txt` and `config/` off the Prism instances is manual
+  and **not yet done** on hydrogen; the commands are in `docs/minecraft.md`. Until then the
+  kids get default video settings and lose their Controlify bindings.
+- The old Prism trees (`~/.local/share/PrismLauncher`, the per-player `instances/`) are left on
+  disk deliberately, and are no longer backed up. Delete once the new setup has been played.
+- The couch stack (four tiled clients, gamepad isolation, VT handoff) has **not** been run
+  since the change — only sulfur's single client was tested end to end.
+
 ## Session: 2026-07-30
 
 ### Changes Made

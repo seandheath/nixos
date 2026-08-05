@@ -1,15 +1,18 @@
 # Minecraft on hydrogen — persistent server + couch split-screen
 
-Three parts:
+Four parts:
 
-- **`modules/minecraft-server.nix`** — a vanilla server on hydrogen (the ZBook next to
+- **`modules/minecraft-server.nix`** — a Fabric server on hydrogen (the ZBook next to
   the projector), running as a system service. Always on, survives reboots, no login
   needed, backed up by borg. Carries the Vanilla Tweaks datapacks.
+- **`packages/minecraft-client/`** — the game itself, pinned: client jar, 115
+  libraries, 424 MiB of assets, the Fabric launch profile. Shared read-only by every
+  client on the machine.
 - **`modules/minecraft-couch.nix`** — one GNOME icon on hydrogen that opens a
   pre-launcher and then tiles up to four Minecraft clients on the projector, one
   gamepad each.
-- **`packages/minecraft-client-mods.nix`** — the Fabric client mod set, shared by the
-  couch clients and sulfur's desktop client.
+- **`packages/minecraft-client-mods.nix`** — the Fabric mod set, shared by the couch
+  clients, sulfur's desktop client, and (the `server = true` subset) the server.
 
 The design spec this was built from is `~/Downloads/specification.md`.
 
@@ -20,16 +23,67 @@ The design spec this was built from is `~/Downloads/specification.md`.
 | I want to… | Do this |
 |---|---|
 | Play on the couch | Click **Minecraft (Couch)** in the GNOME app grid |
+| Play from sulfur | Click **Minecraft**, or run `minecraft-client` |
 | Leave the game | `SUPER`+`SHIFT`+`Q` (returns to GNOME) |
 | Get back to GNOME if something wedges | `sudo chvt 2`, or from another machine `ssh hydrogen 'sudo systemctl stop minecraft-couch'` |
 | Add a player, or pair a controller | In the pre-launcher, before **Start playing** |
-| Add or update a mod | Edit `packages/minecraft-client-mods.nix` and rebuild — the re-link is automatic |
+| Add or update a mod | Edit `packages/minecraft-client-mods.nix` and rebuild — the re-link is automatic on the next launch |
 | Add or update a datapack | Regenerate the zips into `packages/minecraft-datapacks/`, rebuild, restart the server |
-| See what mods are installed | `minecraft-mods-link <instance>` prints the list |
+| See what mods are installed | `ls ~/.local/share/minecraft/<name>/mods/` |
+| Move to a new Minecraft version | `packages/minecraft-client/update.sh <version>`, then re-pin the mods and the Fabric loader |
 | Check what a new controller sends | `minecraft-couch-menu --probe` |
 | See who is connected | `sudo journalctl -u minecraft-server -f` |
 | Run a server command | `echo "time set day" \| sudo tee /run/minecraft-server.stdin` |
 | Restart the server | `sudo systemctl restart minecraft-server` |
+| Rebuild the archive by hand | `sudo systemctl restart minecraft-archive` |
+
+---
+
+## The offline guarantee
+
+**There is no setup step, and nothing is downloaded at launch.** The game is a Nix
+payload pinned by hash — `packages/minecraft-client/`, built from `libraries.json`,
+which `update.sh` generates from Mojang's version manifest. `minecraft-client` hands
+that read-only store path to [portablemc](https://github.com/mindstorm38/portablemc)
+as its main directory and portablemc, finding every file already present at the right
+size, downloads nothing.
+
+Verified, and worth re-verifying after any bump — an empty game directory inside a
+network namespace:
+
+```console
+$ unshare -rn minecraft-client --name LuckyObserver --game-dir /tmp/mc --offline -- --dry
+[  OK  ] Loaded version fabric-loader-0.19.3-1.21.10
+[  OK  ] Checked version jar
+[  OK  ] Checked 4403 assets version 27
+[  OK  ] Checked 78 class and 0 native libraries
+```
+
+Not one download, no Microsoft account, no instance to create. That is the whole
+difference from the Prism setup this replaced (through 2026-08-05), where all of the
+above was undeclared state fetched from Mojang on first launch and deliberately
+*excluded* from the backups as "re-downloadable".
+
+### The archive, and restoring from it
+
+Pinning makes the client rebuildable from the flake — but only for as long as Mojang,
+Modrinth and `maven.fabricmc.net` keep serving these exact versions. So hydrogen keeps
+a copy: `minecraft-archive.service` mirrors the client and server closures into a
+local Nix binary cache at `/var/lib/minecraft-archive` (~1.6 GB), and
+`modules/backup.nix` sends that to both borg repos nightly. The unit has the store
+paths baked into its `ExecStart`, so a switch that changes the payload re-runs it and
+one that does not is a no-op.
+
+To restore on a machine with the flake and no useful internet:
+
+```console
+$ nix copy --no-check-sigs --from file:///var/lib/minecraft-archive --all
+$ nixos-rebuild switch --flake ~/nixos#sulfur
+```
+
+**Scope this honestly.** The archive guarantees *Minecraft* survives its upstreams
+disappearing. It is not a full offline OS restore — everything else in the system
+closure still comes from `cache.nixos.org`.
 
 ---
 
@@ -64,88 +118,64 @@ that means one child logging in as a sibling.
 
 ---
 
-## First-time setup
+## Setup
 
-Everything below is one-time and stateful; Nix owns the plumbing, not the Prism
-instance itself.
+### hydrogen (couch)
 
-### 1. Create the Prism instance
+1. Pair the controllers. Nothing needs recording: click **Minecraft (Couch)**, choose
+   **Pair a controller**, hold the pad's SYNC/PAIR button until its lights flash, and
+   pick it out of the scan results. There is no chicken-and-egg problem with an
+   unpaired first pad — every screen also accepts the keyboard (hydrogen has a wired
+   Dell KB216), so you can reach the pairing screen with no controller at all.
 
-Open **Prism Launcher** on hydrogen (it is in the app grid).
+   Confirm afterwards:
 
-1. Add your real Microsoft account under *Accounts*. This is what unlocks offline
-   launching — the four players are offline accounts, but Prism will not offer
-   offline mode at all without one genuine account attached.
-2. *Add Instance* → name it exactly **`couch`** → Minecraft **1.21.10** → **Fabric**.
-
-   The version must equal the server's. Check with:
    ```console
-   $ nix eval --raw ~/nixos#nixosConfigurations.hydrogen.pkgs.minecraft-server.version
+   $ ls -l /dev/input/couchpad-*
+   lrwxrwxrwx 1 root root 6 … /dev/input/couchpad-event19 -> event19
    ```
-3. **Do not install any mods here.** Nix supplies the whole set — including Controlify
-   and Sodium, which used to be manual steps. `minecraft-couch-sync` (next step) wires
-   it up. See [Mods and datapacks](#mods-and-datapacks).
-4. *Edit Instance* → *Settings*:
-   - **Memory:** 3 GB max. Not more — a bigger heap only lengthens GC pauses,
-     which show up as stutter. 4 × 3 GB + the server's 6 GB fits the 31 GiB
-     installed.
-   - **Framerate:** cap at 60. Uncapped Minecraft eats every spare core for no
-     visible benefit at quarter-screen.
-5. Launch it once by hand, then in-game: press `F3`+`P` until it says
-   *"pauseOnLostFocus: false"* so background windows keep rendering. Set video
-   settings while you are there (render distance 8 is plenty).
 
-### 2. Fan the instance out into one data directory per player
+   One symlink per connected pad. It does not matter which is which — players say who
+   they are at session start.
 
-```console
-$ minecraft-couch-sync
-minecraft-couch-sync: 5 player director(ies) ready under /home/sheath/.local/share/minecraft-couch
-```
+2. Play. Click **Minecraft (Couch)**, choose **Start playing**, and for each pad in
+   turn the player holding it picks their name (or **Nobody (sit out)**, or **Start
+   now** to skip the remaining pads). Expect roughly 30–60 s before everyone is in the
+   world; the launcher staggers them and places each window as it appears.
 
-With no arguments it syncs every player in the roster; with names, only those
-(which is how the pre-launcher sets up a player you add from the couch).
+3. Once, per child, in-game: press `F3`+`P` until it says *"pauseOnLostFocus: false"*
+   so background windows keep rendering, and set render distance to 8. This lands in
+   that player's `options.txt` and is backed up.
 
-Prism refuses to run twice from the same data directory (its single-instance lock
-is keyed on that path), so each player gets their own under
-`~/.local/share/minecraft-couch/<name>`. These are **not** full copies:
-`libraries`, `meta`, `assets`, `java` and the instance's `mods` folder are
-symlinks back to `~/.local/share/PrismLauncher`. You keep editing exactly one
-instance in the GUI.
+### sulfur (desktop)
 
-The sync also runs `minecraft-mods-link couch`, which points that one instance's
-`mods` at the Nix store — so the chain is *player → canonical instance → store*,
-and a rebuild that changes the mod list reaches everybody on the next sync.
+Click **Minecraft**, or run `minecraft-client`. It connects to `10.0.0.10:25565` as
+`LuckyObserver` (`services.minecraftClient` in `hosts/sulfur.nix`). Nothing to
+install, nothing to configure.
 
-**Re-run `minecraft-couch-sync` after any mod change or Minecraft update.** Each
-player's `options.txt`, `config/` and saves are excluded from the sync, so their
-video and controller settings survive it.
+Note the one-login-per-username rule: if sheath is playing `LuckyObserver` from
+sulfur, the couch cannot also be `LuckyObserver`.
 
-### 3. Pair the controllers
+### Migrating from Prism (one-time, 2026-08-05)
 
-Nothing needs recording. Pair them from the pre-launcher itself: click
-**Minecraft (Couch)**, choose **Pair a controller**, hold the pad's SYNC/PAIR
-button until its lights flash, and pick it out of the scan results.
-
-There is no chicken-and-egg problem with an unpaired first pad — every screen
-also accepts the keyboard (hydrogen has a wired Dell KB216), so you can reach the
-pairing screen with no controller at all.
-
-Confirm afterwards:
+Worlds are server-side and untouched. What is worth carrying over is each player's
+video settings and mod configuration:
 
 ```console
-$ ls -l /dev/input/couchpad-*
-lrwxrwxrwx 1 root root 6 … /dev/input/couchpad-event19 -> event19
+# hydrogen, per player
+$ cp -n ~/.local/share/minecraft-couch/$NAME/instances/couch/minecraft/options.txt \
+        ~/.local/share/minecraft-couch/$NAME/
+$ cp -rn ~/.local/share/minecraft-couch/$NAME/instances/couch/minecraft/config/. \
+         ~/.local/share/minecraft-couch/$NAME/config/
+
+# sulfur
+$ mkdir -p ~/.local/share/minecraft/LuckyObserver
+$ cp -n ~/.local/share/PrismLauncher/instances/Hydrogen/minecraft/{options.txt,servers.dat} \
+        ~/.local/share/minecraft/LuckyObserver/
 ```
 
-One symlink per connected pad. It does not matter which is which — players say
-who they are at session start.
-
-### 4. Play
-
-Click **Minecraft (Couch)**. Choose **Start playing**, and for each pad in turn
-the player holding it picks their name (or **Nobody (sit out)**, or **Start now**
-to skip the remaining pads). Expect roughly 30–60 s before everyone is in the
-world; the launcher staggers them and places each window as it appears.
+Leave the old Prism trees alone until the new setup has been played a few times, then
+remove `~/.local/share/PrismLauncher` and the per-player `instances/` subdirectories.
 
 ---
 
@@ -168,12 +198,22 @@ first run from `seedPlayers` in `modules/minecraft-couch.nix`.
 Names must be 3–16 characters of `[A-Za-z0-9_]`. The 16-character cap is not a
 style rule: Minecraft enforces it on the wire, and an over-long name fails to
 encode its login packet, so the client cannot connect at all. The pre-launcher
-rejects bad names as you type, and a Nix assertion catches a bad seed at build
-time.
+rejects bad names as you type, `minecraft-client` rejects them at launch, and a Nix
+assertion catches a bad seed at build time.
 
 `LuckyObserver` is seeded alongside the kids so sheath can play from the couch as
-well as from sulfur — though not from both at once, since the server rejects a
-duplicate login of the same username.
+well as from sulfur — though not from both at once.
+
+Each player gets a game directory of their own — `~/.local/share/minecraft-couch/<name>`
+on hydrogen, `~/.local/share/minecraft/<name>` elsewhere — holding only their
+`options.txt`, `config/`, `screenshots/` and a `mods` symlink. The game itself is one
+shared store path, so a fifth player costs kilobytes.
+
+`minecraft-client` computes the offline UUID exactly as the game does —
+`UUID.nameUUIDFromBytes("OfflinePlayer:<name>")`, an MD5 with the version and variant
+bits forced. portablemc's own offline session would invent one from a private
+namespace instead. It makes no difference to the server, which derives the UUID from
+the name it is given, but it keeps client-side identity consistent.
 
 ---
 
@@ -183,104 +223,65 @@ Two different mechanisms, and the difference matters:
 
 | | Where it runs | Where it lives | Who has to install it |
 |---|---|---|---|
-| **Client mods** | the client, Fabric | `packages/minecraft-client-mods.nix` | every client, separately |
+| **Mods** | Fabric, client **and** the `server = true` subset | `packages/minecraft-client-mods.nix` | Nix, everywhere |
 | **Datapacks** | the server, vanilla | `packages/minecraft-datapacks/` | nobody — the server pushes them |
 
-**The server has no mod loader and is never getting one.** Datapacks are vanilla
-data-driven content; a phone or laptop joining over the tunnel still installs
-nothing. Anything that would need Fabric on the server breaks that for every remote
-device at once.
+**The server runs Fabric** (since 2026-08-04, `packages/fabric-server.nix`). It did
+not until then, and the reason it does now is the reason two features were previously
+impossible: since 1.21.2 the recipe list and container contents live server-side and
+are not sent to clients, so no client-only mod can reach them.
 
-### Client mods
+**The unmodded-join guarantee still holds** and is the thing to re-verify after any
+change to the `server = true` set: a phone, laptop or tablet must still join over the
+tunnel with nothing installed. It holds because none of the server mods add registry
+entries, so Fabric API's registry sync has nothing to reject a vanilla client over.
+Test it, do not assume it.
 
-| Mod | What it is for |
-|---|---|
-| Sodium | the renderer — the reason four clients on one GPU are comfortable |
-| Controlify | gamepad support and controller-driven menus |
-| Xaero's Minimap | minimap and waypoints |
-| Better Name Visibility | legible nameplates at quarter-screen |
-| Jade | what am I looking at |
-| Effortless Crafting | craft using items in reachable chests, no hauling |
+### The mod set
 
-Effortless Crafting is seeded with `enableNearbyContainerUsage: ALWAYS` rather than
-its own `CTRL_HELD` default, because the couch clients are played on gamepads and
-Controlify has no Ctrl — with the stock default the feature would be unreachable on
-a pad. Defaults live in `configDefaults` in `packages/minecraft-client-mods.nix` and
-are seeded **once** into each game directory's `config/`; anything changed in Mod
-Menu afterwards is kept. An instance that already has the file keeps it.
-| Fabric API, YACL, Mod Menu, Cloth Config | dependencies of the above |
+| Mod | What it is for | On the server too |
+|---|---|---|
+| Sodium | the renderer — the reason four clients on one GPU are comfortable | |
+| Controlify | gamepad support and controller-driven menus | |
+| Xaero's Minimap | minimap and waypoints | |
+| Better Name Visibility | legible nameplates at quarter-screen | |
+| Jade | what am I looking at | |
+| Nearby Crafting | chest contents count as your inventory when crafting | ✓ |
+| JEI | recipe viewer | ✓ |
+| Fabric API, YACL, Mod Menu, Recipe Book Access API | dependencies of the above | ✓ |
 
-There is **no recipe viewer**, and that is not an oversight — see below.
+Nearby Crafting replaced Effortless Crafting, which was the client-only approximation
+used while the server was vanilla: it had to physically open each chest over the
+network behind a held Ctrl — a key Controlify has no equivalent for, so on a gamepad
+the feature was unreachable. JEI is likewise only useful now that it is on the server;
+client-only, it printed *"JEI is missing recipes"* in chat on every join, which is why
+it was installed, removed, and installed again.
 
-`minecraft-mods-link <instance>` makes an instance's mods folder a symlink to the
-store path holding all ten jars. Both machines point at the same list, so they
-cannot drift.
+EMI is still the nicer viewer but stopped at 1.21.1. REI's local fallback is broken by
+our own Unlock All Recipes datapack ([#2063](https://github.com/shedaniel/RoughlyEnoughItems/issues/2063));
+the fix merged 2026-07-29 and is still unreleased. Neither matters now that JEI can ask
+the server.
 
-**This runs itself.** `minecraft-mods-link.service` re-links on boot and on any switch
-that changes the jar set — the store path is baked into `ExecStart`, so a changed mod
-list changes the unit and switch restarts it. Instances are named per host in
-`services.minecraftClientMods.instances`. It is idempotent (a correct link is reported
-and left alone) and an instance that does not exist yet is skipped, not an error.
+Default configs live in `configDefaults` in `packages/minecraft-client-mods.nix` and
+are seeded **once** into each game directory's `config/`; anything changed in Mod Menu
+afterwards is kept. The set is currently empty — Nearby Crafting's defaults need no
+adjustment.
 
-The one case it does *not* cover: **creating a new instance** under an otherwise
-unchanged configuration. Nothing changed, so nothing restarts. Run
-`minecraft-mods-link <instance>` by hand once, or `systemctl restart
-minecraft-mods-link`.
+To add or update a mod: find the version on Modrinth for `loader=fabric,
+game_version=1.21.10`, add an entry to `packages/minecraft-client-mods.nix` (the header
+has the API query and the hash-conversion one-liner), and rebuild. There is no re-link
+step — `minecraft-client` re-points `mods/` at the current store path on every launch,
+on both machines.
 
-> **The game root is not always `.minecraft`.** Prism 11 creates instances with a
-> plain `minecraft/`; the dotted name is the MultiMC-era layout, kept only for
-> inherited instances. Both `minecraft-mods-link` and `minecraft-couch-sync` resolve
-> it at runtime. Getting this wrong fails *quietly* — the link lands where Prism
-> never looks, the Mods tab shows an empty list, and a stray `.minecraft/` appears
-> beside the real game root. If the Mods tab is empty, check which one the instance
-> actually uses before anything else.
+> **Nothing can install a mod into `mods/` at runtime** — it is a read-only store
+> path. That is the trade for one list driving three places. Add mods in Nix instead.
+> A pre-existing non-empty `mods/` directory is stashed as `mods.stateful` rather than
+> deleted.
 
-> **Prism's GUI can no longer install mods into a linked instance** — `mods/` is a
-> read-only store path. That is the trade for one list driving both machines. Add
-> mods in Nix instead. Browsing the *Mods* tab still works; only installing does not.
-
-To add or update one: find the version on Modrinth for `loader=fabric,
-game_version=1.21.10`, add an entry to `packages/minecraft-client-mods.nix` (the
-header has the API query and the hash-conversion one-liner), rebuild, then re-link.
-
-An assertion ties the pinned `mcVersion` to `pkgs.minecraft-server.version`, so a
-nixpkgs bump that moves the server off 1.21.10 fails the build instead of showing
-four children an incompatible-mod screen.
-
-### Why there is no recipe viewer
-
-**Since Minecraft 1.21.2 the recipe list lives on the server and is no longer sent to
-clients.** A client-only viewer therefore cannot enumerate recipes against a vanilla
-server. This is a vanilla protocol change, not a property of any particular mod, so
-all three candidates are affected:
-
-| | Status on 1.21.10 |
-|---|---|
-| **JEI** | Works, but every join prints *"JEI is missing recipes. Please install JEI on the server"*. Item list fine, recipe lookup dead. |
-| **EMI** | Never shipped past `1.1.24+1.21.1`, i.e. it stops right before the change. |
-| **REI** | Has a client-side fallback, but it breaks for any recipe **unlocked in-game** ([#2063](https://github.com/shedaniel/RoughlyEnoughItems/issues/2063)) — and Unlock All Recipes unlocks all of them, so it would fail on nearly every item. |
-
-JEI was installed first and removed once the chat error made the cause clear.
-
-**The gap is narrower than it sounds.** Unlock All Recipes leaves every player's
-vanilla recipe book complete and searchable, so *"how do I make X"* is covered. What
-is missing is reverse lookup — *"what is this ingredient for?"* — and the stations the
-recipe book ignores, namely brewing and smithing.
-
-**To revisit:** REI's fix ([#2065](https://github.com/shedaniel/RoughlyEnoughItems/pull/2065))
-merged 2026-07-29 but is unreleased on every branch as of 2026-08-04. Check for a REI
-build published after that date supporting the server's version; if one exists, adding
-it to the mod list is the entire change.
-
-Two alternatives were considered and rejected. **Running Fabric plus JEI on the
-server** would fix it properly, but the server would stop being the stock jar and the
-"any unmodded device can join over the tunnel" guarantee would need re-verifying —
-JEI's jar requires Fabric API server-side, not just the loader. **Downgrading to
-1.21.1**, the last version before the change, would let EMI work fully client-side,
-but the world cannot be downgraded (no path back from `DataVersion` 4556) and 1.21.1
-predates `pause-when-empty-seconds` — verified absent from its server jar — which is
-the only reason this always-on server idles at 0.10% of a core instead of ticking
-continuously.
+Assertions in `modules/minecraft-client.nix` tie the pinned mod `mcVersion` to both
+`pkgs.minecraft-server.version` and the client payload, so a nixpkgs bump that moves
+the server off 1.21.10 fails the build instead of showing four children an
+incompatible-mod screen.
 
 ### Datapacks
 
@@ -313,22 +314,25 @@ them, so regenerate at the next major version bump.
 
 ---
 
-## Playing from sulfur
+## Moving to a new Minecraft version
 
-sulfur has its own Prism instance, `Hydrogen`, and joins at `10.0.0.10:25565` over
-the LAN or the tunnel. One-time setup:
+Five things have to agree, and the nightly auto-update moves the first without asking.
+In order:
 
-1. *Edit Instance* → *Version* → install **Fabric** (the instance started out
-   vanilla, which cannot load any of the mods above).
-2. ```console
-   $ minecraft-mods-link Hydrogen
-   minecraft-mods-link: Hydrogen -> /nix/store/…-minecraft-client-mods-1.21.10
-   ```
-   Only needed this once, because the instance did not exist when the service last
-   ran. After that `minecraft-mods-link.service` keeps it current on every rebuild.
+1. `nixpkgs`' `minecraft-server` — the server jar. This is what moves on its own.
+2. `packages/minecraft-client/update.sh <version>` — regenerates `libraries.json`.
+   Rebuild once; the assets fixed-output derivation will fail with the new hash, which
+   goes into `assetObjects.outputHash` in `packages/minecraft-client/default.nix`.
+3. `packages/fabric-server.nix` — `mcVersion`, the `intermediary` hash, and the loader
+   version if it moved. Re-transcribe from
+   `https://meta.fabricmc.net/v2/versions/loader/<mc>/<loader>/server/json`. This also
+   feeds the client's Fabric profile, so it is one edit for both sides.
+4. `packages/minecraft-client-mods.nix` — re-pin every jar, then bump `mcVersion`.
+   Check upstream support first; not every mod tracks a point release promptly.
+5. The datapacks' `supported_formats` window (server log only, cannot be checked in
+   Nix).
 
-Note the one-login-per-username rule: if sheath is playing `LuckyObserver` from
-sulfur, the couch cannot also be `LuckyObserver`.
+The assertions catch 1 vs 2 vs 3 vs 4 at eval. Nothing catches 5.
 
 ---
 
@@ -343,16 +347,27 @@ sulfur, the couch cannot also be `LuckyObserver`.
                   ├─ minecraft-couch-menu the pre-launcher, in a fullscreen foot
                   └─ minecraft-couch-player <name> <event node>
                       └─ bwrap: tmpfs over /dev/input, one pad bound back
-                          └─ prismlauncher -d …/<name> --offline <name> --server 127.0.0.1:25565
+                          └─ minecraft-client --name <name> --game-dir …/<name>
+                                             --server 127.0.0.1:25565
+                              └─ portablemc --main-dir /nix/store/…-minecraft-client-1.21.10
+                                            --work-dir …/<name>
+                                  └─ java -cp … KnotClient
 
-mods, two symlink hops from every player ("minecraft" here is the instance's game
-root, resolved at runtime — Prism 11 uses that name, MultiMC-era ones ".minecraft"):
-  …/minecraft-couch/<name>/instances/couch/minecraft/mods
-    └─ …/PrismLauncher/instances/couch/minecraft/mods   (minecraft-mods-link)
-        └─ /nix/store/…-minecraft-client-mods-1.21.10
+per player, all that is on disk:
+  ~/.local/share/minecraft-couch/<name>/
+    options.txt  config/  screenshots/  mods -> /nix/store/…-minecraft-client-mods-1.21.10
 ```
 
-Four decisions worth knowing when debugging:
+Five decisions worth knowing when debugging:
+
+**The game is one shared read-only store path.** Every client points `--main-dir` at
+it; only `--work-dir` is per player. Under Prism this was four data directories with
+seven symlinked trees each, fanned out by a `minecraft-couch-sync` command that had to
+be re-run after every mod change — all of which existed because Prism refuses to run
+twice from one data directory (its single-instance lock is keyed on that path) and a
+second `--launch` would have spawned the game outside the second sandbox, moving every
+character in unison. A CLI launcher is just a process, so none of that machinery
+survives.
 
 **Identity is asked, not wired.** This used to key each seat to a controller's
 Bluetooth MAC in a udev rule, which made identity a property of the *hardware*:
@@ -400,14 +415,14 @@ show the game no gamepad at all.
 
 ## Rendering path
 
-Clients currently run under **XWayland**, which needs no configuration and whose
-usual complaint (HiDPI blurriness) is irrelevant at 1080p.
+Clients run under **XWayland**, which needs no configuration and whose usual complaint
+(HiDPI blurriness) is irrelevant at 1080p. Verified working on sulfur's NVIDIA +
+Wayland session, which is the pairing that has broken other things on these machines.
 
-If that turns out to cost too much, switch to native Wayland by adding this to the
-instance's JVM arguments in Prism:
+To try native Wayland instead, pass the JVM argument through the launcher:
 
-```
--Dorg.lwjgl.glfw.libname=/run/current-system/sw/lib/libglfw.so
+```console
+$ minecraft-client -- --jvm-args '-Dorg.lwjgl.glfw.libname=/run/current-system/sw/lib/libglfw.so'
 ```
 
 …pointing at `pkgs.glfw3-minecraft` (add it to `environment.systemPackages` first;
@@ -429,26 +444,23 @@ both the local repo (`/data/borg`) and BorgBase nightly at 03:00. That covers th
 world, `playerdata/`, `ops.json` and `server.properties` — everything needed to
 bring the server back.
 
-The couch **client** state is backed up separately and for a different reason:
+Two more paths, for different reasons:
 
 ```
+/var/lib/minecraft-archive          the game itself (see "The offline guarantee")
 ~/.local/share/minecraft-couch      roster + each player's settings
-~/.local/share/PrismLauncher        the canonical instance + accounts.json
 ```
 
-Nobody loses a character or a build if these go — the world is server-side. What
-they hold is what the flake *cannot* rebuild: `players.json` (authoritative once
-created, so anyone added from the couch exists only there), each child's
-`options.txt` and Controlify bindings, and the Microsoft account that unlocks
-offline launching. Prism's `assets`, `libraries`, `meta`, `java` and `cache` are
-excluded — about a gigabyte that Prism refetches on first launch.
+Nobody loses a character or a build if the couch directory goes — the world is
+server-side. What it holds is what the flake *cannot* rebuild: `players.json`
+(authoritative once created, so anyone added from the couch exists only there) and
+each child's `options.txt` and Controlify bindings. It is kilobytes per player.
 
-> **Both directories are pre-created by `systemd.tmpfiles`, deliberately.** The
-> borg jobs run with `failOnWarnings = true`, and borg treats a missing source
-> path as a warning and exits 1 — so on a machine where Prism had never been
-> opened, adding these paths would have failed the *entire* nightly backup,
-> Nextcloud and Immich included. Do not remove the tmpfiles rules without also
-> removing the paths.
+> **The couch directory is pre-created by `systemd.tmpfiles`, deliberately.** The borg
+> jobs run with `failOnWarnings = true`, and borg treats a missing source path as a
+> warning and exits 1 — so on a machine where nobody had played yet, adding the path
+> would have failed the *entire* nightly backup, Nextcloud and Immich included. Do not
+> remove the tmpfiles rule without also removing the path.
 
 Because the server writes region files continuously, both jobs flush first:
 `preHook` sends `save-off` then `save-all flush` through the server console FIFO
@@ -477,18 +489,17 @@ base in it.
 | Icon does nothing, notification says the server is not running | `sudo systemctl status minecraft-server`; check `journalctl -u minecraft-server` |
 | "No controllers are connected" | Pad is asleep or unpaired. Wake it, or use **Pair a controller**; `ls -l /dev/input/couchpad-*` to confirm |
 | A player is missing from the list | Add them with **Add a player** — the roster is `~/.local/share/minecraft-couch/players.json`, not Nix |
-| "its game folder could not be created" after adding a player | The Prism `couch` instance does not exist yet (step 1). Create it, then `minecraft-couch-sync` |
+| Launch fails: "Checking libraries… FAILED" or a download attempt | The payload is incomplete — a packaging bug, not a runtime one. Rebuild; if it persists, re-run `packages/minecraft-client/update.sh` |
+| Launch fails: read-only file system under `/nix/store` | Same cause. portablemc decided something was missing and tried to fetch it into the payload |
 | Pad cannot move the cursor in the pre-launcher | Its D-pad reports codes not in the accepted set. `minecraft-couch-menu --probe`, press the D-pad, and widen the list in `modules/minecraft-couch.nix`. The left stick and the keyboard both work meanwhile |
 | Projector goes black and stays there | DRM master handoff failed. `sudo chvt 2` to return to GNOME; `journalctl -u minecraft-couch` for the Hyprland log |
 | All characters move together | The bwrap isolation is not taking. Check the nodes handed to each `minecraft-couch-player` are distinct — `ls -l /dev/input/couchpad-*` should show one symlink per pad, each resolving to a different `eventN` |
 | Only one window, or windows stacked | `minecraft-couch-spawn` could not match the window class. `hyprctl clients` during a session and check the class really contains "minecraft" |
 | Client can't join: "Chat disabled due to missing profile public key" | `enforce-secure-profile` drifted back to true — it must be `false` alongside `online-mode=false` |
-| Mods updated but only player 1 has them | `minecraft-couch-sync` |
-| Prism won't install a mod ("read-only" / permission denied) | Expected — `mods/` is a store symlink. Add it to `packages/minecraft-client-mods.nix` instead |
-| Mods tab is empty right after linking | The link went to the wrong game root. `ls -la <instance>/` — if both `minecraft/` and `.minecraft/` exist, delete the one Prism is not using (its log says `Started watching …/mods`) and re-run `minecraft-mods-link` |
-| A mod is missing after a rebuild | `systemctl status minecraft-mods-link` — it should have re-linked. If the instance was created since the last switch, run `minecraft-mods-link <instance>` once |
+| A mod is missing after a rebuild | Launch again — the re-link happens at launch, and the message `minecraft-client: mods -> /nix/store/…` says it took |
+| `minecraft-client` refuses: "nowhere safe to stash it" | Both `mods/` and `mods.stateful` hold real files. Merge or delete one by hand |
 | Datapacks not in effect | `echo "datapack list" \| sudo tee /run/minecraft-server.stdin`, then check the journal. If they are listed as incompatible, the server moved past 1.21.11 — regenerate the zips |
-| `minecraft-mods-link` refuses: "nowhere safe to stash it" | Both `mods/` and `mods.stateful` hold real files. Merge or delete one by hand |
+| Nightly backup fails on a missing path | `/var/lib/minecraft-archive` should exist after the first switch — `systemctl status minecraft-archive` |
 | Session exits but GNOME doesn't come back | `sudo chvt 2`. `ExecStopPost` should do this automatically; check `/run/minecraft-couch.prev-vt` was written |
 
 ### Fallback if the VT handoff proves unreliable
@@ -506,13 +517,16 @@ exec gamescope -f -W 1920 -H 1080 -- Hyprland --config <conf>
 ```
 
 That is a change to `minecraft-couch-session` and the unit only — the udev rule,
-pre-launcher, bubblewrap wrapper, window placement, sync script and desktop entry
-are all unaffected. It costs one extra compositing pass.
+pre-launcher, bubblewrap wrapper, window placement and desktop entry are all
+unaffected. It costs one extra compositing pass.
 
 ---
 
 ## Known limitations
 
+- **No GUI launcher.** Adding a singleplayer world, a different Minecraft version or
+  a modpack means editing Nix and rebuilding. That is the accepted trade for a client
+  that is fully declared and restorable; Prism was removed on 2026-08-05.
 - **No late join.** Whoever is not at the pre-launcher when you press *Start now*
   is not in that session; a kid arriving later needs the session restarted.
   Re-tiling live windows and spawning into an existing layout is a much larger

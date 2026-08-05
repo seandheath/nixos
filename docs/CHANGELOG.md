@@ -1,6 +1,61 @@
 # Changelog
 
 ## [Unreleased]
+### Changed (Prism Launcher replaced by an offline, Nix-pinned client)
+- **The problem.** Prism kept everything the game needs to *run* as undeclared state and
+  refetched it from Mojang: the client jar, 115 libraries, 424 MiB of assets, a JVM, and
+  `accounts.json` — the cached Microsoft account that was the only reason `--offline`
+  launching worked at all. `modules/backup.nix` excluded those trees as "re-downloadable",
+  and `docs/minecraft.md`'s first setup step was "create the instance by hand in the GUI".
+  That is a playable setup only for as long as Mojang keeps serving 1.21.10.
+- `packages/minecraft-client/` — the game itself, pinned. `update.sh` generates
+  `libraries.json` from Mojang's version manifest (115 library artifacts, the client jar,
+  the asset index and the log4j config, each with its sha1 as SRI); `default.nix` assembles
+  them, plus a single fixed-output derivation for the 4403 asset objects (424 MiB, one
+  hash — the objects are content-addressed upstream, so the tree is bit-identical every
+  time), into the directory layout a launcher expects.
+- The **Fabric client profile is generated**, not fetched: `meta.fabricmc.net`'s
+  `/profile/json` stamps `releaseTime`/`time` at request time, so the same URL returns
+  different bytes on every call and there is no hash to pin. Writing it in Nix also means it
+  reuses the eight loader jars `packages/fabric-server.nix` already pins, now exposed as
+  `passthru.loaderLibs` — one loader bump for both sides.
+- `packages/minecraft-client-launcher.nix` — `minecraft-client`, a wrapper around
+  `pkgs.portablemc`. portablemc skips any file already present at the expected size
+  (`download.py:144-156`), so with the payload complete its download list comes out empty.
+  **Verified offline**: an empty game directory inside `unshare -rn` resolves the version,
+  4403 assets and 78 libraries and launches, with no cached manifest and no network. Its
+  manifest cache lives in the *work* dir (`cli/__init__.py:85`), which is what lets the main
+  dir be a read-only store path shared by every player.
+- Offline UUIDs are computed the way the game does —
+  `UUID.nameUUIDFromBytes("OfflinePlayer:<name>")` — rather than portablemc's private
+  `uuid5` namespace. Checked against a reference implementation for five names.
+- `modules/minecraft-client.nix` replaces `modules/minecraft-mods.nix`.
+  `services.minecraftClient` takes a player name, a server and an archive directory. The
+  `minecraft-mods-link.service` oneshot and `packages/minecraft-mods-link.nix` are gone: the
+  launcher re-points `mods/` and seeds the mod configs on every launch, which closes the hole
+  where an instance created since the last switch stayed silently unlinked.
+- **The archive.** `minecraft-archive.service` on hydrogen mirrors the client and server
+  closures into a local Nix binary cache at `/var/lib/minecraft-archive` (~1.6 GB, zstd) on
+  every switch that changes them, and `modules/backup.nix` sends it to both borg repos. This
+  is the copy that makes a restore independent of Mojang, Modrinth and maven.fabricmc.net
+  still serving these versions: `nix copy --no-check-sigs --from file://…` plus the flake.
+  Not a full offline OS restore — the rest of the system closure still comes from
+  cache.nixos.org.
+- `modules/minecraft-couch.nix` — `minecraft-couch-sync` deleted along with the four Prism
+  data directories it maintained. Those existed only because Prism refuses to run twice from
+  one data directory, so each player needed a copy with seven shared trees symlinked back in;
+  a CLI launcher is just a process. A player directory is now `options.txt`, `config/`,
+  `screenshots/` and a `mods` symlink. The "add a player" path creates the directory itself.
+- `hosts/sulfur.nix` — `prismlauncher` dropped; `services.minecraftClient` with a desktop
+  entry that connects straight to `10.0.0.10:25565`. Verified end to end on sulfur's NVIDIA +
+  Wayland session: all 11 mods load, the window renders, JEI and Controlify initialise.
+- `modules/backup.nix` — `~/.local/share/PrismLauncher` and its six exclusions removed;
+  `/var/lib/minecraft-archive` added. `backupExclude` is now empty.
+- **Migration is manual and one-time** (each player's `options.txt` and `config/`); the worlds
+  are server-side and untouched. `docs/minecraft.md` has the commands, and was rewritten — it
+  had also gone stale on the Fabric-server change: it still listed Effortless Crafting, still
+  claimed the server had no mod loader, and still explained why there was no recipe viewer.
+
 ### Fixed (hydrogen journal audit)
 - `hardware/hydrogen.nix` — ESP mounted `fmask=0077,dmask=0077` instead of the generated
   `0022`. vfat carries no ownership of its own, so the mask is the ESP's only access control,

@@ -15,12 +15,19 @@ in
     ../modules/impermanence.nix
     ../modules/wivrn.nix
     ../modules/fleet-vpn.nix
-    ../modules/minecraft-mods.nix     # declarative Fabric client mods, shared with hydrogen
+    ../modules/minecraft-client.nix   # the offline client (game + mods pinned), shared with hydrogen
   ];
 
-  # Keep the desktop Prism instance's mods folder pointed at the current jar set.
-  # Instance name is whatever it is called in Prism; see docs/minecraft.md.
-  services.minecraftClientMods.instances = [ "Hydrogen" ];
+  # Minecraft client for hydrogen's server (modules/minecraft-server.nix), reached at
+  # 10.0.0.10:25565 over the LAN or the tunnel. The whole game -- jar, libraries,
+  # assets, JVM, mods -- is a pinned Nix payload (packages/minecraft-client), so the
+  # desktop entry starts a playable, correctly-modded client on a machine that has
+  # never run it. See docs/minecraft.md.
+  services.minecraftClient = {
+    enable = true;
+    playerName = "LuckyObserver";
+    server = "10.0.0.10:25565";
+  };
 
   # Boot
   boot.loader.systemd-boot.enable = true;
@@ -68,17 +75,7 @@ in
     # stay the same flake pin as hydrogen — that lock-step is why the client comes from
     # nixpkgs and not from Airshipper, which self-updates to upstream weekly nightlies.
     veloren
-
-    # Minecraft client for hydrogen's server (modules/minecraft-server.nix), reached at
-    # 10.0.0.10:25565 over the LAN or the tunnel. Same launcher hydrogen's couch setup uses
-    # (modules/minecraft-couch.nix) rather than a second one; the instance itself is
-    # stateful and created in the GUI — see docs/minecraft.md.
-    #
-    # The server is VANILLA, so mods here are purely a client-side choice. The set is
-    # declarative and shared with hydrogen (packages/minecraft-client-mods.nix): make the
-    # instance Fabric 1.21.10, then run `minecraft-mods-link Hydrogen` once. The version
-    # must match `nix eval --raw ~/nixos#nixosConfigurations.hydrogen.pkgs.minecraft-server.version`.
-    prismlauncher
+    # Minecraft is services.minecraftClient above, not a package here.
   ];
 
   # ASUS ROG services

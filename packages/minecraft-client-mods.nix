@@ -2,12 +2,14 @@
 # The Fabric client mod set for hydrogen's Minecraft server (see docs/minecraft.md).
 #
 # One list, two machines: hydrogen's couch clients and sulfur's desktop client both
-# point their instance's mods folder at this directory via minecraft-mods-link
-# (modules/minecraft-mods.nix), so they cannot drift apart.
+# get their mods/ pointed at this directory by minecraft-client
+# (packages/minecraft-client-launcher.nix), so they cannot drift apart.
 #
-# EVERY MOD HERE IS CLIENT-SIDE. The server stays a plain vanilla jar with no loader
-# (modules/minecraft-server.nix) -- nothing below is required of it, so a phone or
-# laptop joining over the tunnel still installs nothing.
+# MOST MODS HERE ARE CLIENT-SIDE, but not all: since the server gained Fabric on
+# 2026-08-04, the `server = true` entries below are installed on it as well
+# (modules/minecraft-server.nix). None of them add registry entries, so the
+# "any unmodded phone can join over the tunnel" guarantee still holds -- see the
+# header of modules/minecraft-server.nix, and test it rather than assuming it.
 #
 # TO ADD OR UPDATE A MOD:
 #   1. Find the version on Modrinth for loader=fabric, game_version=1.21.10.
@@ -16,12 +18,13 @@
 #        curl -s https://api.modrinth.com/v2/version/<id> |
 #          jq -r '.files[0].hashes.sha512' |
 #          python3 -c 'import sys,base64,binascii; print("sha512-"+base64.b64encode(binascii.unhexlify(sys.stdin.read().strip())).decode())'
-#   3. Rebuild, then re-run minecraft-mods-link (minecraft-couch-sync does it for you
-#      on hydrogen).
+#   3. Rebuild. Nothing else: minecraft-client re-points mods/ at the new store path
+#      on the next launch, on both machines.
 #
-# mcVersion below is asserted against pkgs.minecraft-server.version in
-# modules/minecraft-mods.nix, so a nixpkgs bump that moves the server off 1.21.10
-# fails the build here instead of showing the children an incompatible-mod wall.
+# mcVersion below is asserted against pkgs.minecraft-server.version and against the
+# pinned client payload in modules/minecraft-client.nix, so a nixpkgs bump that moves
+# the server off 1.21.10 fails the build here instead of showing the children an
+# incompatible-mod wall.
 let
   mcVersion = "1.21.10";
 
@@ -184,7 +187,7 @@ let
 
   # ---------------------------------------------------------------------------
   # Default mod configs, SEEDED ONCE into a game directory's config/ when the file
-  # is not already there (minecraft-mods-link, and per player minecraft-couch-sync).
+  # is not already there (minecraft-client, on every launch, per player).
   #
   # Seed-once, never overwrite: these are starting points, and anything a player
   # changes in Mod Menu afterwards is theirs to keep. Partial files are fine --
@@ -194,8 +197,8 @@ let
   # Empty for now: Nearby Crafting's defaults (8-block reach for both the player and
   # the crafting table) need no adjustment, and unlike the client-only mod it replaced
   # there is no modifier key to turn off. Kept because the seeding machinery in
-  # minecraft-mods-link and minecraft-couch-sync is the awkward part to re-derive,
-  # and the next mod that needs a non-default setting will want it.
+  # minecraft-client is the awkward part to re-derive, and the next mod that needs a
+  # non-default setting will want it.
   configDefaults = pkgs.linkFarm "minecraft-client-mod-configs-${mcVersion}" [ ];
 
   serverMods = builtins.filter (m: m.server) mods;

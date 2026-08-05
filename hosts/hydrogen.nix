@@ -16,7 +16,7 @@
     ../modules/fleet-vpn.nix          # on-demand WireGuard tunnel to the Jellyfin fleet (manual switch)
     ../modules/minecraft-server.nix   # persistent vanilla world (system service, no session needed)
     ../modules/minecraft-couch.nix    # 1-4 player split-screen launcher on the projector
-    ../modules/minecraft-mods.nix     # declarative Fabric client mods, shared with sulfur
+    ../modules/minecraft-client.nix   # the offline client (game + mods pinned), shared with sulfur
     # ../modules/veloren-server.nix   # DISABLED 2026-08-03 -- see below
     #
     # Veloren's rtsim (1867 NPCs across 196 sites) never idles: measured 20.7% of a core
@@ -35,10 +35,21 @@
   # diagnose the transient btrfs csum failures (RAM the prime suspect).
   boot.loader.systemd-boot.memtest86.enable = true;
 
-  # Keep the couch Prism instance's mods folder pointed at the current jar set.
-  # minecraft-couch-sync also does this, but the service covers the case where the
-  # mod list changes and nobody re-syncs before the next couch session.
-  services.minecraftClientMods.instances = [ "couch" ];
+  services.minecraftClient = {
+    enable = true;
+
+    # The couch pre-launcher passes --name and --server per player, so no defaults are
+    # wanted here; and the entry point on this host is "Minecraft (Couch)" from
+    # modules/minecraft-couch.nix, not a plain single-player launcher.
+    desktopEntry = false;
+
+    # THE RESTORE COPY. Everything the clients and the server need, mirrored into a
+    # local binary cache on every switch that changes it, and picked up by the nightly
+    # borg run (modules/backup.nix). This is what makes the setup survivable when
+    # Mojang stops serving 1.21.10 or a mod disappears from Modrinth: the flake plus
+    # this directory rebuild a playable client with no network at all.
+    archiveDir = "/var/lib/minecraft-archive";
+  };
 
   networking.hostName = "hydrogen"; # Define your hostname.
 
