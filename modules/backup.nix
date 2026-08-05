@@ -23,11 +23,23 @@
 # dumps. paperless + calibre-web use SQLite inside their data dirs, which Borg
 # captures directly. Redis is cache-only and is not backed up.
 #
-# CLI: `borg-local`, `borg-remote` and `borg-rootfs` (run as root) wrap the borg binary
-# with the matching repo + credentials preset, so e.g. `sudo borg-local list` or
-# `sudo borg-remote extract ::ARCHIVE path` just work. The synthetic subcommand
-# `sudo borg-<local|remote|rootfs> backup` runs an on-demand backup: it refreshes the
-# pg_dumps, then triggers that repo's borg job (archive + prune).
+# CLI (all run as root):
+#
+#   borg-data    \
+#   borg-rootfs   > one per repo: borg with that repo + credentials preset, so
+#   borg-remote  /  `sudo borg-data list` or `sudo borg-remote extract ::ARCHIVE path`
+#                   just work. Their synthetic `backup` subcommand refreshes the
+#                   pg_dumps, then triggers that repo's job (archive + prune).
+#
+#   borg-local      NOT a repo -- runs BOTH on-machine backups, data then rootfs.
+#                   "Back up this machine locally" became two operations the day the
+#                   rootfs repo landed, and remembering the second one is exactly the
+#                   thing that silently does not happen. It takes no borg subcommands;
+#                   use borg-data / borg-rootfs for those.
+#
+# `borg-data` was called `borg-local` until 2026-08-05, back when /data held the only
+# local repo. The systemd job was renamed with it -- see the prune.prefix note there,
+# because that rename would otherwise have orphaned every archive taken before it.
 #
 # SECRETS (add to secrets/secrets.yaml via sops):
 #   borg-passphrase  - repo encryption passphrase. KEEP A COPY OFF-HYDROGEN; without
@@ -82,7 +94,15 @@ let
   # into it -- which borg stores as a symlink rather than following.
   backupExclude = [ ];
   prune = { keep = { daily = 7; weekly = 16; monthly = 24; }; };
-  passCommand = "cat ${config.sops.secrets.borg-passphrase.path}";
+  # ABSOLUTE PATH TO cat, deliberately. borg execs this string itself, so a bare `cat`
+  # resolves against whatever PATH the caller happened to have. That works from a login
+  # shell and fails everywhere else -- observed as `Passcommand supplied in
+  # BORG_PASSCOMMAND failed: [Errno 2] No such file or directory: 'cat'` when running a
+  # `borg check` under systemd-run, whose PATH is systemd's minimal default. Minimal
+  # environments (systemd-run, a rescue shell, a cron-alike) are exactly where a restore
+  # happens, so the wrappers must not depend on the caller's PATH. The jobs themselves
+  # were never affected -- the nixpkgs module gives those units a full PATH.
+  passCommand = "${pkgs.coreutils}/bin/cat ${config.sops.secrets.borg-passphrase.path}";
 
   # Minecraft writes region files continuously, so archiving the live world can
   # capture a half-written chunk. The server's console is exposed as a FIFO by
@@ -122,7 +142,8 @@ let
 
   # Repo targets + transport, shared between the borg jobs and the CLI wrappers
   # so there is a single source of truth.
-  localRepo = "/data/borg";   # parent /data is the mount; borg init creates the repo
+  # Named for the disk, not for "local" -- both this and rootRepo are on the machine.
+  dataRepo = "/data/borg";    # parent /data is the mount; borg init creates the repo
   # BorgBase repo (an identifier, not a credential — access needs borg-ssh-key + passphrase).
   remoteRepo = "ssh://hl4nxm2t@hl4nxm2t.repo.borgbase.com/./repo";
   # On the root SSD, so it survives /data (see the header). Deliberately NOT under any
@@ -131,6 +152,15 @@ let
   rootRepo = "/var/backup/borg";
   remoteRsh =
     "ssh -i ${config.sops.secrets.borg-ssh-key.path} -o StrictHostKeyChecking=accept-new";
+
+  # Nextcloud and Immich live in the same PostgreSQL instance, so an archive is only
+  # consistent if it carries a dump taken just before it -- not last night's. Shared by
+  # every on-demand path so there is one definition of "fresh".
+  pgRefresh = ''
+    echo "Refreshing PostgreSQL dumps (nextcloud, immich)..."
+    ${pkgs.systemd}/bin/systemctl start --wait \
+      postgresqlBackup-nextcloud.service postgresqlBackup-immich.service
+  '';
 
   # `borg-<name>`: borg with this repo's env preset, plus a `backup` subcommand
   # that refreshes pg_dumps then runs the systemd job. Must run as root (repo
@@ -142,23 +172,66 @@ let
       export BORG_PASSCOMMAND=${lib.escapeShellArg passCommand}
       ${lib.optionalString (rsh != null) "export BORG_RSH=${lib.escapeShellArg rsh}"}
       if [ "''${1-}" = "backup" ]; then
-        echo "Refreshing PostgreSQL dumps (nextcloud, immich)..."
-        ${pkgs.systemd}/bin/systemctl start --wait \
-          postgresqlBackup-nextcloud.service postgresqlBackup-immich.service
+        ${pgRefresh}
         echo "Running borg ${name} backup (archive + prune)..."
         exec ${pkgs.systemd}/bin/systemctl start --wait borgbackup-job-${name}.service
       fi
       exec ${pkgs.borgbackup}/bin/borg "$@"
     '';
+
+  # `borg-local`: both ON-MACHINE repos, /data then root. Not built by mkBorgCli --
+  # it addresses no single repo and must not pretend to, so it takes no borg
+  # subcommands at all.
+  #
+  # SEQUENTIAL, DELIBERATELY. The two jobs read the same ~197 GiB off the same pair of
+  # USB spindles, and each wraps its run in save-off/save-all flush ... save-on for the
+  # Minecraft world (see minecraftFlush). Run together, whichever finishes first turns
+  # autosave back on while the other is still archiving -- the exact race the 03:00/04:30
+  # timer stagger exists to avoid. One after the other costs wall-clock and nothing else.
+  #
+  # AND IT RUNS THE SECOND EVEN IF THE FIRST FAILS. A failing /data is the scenario the
+  # root repo exists for; it must never be the reason the root backup is skipped. Exit
+  # status is non-zero if either job failed, so a caller still sees the failure.
+  borgLocalCli = pkgs.writeShellScriptBin "borg-local" ''
+    set -u
+
+    if [ "$#" -gt 0 ] && [ "$1" != "backup" ]; then
+      echo "borg-local runs both on-machine backups; it is not a repo." >&2
+      echo "It was the /data repo's wrapper until 2026-08-05. For borg subcommands" >&2
+      echo "use the per-repo wrappers instead:" >&2
+      echo "  borg-data   $*   (/data/borg)" >&2
+      echo "  borg-rootfs $*   (/var/backup/borg)" >&2
+      echo "  borg-remote $*   (BorgBase, offsite)" >&2
+      exit 2
+    fi
+
+    ${pgRefresh}
+
+    rc=0
+    for job in data rootfs; do
+      echo
+      echo "=== borg $job: archive + prune ==="
+      if ! ${pkgs.systemd}/bin/systemctl start --wait "borgbackup-job-$job.service"; then
+        echo "borg-local: the $job job FAILED -- continuing with the rest." >&2
+        rc=1
+      fi
+    done
+
+    if [ "$rc" -ne 0 ]; then
+      echo "borg-local: at least one job failed; check journalctl -u borgbackup-job-*" >&2
+    fi
+    exit "$rc"
+  '';
 in
 {
   sops.secrets.borg-passphrase = { };
   sops.secrets.borg-ssh-key = { };
 
   environment.systemPackages = [
-    (mkBorgCli { name = "local"; repo = localRepo; })
-    (mkBorgCli { name = "remote"; repo = remoteRepo; rsh = remoteRsh; })
+    (mkBorgCli { name = "data"; repo = dataRepo; })
     (mkBorgCli { name = "rootfs"; repo = rootRepo; })
+    (mkBorgCli { name = "remote"; repo = remoteRepo; rsh = remoteRsh; })
+    borgLocalCli
   ];
 
   # Consistent Postgres dumps at 02:45, before the 03:00 Borg runs.
@@ -169,13 +242,30 @@ in
     startAt = "*-*-* 02:45:00";
   };
 
-  services.borgbackup.jobs.local = {
+  # RENAMED from `local` on 2026-08-05, when /data stopped being the only local repo.
+  #
+  # THE RENAME IS NOT COSMETIC, because the job name is load-bearing twice over:
+  # archiveBaseName defaults to "<hostname>-<jobname>", and prune.prefix defaults to
+  # archiveBaseName. So this job's prune line used to read --glob-archives
+  # 'hydrogen-local*' and would now read 'hydrogen-data*' -- which would stop matching
+  # every archive taken before the rename. They would never be pruned again: immortal,
+  # and holding ~191 GiB of chunks that could never be freed.
+  #
+  # Widening the prefix to "hydrogen" makes the glob cover both the legacy
+  # hydrogen-local-* series and the new hydrogen-data-* one, so they prune as a single
+  # timeline and the old names age out on their own under 7/16/24. Safe because this is
+  # the only job that writes to this repo -- point anything else at /data/borg and its
+  # archives would fall under this prune too.
+  #
+  # Borg's files cache is keyed by repository ID, not by job name, so the rename costs
+  # nothing at runtime: the first hydrogen-data-* run is still incremental.
+  services.borgbackup.jobs.data = {
     paths = backupPaths;
     exclude = backupExclude;
-    repo = localRepo;
+    repo = dataRepo;
     encryption = { mode = "repokey-blake2"; inherit passCommand; };
     compression = "zstd";
-    inherit prune;
+    prune = prune // { prefix = "hydrogen"; };
     startAt = "*-*-* 03:00:00";
     preHook = minecraftFlush;
   };
@@ -194,7 +284,7 @@ in
 
   # The third copy, on the root SSD. Same paths, same retention, same everything as the
   # other two -- the point is that it is the same mechanism, so there is nothing extra to
-  # understand at restore time and `borg-rootfs` behaves exactly like `borg-local`.
+  # understand at restore time and `borg-rootfs` behaves exactly like `borg-data`.
   #
   # 04:30 RATHER THAN 03:00, for two reasons. The existing pair already fire together and
   # already race over the Minecraft autosave: each wraps its run in save-off/flush … and
@@ -219,12 +309,12 @@ in
   };
 
   # Always re-enable the world autosave, even if borg failed. See minecraftFlush.
-  systemd.services.borgbackup-job-local.serviceConfig.ExecStopPost = [ "${minecraftResume}" ];
+  systemd.services.borgbackup-job-data.serviceConfig.ExecStopPost = [ "${minecraftResume}" ];
   systemd.services.borgbackup-job-remote.serviceConfig.ExecStopPost = [ "${minecraftResume}" ];
   systemd.services.borgbackup-job-rootfs.serviceConfig.ExecStopPost = [ "${minecraftResume}" ];
 
-  # The local job writes to /data — don't run it before the disk is mounted.
-  systemd.services.borgbackup-job-local.unitConfig.RequiresMountsFor = "/data";
+  # The data job writes to /data — don't run it before the disk is mounted.
+  systemd.services.borgbackup-job-data.unitConfig.RequiresMountsFor = "/data";
 
   # The rootfs job WRITES to root but READS /data/immich, and the module only derives
   # RequiresMountsFor from the repo path. Without this, a boot with the array absent runs

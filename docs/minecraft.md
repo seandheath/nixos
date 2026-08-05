@@ -471,10 +471,13 @@ exits non-zero, which would leave autosave off until the next server restart.
 Verify a restore at least once:
 
 ```console
-$ sudo borg-local backup
-$ sudo borg-local list ::<archive> | grep 'minecraft/world/region' | head
-$ sudo borg-local extract --strip-components 3 ::<archive> var/lib/minecraft/world/level.dat
+$ sudo borg-local                  # runs both on-machine repos, /data then root
+$ sudo borg-data list ::<archive> | grep 'minecraft/world/region' | head
+$ sudo borg-data extract --strip-components 3 ::<archive> var/lib/minecraft/world/level.dat
 ```
+
+`borg-local` is the runner for both local repos; `borg-data`, `borg-rootfs` and
+`borg-remote` each address one repo and take any borg subcommand.
 
 Keep exactly one canonical world, on the server. Do not keep a local copy "as a
 backup" — two worlds drift and there will be an argument about which one has the

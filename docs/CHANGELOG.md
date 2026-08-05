@@ -1,6 +1,36 @@
 # Changelog
 
 ## [Unreleased]
+### Changed (Borg CLI names now say what they mean)
+- `borg-local` addressed `/data/borg` specifically, which stopped being "the local one" the
+  moment the root SSD repo landed. Now: **`borg-data`** (`/data/borg`), **`borg-rootfs`**
+  (`/var/backup/borg`) and **`borg-remote`** (BorgBase) are per-repo wrappers, and
+  **`borg-local` runs both on-machine backups** — `/data` then root. "Back up this machine
+  locally" became two operations, and remembering the second is exactly what silently does
+  not happen.
+- `services.borgbackup.jobs.local` → `.data`, so the unit (`borgbackup-job-data`), the CLI
+  and the archive prefix (`hydrogen-data-*`) finally agree.
+- **The rename needed care, and this is the part worth not rediscovering.** `archiveBaseName`
+  defaults to `<hostname>-<jobname>` and `prune.prefix` defaults to `archiveBaseName`, so the
+  prune line would have moved from `--glob-archives 'hydrogen-local*'` to `'hydrogen-data*'` —
+  silently orphaning all 15 pre-rename archives. Never pruned again: immortal, holding ~191 GiB
+  of chunks that could never be freed. `prune.prefix = "hydrogen"` widens the glob so both
+  series prune as one timeline and the legacy names age out under 7/16/24. Verified on the
+  built config before switching. Borg's files cache is keyed by repository ID, not job name,
+  so the rename cost nothing at runtime.
+- `borg-local` refuses borg subcommands rather than silently doing something else — `borg-local
+  list` now errors with the replacement command named, since it used to work. It refreshes the
+  pg_dumps once (both archives get the same snapshot), runs the jobs **sequentially** — they
+  read the same spindles and both toggle the Minecraft autosave — and **runs the second even if
+  the first fails**, because a failing `/data` is precisely the scenario the root repo exists
+  for. Exits non-zero if either failed.
+- **Fixed: `BORG_PASSCOMMAND` was an unqualified `cat`.** It resolved against the caller's PATH,
+  so the wrappers worked from a login shell and failed anywhere else — found when a `borg check`
+  under `systemd-run` died with `[Errno 2] No such file or directory: 'cat'` after the repository
+  check had already passed. Minimal environments are exactly where a restore happens. Now
+  `${pkgs.coreutils}/bin/cat`. The jobs were never affected; the nixpkgs module gives those
+  units a full PATH.
+
 ### Added (a third Borg repo, on hydrogen's root SSD)
 - **The exposure.** `/data` is btrfs **RAID0** across two USB-attached rotational disks, so
   either member dying takes the array — and the array held two of the three copies of
