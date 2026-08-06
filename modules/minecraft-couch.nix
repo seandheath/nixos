@@ -785,6 +785,21 @@
           # Keep the exec-once process alive so its children stay in the session's
           # control group; Hyprland exiting still kills the lot.
           wait
+
+          # ...and now make that relationship two-directional: when the last player
+          # has exited, end the session so the projector returns to GNOME by itself.
+          #
+          # Without this, quitting via Minecraft's own "Quit Game" -- the obvious
+          # thing to do, and the only exit a gamepad can reach -- left an empty
+          # compositor on a black screen, recoverable only with SUPER+SHIFT+Q on a
+          # keyboard that may not be near the couch. `wait` returns only once every
+          # backgrounded player is gone, so a session with three players still in it
+          # is unaffected by the fourth quitting.
+          #
+          # This also bounds the failure case: a player that dies without ever
+          # opening a window now ends the session (after awaitNewWindow's timeout
+          # and its notification) instead of leaving a blank screen indefinitely.
+          hyprctl dispatch exit
         '';
       };
 
