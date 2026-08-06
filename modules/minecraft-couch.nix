@@ -705,10 +705,19 @@
 
           total="$(wc -l < "$picks")"
 
-          # Projector geometry, straight from the compositor -- no 1080p assumption.
+          # Screen geometry, straight from the compositor -- no 1080p assumption.
+          #
+          # Select the FOCUSED monitor, not .[0]. The config mirrors every external
+          # output onto eDP-1, so there should only ever be one candidate -- but
+          # .[0] is aquamarine's enumeration order, which is not the order windows
+          # open in, and a mirror rule that fails to match (a connector named
+          # something other than DP-1..3) would silently reintroduce a second entry.
+          # The windows are placed on the focused monitor, so its dimensions are the
+          # ones the quadrant math has to describe. Fall back to .[0] if nothing
+          # reports focus.
           mon="$(hyprctl -j monitors)"
-          sw="$(printf '%s' "$mon" | jq -r '.[0].width')"
-          sh="$(printf '%s' "$mon" | jq -r '.[0].height')"
+          sw="$(printf '%s' "$mon" | jq -r 'map(select(.focused)) + . | .[0].width')"
+          sh="$(printf '%s' "$mon" | jq -r 'map(select(.focused)) + . | .[0].height')"
           hw=$(( sw / 2 )); hh=$(( sh / 2 ))
 
           # Quadrant (or half, or full) geometry for player $1 of $2, as "X Y W H".
@@ -783,8 +792,26 @@
       # Layer 3: the compositor config. Generated, never user state.
       # ---------------------------------------------------------------------
       hyprConf = pkgs.writeText "minecraft-couch-hyprland.conf" ''
-        # Projector at its native mode, no scaling.
-        monitor = , preferred, auto, 1
+        # ONE LOGICAL SCREEN, ALWAYS. The internal panel is the session's screen and
+        # every external output mirrors it, rather than extending the desktop.
+        #
+        # Two reasons, and the second is the one that bites. First, this box drives
+        # the projector from a laptop that is also its own console, so "play on the
+        # panel and show the same thing on the projector" is what is actually wanted
+        # -- and GNOME's display settings cannot deliver it, because the couch
+        # session is a separate compositor on tty7 that never sees them. Second, the
+        # bare `monitor = , preferred, auto, 1` catch-all this replaces positions a
+        # newly-plugged output *beside* the panel, and minecraft-couch-spawn then has
+        # two monitors to choose between when it computes quadrants (see the
+        # `.focused` selector there). Mirroring keeps that choice from existing.
+        #
+        # All three DP connectors are listed because the projector's cable can land
+        # on any of them; eDP-1 is the only output that is always present. A
+        # connector that is not plugged in costs nothing.
+        monitor = eDP-1, preferred, auto, 1
+        monitor = DP-1, preferred, auto, 1, mirror, eDP-1
+        monitor = DP-2, preferred, auto, 1, mirror, eDP-1
+        monitor = DP-3, preferred, auto, 1, mirror, eDP-1
 
         # SDL's udev enumeration would still list the other players' event nodes
         # (they exist in /run/udev, just not in the sandbox's /dev/input) and log
