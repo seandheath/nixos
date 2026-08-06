@@ -46,9 +46,17 @@ in
       # family laptops -- is simply not routable from here.
       allowedIPs = [ "${fam.address}/32" "${adm.address}/32" ];
 
-      # Replaced at runtime with hydrogen's LAN address when this machine is at home;
-      # see modules/family/wg-endpoint.nix. This value is what it falls back to.
-      endpoint = "${peers.endpointHost}:${toString fam.port}";
+      # A BOOTSTRAP VALUE, and deliberately an IP literal rather than
+      # ${peers.endpointHost}. modules/family/wg-endpoint.nix owns endpoint selection
+      # from here on and overwrites this within seconds of boot.
+      #
+      # It must not be a hostname: wg-quick resolves the endpoint while CREATING the
+      # interface, and a failed lookup aborts the whole unit -- which then sits failed
+      # and never retries. A laptop behind a captive portal, or one that boots before
+      # DNS is up, would have no tunnel at all until someone restarted it by hand. An
+      # address that is merely *wrong* when away from home is harmless by comparison;
+      # wg-endpoint corrects it on the first run.
+      endpoint = "${peers.lanEndpoint}:${toString fam.port}";
 
       # Keeps the NAT mapping alive so the hub can reach back, and bounds how long a
       # re-targeted endpoint takes to produce a handshake.

@@ -292,9 +292,11 @@ in
     peers = [{
       publicKey = adm.publicKey;
       allowedIPs = [ "${adm.address}/32" peers.hubs.fam.subnet ];
-      # Rewritten at runtime to hydrogen's LAN address when sulfur is at home; see
-      # modules/family/wg-endpoint.nix. This is the fallback.
-      endpoint = "${peers.endpointHost}:${toString adm.port}";
+      # Bootstrap only, and an IP literal on purpose -- modules/family/wg-endpoint.nix
+      # owns endpoint selection and rewrites this at boot. A hostname here would make
+      # DNS a hard dependency of interface creation: wg-quick resolves the endpoint in
+      # `wg setconf`, and a failed lookup takes the whole unit down with it.
+      endpoint = "${peers.lanEndpoint}:${toString adm.port}";
       persistentKeepalive = 25;
     }];
   };

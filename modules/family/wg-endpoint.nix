@@ -87,16 +87,30 @@ in
   };
 
   config = lib.mkIf (cfg != { }) {
-    systemd.services.wg-endpoint = {
-      description = "Point WireGuard endpoints at the LAN or public address";
-      after = [ "network-online.target" ];
-      wants = [ "network-online.target" ];
-      wantedBy = [ "multi-user.target" ];
-      serviceConfig = {
-        Type = "oneshot";
-        ExecStart = script;
+    systemd.services = {
+      wg-endpoint = {
+        description = "Point WireGuard endpoints at the LAN or public address";
+        after = [ "network-online.target" ];
+        wants = [ "network-online.target" ];
+        wantedBy = [ "multi-user.target" ];
+        serviceConfig = {
+          Type = "oneshot";
+          ExecStart = script;
+        };
       };
-    };
+    }
+    # wg-quick's unit is a oneshot: if bringing the interface up fails for any reason it
+    # stays failed forever, and on a child's laptop nobody is going to notice a dead
+    # systemd unit. Retry instead. (The usual cause -- a hostname endpoint that could not
+    # be resolved at boot -- is gone now that the configured endpoint is an IP literal,
+    # but "no tunnel until an adult intervenes" is a bad enough failure mode to defend
+    # against twice.)
+    // lib.mapAttrs' (iface: _: lib.nameValuePair "wg-quick-${iface}" {
+      serviceConfig = {
+        Restart = "on-failure";
+        RestartSec = 10;
+      };
+    }) cfg;
 
     # Re-run on every connectivity change. The dispatcher only kicks the unit rather
     # than doing the work: NetworkManager runs these scripts serially and this one
