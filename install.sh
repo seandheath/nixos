@@ -38,27 +38,48 @@ if [[ "${1:-}" == "--resume" ]]; then
         fi
     fi
 
+    # Family laptops set both passwords declaratively from sops (see
+    # modules/family/profile.nix), so there is no `passwd` in the system profile to run.
+    # Same list as the main path below; kept in step with modules/family/peers.nix.
+    resume_is_family=false
+    for _fh in gentlemenpupil vizualwanderer phantomspecialst maddreamer; do
+        [[ "$hostname" == "$_fh" ]] && resume_is_family=true && break
+    done
+
+    finish_install() {
+        rm -f "$RESUME_FILE"
+        if [[ "$resume_is_family" == "true" ]]; then
+            echo "Passwords on this host come from secrets/family.yaml; nothing to set here."
+        fi
+        echo "Configuration complete! You can now reboot."
+    }
+
+    enter_and_set_passwords() {
+        if [[ "$resume_is_family" == "true" ]]; then
+            return 0
+        fi
+        echo "You will now be dropped into a shell in the new system."
+        echo ">>> Please run 'passwd sheath' to set your user password, then type 'exit' to continue. <<<"
+        sudo nixos-enter --root /mnt
+    }
+
     case "$stage" in
         "install")
             echo "Resuming nixos-install..."
             if sudo nixos-install --root /mnt --flake "/mnt/home/sheath/nixos#${hostname}"; then
                 echo "stage=passwd" >> "$RESUME_FILE"
-                echo "Installation finished. You will now be dropped into a shell in the new system."
-                echo ">>> Please run 'passwd sheath' to set your user password, then type 'exit' to continue. <<<"
-                sudo nixos-enter --root /mnt
-                rm -f "$RESUME_FILE"
-                echo "Configuration complete! You can now reboot."
+                echo "Installation finished."
+                enter_and_set_passwords
+                finish_install
             else
                 echo "Installation failed again. Check the logs and try again."
                 exit 1
             fi
             ;;
         "passwd")
-            echo "Installation was successful. Entering system to set password..."
-            echo ">>> Please run 'passwd sheath' to set your user password, then type 'exit' to continue. <<<"
-            sudo nixos-enter --root /mnt
-            rm -f "$RESUME_FILE"
-            echo "Configuration complete! You can now reboot."
+            echo "Installation was successful."
+            enter_and_set_passwords
+            finish_install
             ;;
         *)
             echo "Unknown resume stage: $stage"
@@ -105,6 +126,9 @@ echo "Select installation mode:"
 echo "  1) Simple (ext4, no encryption)"
 echo "  2) Impermanence (Btrfs + LUKS encryption)"
 echo "  3) Impermanence (Btrfs, no encryption)"
+echo
+echo "  The family laptops (gentlemenpupil, vizualwanderer, phantomspecialst,"
+echo "  maddreamer) must use option 1 -- they do not import modules/impermanence.nix."
 read -p "Enter choice [1-3]: " INSTALL_MODE
 
 case "$INSTALL_MODE" in
@@ -262,6 +286,49 @@ fi
 
 echo "Selected host: $hostname"
 
+# --- Family host handling ---
+# The four kids' laptops differ from every other host in three ways that this script
+# has to know about: which age key they get, which disk layout they support, and how
+# their passwords are set. Keep this list in step with `family` in
+# modules/family/peers.nix (minus osmium, which is sheath's own machine and holds the
+# main key).
+FAMILY_HOSTS=(gentlemenpupil vizualwanderer phantomspecialst maddreamer)
+IS_FAMILY_HOST=false
+for _fh in "${FAMILY_HOSTS[@]}"; do
+    if [[ "$hostname" == "$_fh" ]]; then
+        IS_FAMILY_HOST=true
+        break
+    fi
+done
+
+if [[ "$IS_FAMILY_HOST" == "true" ]]; then
+    # modules/family/profile.nix imports modules/sops.nix, whose keyFile is
+    # ${config.users.users.sheath.home}/.config/sops/age/keys.txt -- the SIMPLE layout's
+    # path. It does not import impermanence, so nothing would ever populate
+    # /persist/secrets, and sops would fail on first boot with every secret missing
+    # (which on these hosts includes both login passwords -- an unbootable-to-a-login
+    # machine). Refuse rather than produce that.
+    if [[ "$USE_IMPERMANENCE" == "true" ]]; then
+        echo
+        echo -e "\e[1;31mERROR: ${hostname} is a family laptop and only supports Simple mode (option 1).\e[0m"
+        echo "Family hosts keep the age key at /home/sheath/.config/sops/age/keys.txt and do"
+        echo "not import modules/impermanence.nix. Re-run and choose option 1."
+        exit 1
+    fi
+
+    # The whole point of the family age key is that it lives in the repository,
+    # passphrase-protected, so an install needs nothing but this checkout and the
+    # passphrase. If it is absent, something is wrong -- do not silently fall through
+    # to the "paste a plaintext key" prompt.
+    if [[ ! -f secrets/family-age-key.enc ]]; then
+        echo
+        echo -e "\e[1;31mERROR: secrets/family-age-key.enc is missing.\e[0m"
+        echo "Generate it with ./gen-family-secrets.sh on an existing machine and commit it"
+        echo "before installing a family laptop."
+        exit 1
+    fi
+fi
+
 # --- Copy Configuration ---
 echo "Copying configuration to /mnt/home/sheath/nixos..."
 sudo mkdir -p /mnt/home/sheath
@@ -281,6 +348,18 @@ else
     AGE_KEY_DEST="/mnt/home/sheath/.config/sops/age/keys.txt"
 fi
 
+# WHICH key, as opposed to where it goes. The family laptops get the family age key,
+# which decrypts secrets/family.yaml (their own WireGuard key and passwords) and
+# NOTHING else -- not the Nextcloud admin password, the Borg repository key or the
+# fleet VPN SSH key. See .sops.yaml. These machines leave the house, are used by
+# children and are not disk-encrypted, so the main key has no business on them.
+if [[ "$IS_FAMILY_HOST" == "true" ]]; then
+    AGE_KEY_ENC="secrets/family-age-key.enc"
+    echo "Family host: using ${AGE_KEY_ENC} (decrypts secrets/family.yaml only)."
+else
+    AGE_KEY_ENC="secrets/age-key.enc"
+fi
+
 # Decrypt $1 to stdout using whatever age implementation is available in the live env.
 age_decrypt() {
     if command -v age >/dev/null 2>&1; then age -d "$1"
@@ -289,20 +368,20 @@ age_decrypt() {
     fi
 }
 
-if [[ -f secrets/age-key.enc ]]; then
-    echo "Decrypting secrets/age-key.enc (enter its passphrase)..."
+if [[ -f "$AGE_KEY_ENC" ]]; then
+    echo "Decrypting ${AGE_KEY_ENC} (enter its passphrase)..."
     sudo mkdir -p "$(dirname "$AGE_KEY_DEST")"
-    if age_decrypt secrets/age-key.enc | sudo tee "$AGE_KEY_DEST" >/dev/null; then
+    if age_decrypt "$AGE_KEY_ENC" | sudo tee "$AGE_KEY_DEST" >/dev/null; then
         sudo chmod 600 "$AGE_KEY_DEST"
         echo "Age key installed at ${AGE_KEY_DEST#/mnt}"
     else
         sudo rm -f "$AGE_KEY_DEST"
-        echo "ERROR: failed to decrypt secrets/age-key.enc. Secret-backed services will"
+        echo "ERROR: failed to decrypt ${AGE_KEY_ENC}. Secret-backed services will"
         echo "fail on first boot until you place the key at ${AGE_KEY_DEST#/mnt} manually."
     fi
 else
     # Fallback: copy a plaintext key from a path the user provides.
-    read -p "secrets/age-key.enc not found. Path to plaintext age key (or Enter to skip): " AGE_KEY_SRC
+    read -p "${AGE_KEY_ENC} not found. Path to plaintext age key (or Enter to skip): " AGE_KEY_SRC
     if [[ -n "$AGE_KEY_SRC" && -f "$AGE_KEY_SRC" ]]; then
         sudo install -Dm600 "$AGE_KEY_SRC" "$AGE_KEY_DEST"
         echo "Age key installed at ${AGE_KEY_DEST#/mnt}"
@@ -529,7 +608,22 @@ echo "Running nixos-install..."
 if sudo nixos-install --root /mnt --flake "/mnt/home/sheath/nixos#${hostname}"; then
     echo "stage=passwd" >> "$RESUME_FILE"
 
-    if [[ "$USE_IMPERMANENCE" == "true" && "$ENCRYPT" == "true" ]]; then
+    if [[ "$IS_FAMILY_HOST" == "true" ]]; then
+        # No nixos-enter, and no passwd. modules/family/profile.nix sets
+        # users.mutableUsers = false with both accounts' hashedPasswordFile coming from
+        # secrets/family.yaml, so passwords are already set and cannot be changed on the
+        # machine -- NixOS does not even install shadow's `passwd` under mutableUsers =
+        # false, which is also why nixos-install did not prompt for a root password.
+        echo
+        echo "Installation finished!"
+        echo
+        echo "Passwords are declarative on this host: the ${hostname} account and sheath both"
+        echo "read their hash from secrets/family.yaml. Change them by re-running"
+        echo "./gen-family-secrets.sh --rotate and rebuilding, not with passwd."
+        echo "root has no password by design; administer as sheath (NOPASSWD sudo)."
+        echo
+        echo "You can now reboot into your new system."
+    elif [[ "$USE_IMPERMANENCE" == "true" && "$ENCRYPT" == "true" ]]; then
         echo
         echo "Installation finished!"
         echo "Note: With LUKS impermanence, passwords are stored in /persist/secrets/"

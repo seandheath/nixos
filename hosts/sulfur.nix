@@ -2,6 +2,8 @@
 
 let
   dock-monitors = import ../packages/dock-monitors.nix { inherit pkgs; };
+  peers = import ../modules/family/peers.nix;
+  adm = peers.hubs.adm;
 in
 {
   imports = [
@@ -15,18 +17,20 @@ in
     ../modules/impermanence.nix
     ../modules/wivrn.nix
     ../modules/fleet-vpn.nix
-    ../modules/minecraft-client.nix   # the offline client (game + mods pinned), shared with hydrogen
+    ../modules/minecraft-client.nix       # the offline client (game + mods pinned), shared with hydrogen
+    ../modules/family/wg-endpoint.nix     # keeps wgadm pointed at the LAN or the WAN
   ];
 
-  # Minecraft client for hydrogen's server (modules/minecraft-server.nix), reached at
-  # 10.0.0.10:25565 over the LAN or the tunnel. The whole game -- jar, libraries,
-  # assets, JVM, mods -- is a pinned Nix payload (packages/minecraft-client), so the
-  # desktop entry starts a playable, correctly-modded client on a machine that has
-  # never run it. See docs/minecraft.md.
+  # Minecraft client for hydrogen's server (modules/minecraft-server.nix). Reached by
+  # name over wgadm now, not at 10.0.0.10 -- 25565 is no longer open on the LAN
+  # (hosts/hydrogen.nix). networking.hosts below resolves the name to 10.42.0.1. The
+  # whole game -- jar, libraries, assets, JVM, mods -- is a pinned Nix payload
+  # (packages/minecraft-client), so the desktop entry starts a playable,
+  # correctly-modded client on a machine that has never run it. See docs/minecraft.md.
   services.minecraftClient = {
     enable = true;
     playerName = "LuckyObserver";
-    server = "10.0.0.10:25565";
+    server = "mc.luckyobserver.com:25565";
   };
 
   # Boot
@@ -239,6 +243,69 @@ in
       ip route del 10.0.0.0/24 dev wg0 metric 1000 || true
     '';
   };
+
+  # --------------------------------------------------------------------------
+  # sheath's login password, from sops rather than /persist/secrets/sheath-password.
+  #
+  # modules/impermanence.nix already sets users.mutableUsers = false and points this at a
+  # plaintext hash that install.sh writes once, by hand, per machine -- so the password on
+  # this laptop, hydrogen and the four kids' laptops could drift apart with nothing to
+  # notice. One sops entry is now the source for all six.
+  #
+  # It lives in secrets/family.yaml, which needs saying: that file is encrypted to the
+  # main key AND the family key (see .sops.yaml), so this host reads it with the main key
+  # it already has. sopsFile is explicit because this host's defaultSopsFile is
+  # secrets/secrets.yaml.
+  #
+  # root is deliberately left on /persist/secrets/root-password. It is the recovery path
+  # for a machine whose /home -- and therefore whose age key -- did not mount, and that is
+  # exactly when a sops-backed password would be unavailable.
+  #
+  # REVERT: drop these two lines. /persist/secrets/sheath-password is still there and
+  # modules/impermanence.nix picks it back up.
+  sops.secrets."sheath-password-hash" = {
+    sopsFile = ../secrets/family.yaml;
+    neededForUsers = true;
+  };
+  users.users.sheath.hashedPasswordFile =
+    lib.mkForce config.sops.secrets."sheath-password-hash".path;
+
+  # --------------------------------------------------------------------------
+  # wgadm: the administrative tunnel to hydrogen (modules/family/vpn-hub.nix).
+  #
+  # This is now the ONLY way into hydrogen's services. As of 2026-08-06 that host
+  # scopes every service port to a WireGuard interface and keeps nothing but sshd on
+  # br0, so SSH, RustDesk, Syncthing, Immich, Nextcloud, Paperless and Minecraft all
+  # arrive here. wg0 above stays as it is -- it reaches the LAN, which is the
+  # break-glass path if this tunnel or hydrogen's sops decrypt ever breaks.
+  #
+  # 10.41.0.0/24 is in allowedIPs because sulfur administers the kids' laptops over
+  # SSH; hydrogen forwards exactly port 22 in that direction and drops the rest.
+  sops.secrets.${peers.admin.sulfur.secret} = { };
+
+  networking.wg-quick.interfaces.${adm.interface} = {
+    # /32 with explicit host/route entries, so nothing here can shadow the local
+    # network the way a /24 would -- no `table = "off"` dance needed, unlike wg0.
+    address = [ "${peers.admin.sulfur.address}/32" ];
+    privateKeyFile = config.sops.secrets.${peers.admin.sulfur.secret}.path;
+
+    peers = [{
+      publicKey = adm.publicKey;
+      allowedIPs = [ "${adm.address}/32" peers.hubs.fam.subnet ];
+      # Rewritten at runtime to hydrogen's LAN address when sulfur is at home; see
+      # modules/family/wg-endpoint.nix. This is the fallback.
+      endpoint = "${peers.endpointHost}:${toString adm.port}";
+      persistentKeepalive = 25;
+    }];
+  };
+
+  family.wgEndpoint.${adm.interface} = {
+    inherit (adm) publicKey port;
+  };
+
+  # hydrogen's vhosts, resolved to the admin tunnel. Same names as the public ones, so
+  # the wildcard cert in modules/reverse-proxy.nix still matches.
+  networking.hosts.${adm.address} = peers.serviceNames;
 
   # Required to avoid dropping asymmetric routing replies from WireGuard interface
   networking.firewall.checkReversePath = "loose";

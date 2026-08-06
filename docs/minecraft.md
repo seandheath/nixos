@@ -97,24 +97,41 @@ because it matches on names that are themselves unauthenticated.
 
 **Reachability is therefore the authentication boundary.**
 
-- `openFirewall = false` on the service; 25565 is opened only on `br0`
-  (`hosts/hydrogen.nix`).
-- hydrogen has **no `wg0`**. The WireGuard hub lives on the router
-  (`vpn.luckyobserver.com`, tunnel `10.40.0.0/24`) and remote peers route to
-  hydrogen's LAN address `10.0.0.10` — so tunnel traffic arrives on `br0` exactly
-  like LAN traffic. The single `br0` rule covers both.
-- The router forwards only `51820/udp`, so 25565 is not reachable from the
-  internet.
+Until 2026-08-06 that boundary was the home LAN: 25565 was opened on `br0`, hydrogen
+had no WireGuard interface of its own, and remote peers came in via the router's hub
+(`vpn.luckyobserver.com`, `10.40.0.0/24`) which forwarded to hydrogen's LAN address —
+so tunnel traffic and wifi traffic were indistinguishable and one `br0` rule covered
+both. Anyone who ever got onto the wifi could join as any child.
 
-**Re-verify that last point after any router change.** From a phone on cellular:
+Now the boundary is a private key:
+
+- `openFirewall = false` on the service; 25565 is opened only on hydrogen's own
+  WireGuard interfaces (`hosts/hydrogen.nix`, `modules/family/vpn-hub.nix`):
+  - `wgfam` (`10.41.0.0/24`, port 51821) — the kids' laptops, phones, osmium, surface
+  - `wgadm` (`10.42.0.0/24`, port 51822) — sulfur
+- **Not `br0`.** A device on the LAN with no key gets nothing. The couch clients are
+  unaffected: they connect over `127.0.0.1`, and `server-ip` is deliberately unset so
+  the server listens everywhere and interface scoping does the work.
+- The router forwards `51820`, `51821` and `51822/udp` and nothing else, so 25565 is
+  not reachable from the internet.
+
+**Re-verify after any router change.** From a phone on cellular:
 
 ```console
 $ nc -vz <wan-address> 25565
 nc: connect to <wan-address> port 25565 (tcp) failed: Connection refused
 ```
 
-Residual risk, accepted: any enrolled peer can log in as any username. In practice
-that means one child logging in as a sibling.
+...and from a phone on the home wifi with WireGuard switched **off**, which is the
+check that this model actually holds:
+
+```console
+$ nc -vz 10.0.0.10 25565
+nc: connect to 10.0.0.10 port 25565 (tcp) failed: Connection refused
+```
+
+Residual risk, accepted and unchanged: any enrolled peer can log in as any username.
+In practice that means one child logging in as a sibling.
 
 ---
 

@@ -1,5 +1,5 @@
 # Shared Bluetooth configuration. Imported by workstation.nix and
-# surface-tablet.nix (deduplicated when a host pulls in both).
+# workstation.nix (deduplicated when a host pulls in both).
 { ... }:
 {
   hardware.bluetooth = {

@@ -4,8 +4,9 @@
 # Runs as a system service independent of any graphical session, so the world is
 # joinable after a reboot with nobody logged in. Two classes of client:
 #   - the couch clients (modules/minecraft-couch.nix) over 127.0.0.1, and
-#   - remote devices over the router's WireGuard tunnel, which reach hydrogen at
-#     its LAN address and therefore arrive on br0.
+#   - every other device over one of hydrogen's own WireGuard hubs
+#     (modules/family/vpn-hub.nix): the kids' laptops and phones on wgfam, sulfur on
+#     wgadm. As of 2026-08-06 the LAN is NOT one of them -- see SECURITY below.
 #
 # THE SERVER RUNS FABRIC (packages/fabric-server.nix), over the same vanilla jar.
 # It was deliberately loader-free until 2026-08-04; what changed and why:
@@ -34,10 +35,15 @@
 # SECURITY: online-mode=false means the server performs NO identity verification --
 # anything that can reach 25565 may claim any username, and a whitelist does not
 # help because it matches on names that are themselves unauthenticated. The
-# network boundary is therefore the authentication boundary: openFirewall is off
-# here and the port is scoped to br0 in hosts/hydrogen.nix (LAN + tunnel peers,
-# never the internet -- the router forwards only 51820/udp). Residual risk: one
-# child can log in as a sibling. Known; not worth more machinery.
+# network boundary is therefore the authentication boundary.
+#
+# That boundary USED TO BE THE HOME LAN, which is a weak thing to authenticate with:
+# openFirewall is off here and the port was scoped to br0, so any device on the wifi --
+# a guest phone, anything that ever learned the passphrase -- could join as any child.
+# Since 2026-08-06 the port is scoped to hydrogen's own WireGuard interfaces instead
+# (hosts/hydrogen.nix, modules/family/vpn-hub.nix), so joining requires a private key
+# rather than proximity. Residual risk is unchanged and still accepted: one child can
+# log in as a sibling, because they are peers of equal standing on wgfam.
 let
   datapacks = import ../packages/minecraft-datapacks.nix { inherit pkgs; };
   mods = import ../packages/minecraft-client-mods.nix { inherit pkgs; };

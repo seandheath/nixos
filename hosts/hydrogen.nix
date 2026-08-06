@@ -14,6 +14,7 @@
     ../modules/backup.nix
     ../modules/auto-update.nix        # nightly stable-branch security updates (server runs 24/7)
     ../modules/fleet-vpn.nix          # on-demand WireGuard tunnel to the Jellyfin fleet (manual switch)
+    ../modules/family/vpn-hub.nix     # wgadm (sulfur) + wgfam (family devices) -- see the firewall block below
     ../modules/minecraft-server.nix   # persistent vanilla world (system service, no session needed)
     ../modules/minecraft-couch.nix    # 1-4 player split-screen launcher on the projector
     ../modules/minecraft-client.nix   # the offline client (game + mods pinned), shared with sulfur
@@ -73,15 +74,45 @@
   networking.defaultGateway = "10.0.0.1";
   networking.nameservers = [ "10.0.0.1" ];
   networking.firewall.enable = true;
+
+  # ---------------------------------------------------------------------------
+  # THE ACCESS BOUNDARY. Read this whole block before changing any port anywhere.
+  #
+  # Every service on this box is reachable only over a WireGuard interface. Being on
+  # the home wifi grants nothing but SSH. That is a deliberate change from how this
+  # host worked until now, and the reason is modules/minecraft-server.nix: that server
+  # runs online-mode=false and verifies no identity, so whatever can reach 25565 may
+  # claim to be any child. Scoping it to br0 meant "any device on the LAN", including
+  # a guest phone and anything that ever gets onto the wifi.
+  #
+  # The two hubs are modules/family/vpn-hub.nix:
+  #   wgadm (10.42.0.0/24, port 51822)  sulfur only -- full administrative access
+  #   wgfam (10.41.0.0/24, port 51821)  family devices -- web + Minecraft, nothing else
+  #
+  # The router's own hub (vpn.luckyobserver.com:51820, 10.40.0.0/24) still exists and
+  # still reaches the LAN, but it is NOT listed here and therefore reaches no service.
+  # It is the break-glass path: combined with 22 on br0 below, a broken wgadm config or
+  # a failed sops decrypt cannot lock you out of the box.
+  #
+  # Only the two WireGuard listen ports face the internet. The router forwards 51820,
+  # 51821 and 51822/udp and nothing else -- verify that from off-tunnel after any router
+  # change, as docs/minecraft.md has said all along.
   networking.firewall.allowedTCPPorts = [
-    22
-    80
-    443
-    6789
-    7878
-    8096
-    8989
+    # Nothing. Every service port lives in an interface-scoped list below.
+    #
+    # Removed 2026-08-06: 6789, 7878, 8096, 8989 (sabnzbd/radarr/jellyfin/sonarr) --
+    # modules/usenet.nix has not been imported by any host for a long time, so these
+    # were open to the whole LAN for services that do not run.
   ];
+  networking.firewall.allowedUDPPorts = [
+    51821   # wgfam -- family devices
+    51822   # wgadm -- sulfur
+  ];
+
+  # Break-glass only. sshd is the one thing still reachable by LAN address, so that a
+  # mistake in the tunnel configuration is recoverable without walking to the machine.
+  # It is key-based with PermitRootLogin = "no" (see services.openssh below).
+  networking.firewall.interfaces."br0".allowedTCPPorts = [ 22 ];
   environment.systemPackages = with pkgs; [
     rustdesk-flutter   # RustDesk host (this box is remote-controlled); LAN direct-IP
     rustup
@@ -160,38 +191,44 @@
   '';
   services.desktopManager.gnome.extraGSettingsOverridePackages = [ pkgs.gnome-settings-daemon ];
 
-  # RustDesk direct-IP remote desktop (LAN). Captures via the xdg-desktop-portal
-  # ScreenCast path, which works on this NVIDIA+Wayland box — unlike gnome-remote-desktop
-  # RDP (blank frames, mutter #3297) and Sunshine KMS capture (GL_INVALID_VALUE), both
+  # RustDesk direct-IP remote desktop. Captures via the xdg-desktop-portal ScreenCast
+  # path, which works on this NVIDIA+Wayland box — unlike gnome-remote-desktop RDP
+  # (blank frames, mutter #3297) and Sunshine KMS capture (GL_INVALID_VALUE), both
   # tried and abandoned. Host app runs in the autologin session; set an unattended
   # password + enable direct-IP in its Security settings. 21118 is the direct-access
   # port; open its full range.
-  networking.firewall.interfaces."br0".allowedTCPPorts = [
-    21115 21116 21117 21118 21119   # RustDesk (see above)
+  #
+  # Direct-IP now means the wgadm address 10.42.0.1, not 10.0.0.10 — it moved off the
+  # LAN with everything else. Update the saved connection on sulfur accordingly.
 
-    # Minecraft (modules/minecraft-server.nix). Scoped to br0 rather than opened
-    # globally: the server runs online-mode=false and performs no identity
-    # verification, so reachability IS the authentication boundary.
-    #
-    # There is no wg0 on this host — the WireGuard hub lives on the router
-    # (vpn.luckyobserver.com, tunnel 10.40.0.0/24) and remote peers route to
-    # hydrogen's LAN address 10.0.0.10, so tunnel traffic ingresses on br0 just
-    # like LAN traffic. This rule therefore admits the home LAN and enrolled
-    # peers, and nothing else: the router forwards only 51820/udp, so 25565 is
-    # not reachable from the internet. Verify that from off-tunnel after any
-    # router change — it is the single most important check for this service.
+  # --- wgadm: sulfur, full administrative access ------------------------------
+  networking.firewall.interfaces."wgadm".allowedTCPPorts = [
+    22                              # SSH (also on br0 as break-glass, above)
+    80 443                          # the vhosts in modules/reverse-proxy.nix
+    25565                           # Minecraft (modules/minecraft-server.nix)
+    21115 21116 21117 21118 21119   # RustDesk (see the comment above this block)
+    22000                           # Syncthing sync protocol
+  ];
+  networking.firewall.interfaces."wgadm".allowedUDPPorts = [
+    21116           # RustDesk
+    22000 21027     # Syncthing sync + local discovery
+  ];
+
+  # --- wgfam: family devices --------------------------------------------------
+  # Web services and the game. Note what is absent: 22, RustDesk, Syncthing. A family
+  # peer that tries them is rejected here even before hydrogen's FORWARD policy
+  # (modules/family/vpn-hub.nix) stops it addressing anything but this host.
+  networking.firewall.interfaces."wgfam".allowedTCPPorts = [
+    80 443
     25565
 
     # Veloren game port (modules/veloren-server.nix). Closed alongside the disabled
-    # import above; re-open with it. Scoped to br0 for exactly the reason spelled out
-    # for 25565: the server runs with auth_server_address: None and verifies no
-    # identity, so reachability IS the authentication boundary.
+    # import above; re-open with it, here rather than on br0 -- that server also runs
+    # with auth_server_address: None and verifies no identity, so it belongs behind the
+    # tunnel for exactly the reason 25565 does.
     # 14004
   ];
-  networking.firewall.interfaces."br0".allowedUDPPorts = [
-    21116   # RustDesk
-    # 14006 # Veloren server-browser query — closed with the disabled import above
-  ];
+  # networking.firewall.interfaces."wgfam".allowedUDPPorts = [ 14006 ]; # Veloren query
 
   # Auto-start the RustDesk host with the (autologin) graphical session, so the box
   # accepts connections after boot without launching it by hand. Runs as a user
@@ -288,6 +325,39 @@
     settings.PermitRootLogin = "no";
   };
 
+  # ---------------------------------------------------------------------------
+  # Declarative passwords, from sops.
+  #
+  # mutableUsers = false is what makes the declared hashes authoritative; with the
+  # default (true) NixOS only applies a declared password when it CREATES the account,
+  # so setting hashedPasswordFile alone would change nothing on this running system.
+  #
+  # THE CONSEQUENCE, stated plainly: this also discards the root password that was set
+  # interactively at install time. Declared state becomes the whole state. That is why
+  # root is declared here as well -- without it the systemd emergency shell would have no
+  # way in, and a server that cannot be rescued from its own console is a bad trade for a
+  # tidier password story. (nixpkgs' assertion in config/users-groups.nix would still pass
+  # on sheath's key alone; passing that assertion is not the same as being recoverable.)
+  #
+  # Ordering works because modules/impermanence-server.nix marks /persist neededForBoot,
+  # so the age key at /persist/secrets/age-keys.txt is readable before
+  # sops-install-secrets-for-users runs. Read that comment before changing either.
+  #
+  # sheath's hash comes from secrets/family.yaml -- encrypted to the main key AND the
+  # family key, so hydrogen, sulfur and the four laptops all share one entry. root's stays
+  # in secrets/secrets.yaml: the kids' laptops have no business with it and leave root
+  # locked on purpose.
+  users.mutableUsers = false;
+
+  sops.secrets."sheath-password-hash" = {
+    sopsFile = ../secrets/family.yaml;
+    neededForUsers = true;
+  };
+  sops.secrets."root-password-hash".neededForUsers = true;
+
+  users.users.sheath.hashedPasswordFile = config.sops.secrets."sheath-password-hash".path;
+  users.users.root.hashedPasswordFile = config.sops.secrets."root-password-hash".path;
+
   # PostgreSQL for nextcloud + immich (shared instance). Pinned explicitly rather
   # than tracking the stateVersion default, so future stateVersion bumps don't
   # silently trigger another major upgrade. Moving 15 -> 17 is a deliberate
@@ -339,9 +409,17 @@
   # Enable Syncthing
   services.syncthing.enable = true;
   # GUI stays on localhost (default 127.0.0.1:8384) — reach it via SSH port-forward:
-  #   ssh -L 8384:localhost:8384 sheath@10.0.0.10  ->  http://localhost:8384
-  # Only open the sync protocol ports (22000/tcp+udp, 21027/udp discovery).
-  services.syncthing.openDefaultPorts = true;
+  #   ssh -L 8384:localhost:8384 sheath@10.42.0.1  ->  http://localhost:8384
+  #
+  # openDefaultPorts opens 22000/tcp+udp and 21027/udp on EVERY interface, which is the
+  # one thing this host no longer does. The same ports are listed under wgadm above, so
+  # sulfur syncs over the admin tunnel and nothing else can reach the daemon.
+  #
+  # CONSEQUENCE: osmium can no longer sync with hydrogen directly — it is a wgfam
+  # peer, and wgfam does not carry 22000. It will fall back to Syncthing's relays or
+  # stall. If that matters, either add 22000/21027 back under interfaces."br0" or give
+  # osmium a wgadm peer.
+  services.syncthing.openDefaultPorts = false;
 
   # Disk layout, initrd modules, swap, hostPlatform and microcode all come from the
   # installer-generated ../hardware/hydrogen.nix (single source of disk-dependent config).

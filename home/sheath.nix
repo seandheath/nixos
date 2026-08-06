@@ -6,7 +6,14 @@ let
   # secrets fails there — and we don't want Pi on the server anyway. Gate on the
   # host so hydrogen's home config needs no user secrets. osConfig is the NixOS
   # config (home-manager runs as a NixOS module here).
-  enablePi = osConfig.networking.hostName != "hydrogen";
+  #
+  # The family laptops are excluded for a different reason: they carry the FAMILY age
+  # key, which by design cannot decrypt secrets/secrets.yaml (see .sops.yaml), so the
+  # openwebui-* secrets below would fail activation there — and Pi has no business on a
+  # child's machine either way. `or false` because modules/family/profile.nix is the
+  # module that declares family.enable, and the other hosts never import it.
+  enablePi = osConfig.networking.hostName != "hydrogen"
+    && !(osConfig.family.enable or false);
 in
 {
   imports = [

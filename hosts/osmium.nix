@@ -10,6 +10,13 @@
     ../modules/steam.nix
     ../modules/workstation.nix
     ../modules/virtualisation.nix
+
+    # Family tunnel. Not an admin machine -- that is sulfur alone, on wgadm -- but
+    # hydrogen's web services moved off the LAN entirely on 2026-08-06, so reaching
+    # Immich/Nextcloud/Paperless from here requires a WireGuard key like everyone
+    # else's. The peer address and secret name come from the hostname; see
+    # modules/family/peers.nix.
+    ../modules/family/vpn-peer.nix
   ];
 
   # Boot

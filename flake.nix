@@ -82,14 +82,6 @@
           chaotic.nixosModules.default
         ] ++ commonModules;
       };
-      surface = nixpkgs.lib.nixosSystem {
-        system = "x86_64-linux";
-        specialArgs = { inherit inputs; lib = nixpkgs.lib; };
-        modules = [
-          ./hosts/surface.nix
-          nixos-hardware.nixosModules.microsoft-surface-go
-        ] ++ commonModules;
-      };
       sulfur = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
         specialArgs = { inherit inputs; lib = nixpkgs.lib; };
@@ -100,6 +92,28 @@
           chaotic.nixosModules.default
         ] ++ commonModules;
       };
-    };
+    }
+    # The kids' laptops. Identical apart from the hostname, which is the only thing
+    # they declare: modules/family/profile.nix derives the username, WireGuard peer
+    # address, sops key names and Minecraft handle from it via
+    # modules/family/peers.nix.
+    #
+    # They still get commonModules, and therefore the sheath account and its home
+    # config -- that is what makes them administrable. What they do NOT get is
+    # modules/workstation.nix; see the header of modules/family/profile.nix.
+    #
+    # No nixos-hardware module yet: add the matching one here once the actual laptop
+    # models are known. hardware/<name>.nix is a placeholder until install.sh
+    # regenerates it on the real machine.
+    // nixpkgs.lib.genAttrs [
+      "gentlemenpupil"
+      "vizualwanderer"
+      "phantomspecialst"
+      "maddreamer"
+    ] (host: nixpkgs.lib.nixosSystem {
+      system = "x86_64-linux";
+      specialArgs = { inherit inputs; lib = nixpkgs.lib; };
+      modules = [ ./hosts/${host}.nix ] ++ commonModules;
+    });
   };
 }

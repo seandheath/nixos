@@ -1,6 +1,74 @@
 # Changelog
 
 ## [Unreleased]
+### Security (hydrogen's services are behind WireGuard; the LAN is no longer a credential)
+- **What was wrong.** Every service on hydrogen was scoped to `br0`, and the only WireGuard
+  hub lived on the router, forwarding to hydrogen's LAN address — so a tunnel peer *was* a
+  LAN citizen and the firewall could not tell them apart. Network location was the
+  authorisation. `modules/minecraft-server.nix` has always said what that costs: the server
+  runs `online-mode=false` and verifies no identity, so anything that can reach 25565 may
+  claim to be any child. "Anything" included every device that ever joined the wifi.
+- **What replaced it.** Two hubs on hydrogen (`modules/family/vpn-hub.nix`):
+  **`wgadm`** (`10.42.0.0/24`, 51822) for sulfur — SSH, RustDesk, Syncthing and the web
+  services; **`wgfam`** (`10.41.0.0/24`, 51821) for family devices — `80/443` and `25565`,
+  nothing else. `hosts/hydrogen.nix` now opens **no TCP port globally**; the only global
+  entries are the two listen ports.
+- **Peer isolation is enforced on the hub, not just declared on the client.** A family
+  laptop's `allowedIPs` stops it addressing anything but the hub, but that is configuration
+  on a machine a child has physical access to. hydrogen's FORWARD chain is the half that
+  counts: sulfur→laptop port 22, established returns, then `-i wgfam -j DROP` and
+  `-o wgfam -j DROP`. No family peer reaches the LAN, the router's admin page at 10.0.0.2,
+  or a sibling.
+- `22` stays on `br0` deliberately, and the router hub stays alive as LAN-only access. A bad
+  tunnel config or a failed sops decrypt is then recoverable without walking to the machine.
+- **Removed 6789/7878/8096/8989** from hydrogen's global firewall — sabnzbd/radarr/jellyfin/
+  sonarr ports for `modules/usenet.nix`, which no host has imported in a long time.
+- `services.syncthing.openDefaultPorts = false` on hydrogen; 22000/21027 are on `wgadm` only.
+  **Consequence:** osmium can no longer sync with hydrogen directly (it is a `wgfam`
+  peer) and will fall back to relays. Fix is one line if it matters — see the note in
+  `hosts/hydrogen.nix`.
+
+### Added (four family laptops)
+- `modules/family/profile.nix` — the kids' laptop counterpart to `modules/workstation.nix`:
+  GNOME, key-only sshd, NOPASSWD sudo for sheath, `users.mutableUsers = false` with both
+  passwords from sops, and a deliberately small package set (VSCodium, LibreOffice, Chrome,
+  Firefox, Klavaro, KeePassXC, Nextcloud client, Steam, the pinned Minecraft client).
+  It does **not** import `workstation.nix`; the header explains the three reasons.
+- `hosts/{gentlemenpupil,vizualwanderer,phantomspecialst,maddreamer}.nix` declare only a
+  hostname. Username, WireGuard address, sops key names and Minecraft handle all derive from
+  it via `modules/family/peers.nix`.
+- **Hostnames are the kids' Minecraft handles, lowercased — not their names.** Usernames and
+  hostnames are needed at *evaluation* time, so sops cannot supply them (secrets exist only
+  at runtime under `/run/secrets`); the handles were already committed in
+  `modules/minecraft-couch.nix`, identify nobody, and keep the login and game identities in
+  step. Only real secrets went to sops, keyed by that same name: `wg-priv-<host>` and
+  `<host>-password-hash`. An earlier draft numbered them `family-device-1..4` to keep names
+  out of a public repo — redundant once the names are handles, and a second identifier to
+  keep in step for nothing.
+- First use of `sops.secrets.<name>.neededForUsers` in this repo — the only way a declarative
+  password can come from sops, since it decrypts before user creation.
+
+### Added (secret scoping, and a `.sops.yaml` at last)
+- The repo had **no `.sops.yaml`**: one age key read everything. Putting that key on a child's
+  laptop would have handed it the Nextcloud admin password, the Borg repository key and the
+  fleet VPN SSH key. There are now two recipients — `main` keeps `secrets/secrets.yaml`,
+  `family` additionally reads `secrets/family.yaml` (per-device WireGuard keys and password
+  hashes) and nothing else. `install.sh` places the right key per host.
+- `gen-family-secrets.sh` generates all of it — eight WireGuard keypairs, the family age key,
+  five password hashes — without any plaintext reaching a terminal, argv, or shell history.
+  It prints only public keys. Rationale for each contortion is in its header; the short
+  version is that `/proc` makes argv world-readable and `shred` cannot overwrite on CoW.
+
+### Added (tunnels that stay up at home)
+- `modules/family/wg-endpoint.nix` re-targets a live peer with `wg set ... endpoint` on every
+  NetworkManager event and every 5 minutes. At home it uses hydrogen's LAN address, avoiding
+  a NAT-hairpin dependency and a pointless round trip to the WAN port; away it uses
+  `hub.luckyobserver.com`. It **probes rather than assumes** — plenty of other houses use
+  `10.0.0.0/24`, and guessing wrong there would silently leave a child with no tunnel.
+- Requires two manual steps: forward `51821/udp` and `51822/udp` to 10.0.0.10 on the router,
+  and add a Cloudflare CNAME `hub.luckyobserver.com` → `vpn.luckyobserver.com` (which
+  inherits the router's dynamic DNS, and keeps hydrogen's hubs from colliding with the
+  router hub's use of the `vpn.` name).
 ### Changed (Borg CLI names now say what they mean)
 - `borg-local` addressed `/data/borg` specifically, which stopped being "the local one" the
   moment the root SSD repo landed. Now: **`borg-data`** (`/data/borg`), **`borg-rootfs`**

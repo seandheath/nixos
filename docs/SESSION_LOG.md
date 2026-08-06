@@ -1,5 +1,104 @@
 # Session Log
 
+## Session: 2026-08-06
+
+### Changes Made
+- `gen-family-secrets.sh`: new. Generates 8 WireGuard keypairs, the family age key,
+  `.sops.yaml`, `secrets/family.yaml`, the 4 additions to `secrets/secrets.yaml` and
+  `secrets/family-age-key.enc`. Prints only public material. Run 2026-08-06.
+- `modules/family/peers.nix`: new. Single registry of both hubs and every peer —
+  addresses, public keys, sops key names, Minecraft handles, service hostnames.
+- `modules/family/vpn-hub.nix`: new. hydrogen's `wgfam` + `wgadm`, `ip_forward`, and the
+  four-rule FORWARD policy that enforces peer isolation.
+- `modules/family/vpn-peer.nix`: new. Client side; self-configures from
+  `networking.hostName`. Imported by the four laptops and osmium.
+- `modules/family/wg-endpoint.nix`: new. LAN/public endpoint switching via a
+  NetworkManager dispatcher hook, a boot oneshot and a 5-minute timer.
+- `modules/family/profile.nix`: new. The kids' laptop profile.
+- `hosts/{gentlemenpupil,vizualwanderer,phantomspecialst,maddreamer}.nix` +
+  `hardware/` placeholders + four `flake.nix` entries via `genAttrs`.
+- `hosts/hydrogen.nix`: firewall rewritten — global TCP list emptied, service ports moved
+  to `wgadm`/`wgfam`, `22` kept on `br0`, stale usenet ports deleted,
+  `syncthing.openDefaultPorts = false`.
+- `hosts/sulfur.nix`: `wgadm` peer, `networking.hosts` for the service names, Minecraft
+  server address moved from `10.0.0.10:25565` to `mc.luckyobserver.com:25565`.
+- `hosts/osmium.nix`: `wgfam` peer.
+- **surface retired.** `hosts/surface.nix`, `hardware/surface.nix` and
+  `modules/surface-tablet.nix` deleted, flake entry and the microsoft-surface-go
+  nixos-hardware module dropped. 10.41.0.4 is left unallocated rather than recycled.
+- `home/sheath.nix`: `enablePi` also excludes family hosts (they cannot decrypt
+  `secrets/secrets.yaml` by design).
+- `install.sh`: picks `secrets/family-age-key.enc` for the four family hostnames.
+- `modules/minecraft-server.nix`, `docs/minecraft.md`: the "there is no wg0 on this host"
+  reasoning was load-bearing and is now false; both rewritten.
+
+### Decisions
+- **Hostnames are the Minecraft handles, lowercased.** The request was to keep the kids'
+  usernames in sops, which cannot work: Nix needs `users.users.<name>` and
+  `networking.hostName` at evaluation time, and sops secrets only exist at runtime. The
+  handles were already public in `modules/minecraft-couch.nix`, identify nobody, and make
+  the login and game identities the same string.
+- **Two hubs, not one interface with source matching.** `wgadm` and `wgfam` carry different
+  authority and that should be visible in `iptables -S`, not buried in a `-s` match.
+- **Client `allowedIPs` is not the boundary.** It is configuration on a machine a child has
+  physical access to. hydrogen's FORWARD chain is the enforcing half.
+- **Endpoint selection probes instead of assuming.** A plain "am I on 10.0.0.0/24?" test is
+  wrong at any other house using that subnet, and being wrong means a child silently has no
+  tunnel. It tries the LAN address, waits for a handshake, and falls back.
+- **Second age recipient.** One key for everything would have put the Nextcloud admin
+  password, the Borg repo key and the fleet VPN SSH key on four unencrypted laptops used by
+  children outside the house.
+- Router hub kept as LAN-only break-glass, and `22` kept on `br0`, so a tunnel or sops
+  failure is recoverable without physical access.
+
+### Incident: partial secret generation, then a truncated secrets file
+Worth recording because both halves were avoidable and the fixes are in the script now.
+
+1. `gen-family-secrets.sh` was run while it was still being edited. It wrote `.sops.yaml`,
+   `secrets/family.yaml` and `secrets/secrets.yaml`, then died at the age passphrase
+   prompt — **after** its `EXIT` trap shredded `$WORK`. Result: two committed-looking files
+   naming a family recipient whose private half no longer existed anywhere, and no way to
+   tell that by looking at them.
+2. A stub-encryption command then truncated `secrets/family.yaml` to zero bytes: it assumed
+   no `.sops.yaml` existed, so `sops -e --age …` failed the creation-rule match, but the
+   `>` redirect had already emptied the target. Recovered intact from a dangling git blob
+   that an earlier `git add -A` had preserved (`git fsck --unreachable`).
+
+Both fixed in the script: **no repository file is written before step 8**, everything is
+staged in `/dev/shm` and `install`ed at the end (the passphrase prompt moved to step 3, so
+the only step that can fail on user input now happens before anything is committed); and
+the `secrets.yaml` rewrite **strips every key it is about to add** before appending, so
+`--rotate` cannot produce duplicate YAML mapping keys — which sops does not error on, it
+silently keeps one.
+
+### Declarative passwords (added after the first pass)
+- `sheath-password-hash` in `secrets/family.yaml` — that file is encrypted to both age
+  keys, so hydrogen and sulfur read it with the main key and the four laptops with the
+  family key. One hash for six machines.
+- hydrogen: `users.mutableUsers = false`, which is required for a declared hash to mean
+  anything (with the default, NixOS applies one only when it *creates* the account). That
+  also discards the root password set at install, so `root-password-hash` is declared too,
+  from `secrets/secrets.yaml`. nixpkgs' assertion would have passed on sheath's SSH key
+  alone; passing it is not the same as being able to rescue the box from its console.
+- sulfur: sheath from sops, root left on `/persist/secrets/root-password` — that is the
+  recovery path for a machine whose `/home`, and therefore whose age key, did not mount.
+- Retired `sheath_password_hash` (underscores, unreferenced by any `.nix` file). It
+  differed from its replacement by one character, in a different file, read by a different
+  key.
+
+### Known Issues
+- **Nothing has been switched yet.** All seven configurations build clean, but hydrogen,
+  sulfur and osmium still run the old generation.
+- Syncthing between hydrogen and osmium will break on switch (see CHANGELOG).
+- 5353/udp (mDNS) remains open on every interface — GNOME enables avahi with
+  `openFirewall`. Unrelated to the service boundary, left alone.
+- `users.mutableUsers = false` with sops `neededForUsers` is new here. It is now load
+  bearing on hydrogen and sulfur as well as the laptops: verify the login works before
+  rebooting either, and remember `/persist/secrets/sheath-password` is still on disk as
+  sulfur's revert path.
+- The four `hardware/*.nix` are placeholders until `install.sh` regenerates them on real
+  machines.
+
 ## Session: 2026-08-05
 
 ### Changes Made
