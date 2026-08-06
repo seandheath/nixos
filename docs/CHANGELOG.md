@@ -15,10 +15,18 @@
   entries are the two listen ports.
 - **Peer isolation is enforced on the hub, not just declared on the client.** A family
   laptop's `allowedIPs` stops it addressing anything but the hub, but that is configuration
-  on a machine a child has physical access to. hydrogen's FORWARD chain is the half that
-  counts: sulfur→laptop port 22, established returns, then `-i wgfam -j DROP` and
-  `-o wgfam -j DROP`. No family peer reaches the LAN, the router's admin page at 10.0.0.2,
-  or a sibling.
+  on a machine a child has physical access to. The enforcing half is a dedicated
+  `family-forward` chain, jumped to from `FORWARD` position 1: sulfur→laptop port 22,
+  established returns, then `-i wgfam -j DROP` and `-o wgfam -j DROP`. No family peer
+  reaches the LAN, the router's admin page at 10.0.0.2, or a sibling.
+- **Why a chain rather than four rules appended to `FORWARD`.** The first version appended
+  them individually, and hydrogen's first switch produced three of the four — `-i wgfam -j
+  DROP` was absent. `FORWARD`'s policy is `ACCEPT`, so a partial application is not a
+  weaker boundary, it is none: a peer's packet addressed to 10.0.0.2 leaves via `br0`,
+  where `-o wgfam -j DROP` cannot match. It also fails silently, and the three rules that
+  *did* land make it look healthy. Creating, flushing and refilling one chain makes the
+  set all-or-nothing, fixes the order by construction, and survives reloads and libvirtd
+  editing the same table.
 - `22` stays on `br0` deliberately, and the router hub stays alive as LAN-only access. A bad
   tunnel config or a failed sops decrypt is then recoverable without walking to the machine.
 - **Removed 6789/7878/8096/8989** from hydrogen's global firewall — sabnzbd/radarr/jellyfin/
