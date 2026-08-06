@@ -72,10 +72,20 @@
   a NAT-hairpin dependency and a pointless round trip to the WAN port; away it uses
   `hub.luckyobserver.com`. It **probes rather than assumes** — plenty of other houses use
   `10.0.0.0/24`, and guessing wrong there would silently leave a child with no tunnel.
-- Requires two manual steps: forward `51821/udp` and `51822/udp` to 10.0.0.10 on the router,
-  and add a Cloudflare CNAME `hub.luckyobserver.com` → `vpn.luckyobserver.com` (which
-  inherits the router's dynamic DNS, and keeps hydrogen's hubs from colliding with the
-  router hub's use of the `vpn.` name).
+- **No manual DNS step, and no manual router step.** The public endpoint is
+  `vpn.luckyobserver.com`, which the router's ddclient already keeps pointed at the WAN
+  address; the three hubs are told apart by port, not by name. The forwards for
+  `51821/udp` and `51822/udp` are declared in the nixrouter repo (`config.nix`
+  `portForwards`), not clicked into a web UI.
+- **The Kids VLAN needed a pinhole.** The kids' laptops belong on the router's filtered
+  Kids VLAN, which drops everything to `10.0.0.0/8` — including the tunnel they need to
+  reach hydrogen at all. Falling back to the public endpoint does not help: it arrives at
+  our own WAN address from the inside, where `forwardPorts` (`-i wan`) does not match.
+  nixrouter `config.nix` `kidsPinholes` opens exactly one UDP port on one host.
+- `wg-endpoint.nix` no longer gates the LAN probe on holding a `10.0.0.x` address — the
+  laptops never do. It probes unconditionally and lets the handshake decide, and skips
+  the probe entirely while the current endpoint is healthy so the 5-minute timer cannot
+  disturb a working tunnel.
 ### Changed (Borg CLI names now say what they mean)
 - `borg-local` addressed `/data/borg` specifically, which stopped being "the local one" the
   moment the root SSD repo landed. Now: **`borg-data`** (`/data/borg`), **`borg-rootfs`**

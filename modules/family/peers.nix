@@ -19,19 +19,24 @@
 # Regenerate everything with ./gen-family-secrets.sh; it prints exactly the public
 # keys below.
 rec {
-  # Public endpoint for both hubs. A Cloudflare CNAME to vpn.luckyobserver.com, so it
-  # inherits the router's dynamic DNS without the hydrogen hubs colliding with the
-  # router hub's own use of the `vpn.` name (that one is still 51820 -> the router).
-  endpointHost = "hub.luckyobserver.com";
+  # Public endpoint for both hubs -- the SAME name the router's own hub uses.
+  #
+  # An earlier draft invented hub.luckyobserver.com to avoid a "collision" that does not
+  # exist: a hostname is just an A record, and the three hubs are told apart by port
+  # (51820 -> the router itself, 51821/51822 -> hydrogen via the router's forwardPorts).
+  # Reusing vpn. means ddclient on the router already keeps it pointed at the current WAN
+  # address, and there is no Cloudflare record to remember to create.
+  #
+  # It resolves to the WAN address on the LAN too: the router's split-horizon DNS answers
+  # per-subdomain and deliberately never wildcards this zone, precisely to leave this
+  # record alone. That is fine -- peers at home reach hydrogen by its LAN address instead,
+  # which modules/family/wg-endpoint.nix tries first.
+  endpointHost = "vpn.luckyobserver.com";
 
   # hydrogen's LAN address. Peers on the home network target this directly instead of
   # bouncing off the gateway -- see modules/family/wg-endpoint.nix.
   lanEndpoint = "10.0.0.10";
   lanSubnet = "10.0.0.0/24";
-  # Address prefix used to spot "we might be at home" before probing. Kept alongside
-  # lanSubnet rather than derived from it: string-slicing a CIDR in Nix is more code
-  # than the duplication is worth, and the two only ever change together.
-  lanPrefix = "10.0.0.";
 
   hubs = {
     # Family tunnel: web services + Minecraft, nothing else. Peers are isolated from

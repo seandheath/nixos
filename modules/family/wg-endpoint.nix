@@ -42,18 +42,30 @@ let
       # come back around.
       ip link show "$iface" >/dev/null 2>&1 || return 0
 
-      # Only worth trying the LAN address if we hold one from that subnet at all.
-      if ip -4 -o addr show scope global | grep -q 'inet ${peers.lanPrefix}'; then
-        wg set "$iface" peer "$key" endpoint "${peers.lanEndpoint}:$port" 2>/dev/null || true
+      # Already working: leave it alone. Without this the 5-minute timer would tear a
+      # healthy public-endpoint tunnel down to re-test the LAN address every time it
+      # fired.
+      if [ "$(handshake_age "$iface" "$key")" -lt 180 ]; then
+        return 0
+      fi
 
-        # Give the handshake a chance. persistentKeepalive is 25s, but a fresh endpoint
-        # triggers one immediately, so a few seconds is enough to tell success from
-        # "this 10.0.0.0/24 is not ours".
-        sleep 5
-        if [ "$(handshake_age "$iface" "$key")" -lt 180 ]; then
-          echo "$iface: endpoint ${peers.lanEndpoint}:$port (LAN)"
-          return 0
-        fi
+      # Try hydrogen's LAN address first, UNCONDITIONALLY -- no "am I on 10.0.0.0/24?"
+      # test. That test was wrong: the kids' laptops live on the router's Kids VLAN
+      # (10.20.0.0/24) and reach hydrogen through a pinhole, so they never hold a
+      # 10.0.0.x address and would have skipped straight to the public endpoint -- which
+      # arrives at our own WAN address from the inside and is not DNAT'd. No hairpin, no
+      # tunnel, no services, for exactly the machines this exists to serve.
+      #
+      # Probing is the honest test anyway: a foreign network that happens to use the
+      # same subnet cannot complete a WireGuard handshake with hydrogen's key.
+      wg set "$iface" peer "$key" endpoint "${peers.lanEndpoint}:$port" 2>/dev/null || true
+
+      # persistentKeepalive is 25s, but a freshly-set endpoint triggers a handshake
+      # immediately, so a few seconds distinguishes "at home" from "not".
+      sleep 5
+      if [ "$(handshake_age "$iface" "$key")" -lt 180 ]; then
+        echo "$iface: endpoint ${peers.lanEndpoint}:$port (LAN)"
+        return 0
       fi
 
       wg set "$iface" peer "$key" endpoint "${peers.endpointHost}:$port" 2>/dev/null || true
