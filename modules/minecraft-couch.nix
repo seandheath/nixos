@@ -826,14 +826,26 @@
           layout = dwindle
         }
 
+        # Nested categories must be written out. Hyprland's parser does not accept
+        # a category opened and closed on one line -- `blur { enabled = false }`
+        # is read as an option named "blur { enabled", which it rejects. Written
+        # that way these three silently did nothing: blur, shadows and animations
+        # were all still on, and the session drew an error banner across the top
+        # of the screen on every launch.
         decoration {
           rounding = 0
-          blur { enabled = false }
-          shadow { enabled = false }
+          blur {
+            enabled = false
+          }
+          shadow {
+            enabled = false
+          }
         }
 
         # An appliance for children: nothing that animates, dims, locks or blanks.
-        animations { enabled = false }
+        animations {
+          enabled = false
+        }
         misc {
           disable_hyprland_logo = true
           disable_splash_rendering = true
