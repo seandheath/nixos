@@ -39,7 +39,7 @@ MAIN_RECIPIENT="age1276ku650f9gsmv3slnduus8styr0m6ued8dpza2qau446sp9l4qsq5dden"
 #
 # FAMILY_PEERS are hostnames -- the kids' Minecraft handles, lowercased. Keep them in
 # step with `family` in modules/family/peers.nix.
-HUB_PEERS=(wgfam-hub wgadm-hub sulfur-adm osmium-fam)
+HUB_PEERS=(wgfam-hub wgadm-hub sulfur-adm)
 FAMILY_PEERS=(gentlemenpupil vizualwanderer phantomspecialst maddreamer)
 
 # Accounts needing a hashed password, keyed `<name>-password-hash` (matching

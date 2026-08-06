@@ -14,7 +14,7 @@
 # and they identify nobody. The private halves live in sops (`secret` below); which
 # file each one is in follows the host's own sops.defaultSopsFile:
 #   - family laptops   -> secrets/family.yaml  (family age key, see .sops.yaml)
-#   - hydrogen/sulfur/osmium -> secrets/secrets.yaml (main age key)
+#   - hydrogen/sulfur -> secrets/secrets.yaml (main age key)
 #
 # Regenerate everything with ./gen-family-secrets.sh; it prints exactly the public
 # keys below.
@@ -75,6 +75,8 @@ rec {
   # out of a public repo, which the handles already do, so the number was a second
   # identifier to keep in step for nothing.
   #
+  # Every peer here is a family laptop, so every secret is in secrets/family.yaml.
+  #
   # Hostnames are the Minecraft handles from modules/minecraft-couch.nix, lowercased.
   # Deliberately not the kids' real names: this repository is public. The handles are
   # already committed there, identify nobody, and keep the login identity and the game
@@ -110,17 +112,9 @@ rec {
       minecraftName = "MadDreamer";
     };
 
-    # Not a family laptop, but it needs the same thing the kids do: the web services and
-    # nothing more. With every service port off br0 it would otherwise lose all access.
-    # It is not an admin machine, so it does not belong on wgadm.
-    osmium = {
-      address = "10.41.0.3";
-      publicKey = "PGUol1ic6cH+xyBjdn3BIDKQt4FfJvp8tDZkMI8cCg0=";
-      secret = "wg-priv-osmium-fam";
-    };
-    # 10.41.0.4 was surface, retired 2026-08-06. Left unused rather than recycled --
-    # an address that once meant a different machine is a good way to misread a
-    # `wg show` later.
+    # 10.41.0.3 was osmium and 10.41.0.4 was surface, both retired 2026-08-06. Left
+    # unallocated rather than recycled -- an address that once meant a different machine
+    # is a good way to misread a `wg show` later.
   };
 
   # 10.41.0.20+ is reserved for phones and tablets. Add them here with a public key

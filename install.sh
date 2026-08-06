@@ -290,8 +290,7 @@ echo "Selected host: $hostname"
 # The four kids' laptops differ from every other host in three ways that this script
 # has to know about: which age key they get, which disk layout they support, and how
 # their passwords are set. Keep this list in step with `family` in
-# modules/family/peers.nix (minus osmium, which is sheath's own machine and holds the
-# main key).
+# modules/family/peers.nix -- every peer there is one of these four.
 FAMILY_HOSTS=(gentlemenpupil vizualwanderer phantomspecialst maddreamer)
 IS_FAMILY_HOST=false
 for _fh in "${FAMILY_HOSTS[@]}"; do

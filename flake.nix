@@ -74,14 +74,6 @@
           ./hosts/hydrogen.nix
         ] ++ commonModules;
       };
-      osmium = nixpkgs.lib.nixosSystem {
-        system = "x86_64-linux";
-        specialArgs = { inherit inputs; lib = nixpkgs.lib; };
-        modules = [
-          ./hosts/osmium.nix
-          chaotic.nixosModules.default
-        ] ++ commonModules;
-      };
       sulfur = nixpkgs.lib.nixosSystem {
         system = "x86_64-linux";
         specialArgs = { inherit inputs; lib = nixpkgs.lib; };

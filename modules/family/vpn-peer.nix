@@ -1,5 +1,5 @@
 # Family-tunnel client. Imported by the four kids' laptops (via
-# modules/family/profile.nix) and directly by osmium.
+# modules/family/profile.nix), and by nothing else.
 #
 # Which peer this host is comes from networking.hostName, so the module configures
 # itself and there is no second place to keep a hostname in step.
@@ -18,8 +18,8 @@ in
 {
   imports = [ ./wg-endpoint.nix ];
 
-  # Picks up the host's sops.defaultSopsFile: secrets/family.yaml on the kids' laptops
-  # (family age key), secrets/secrets.yaml on osmium (main key).
+  # Picks up the host's sops.defaultSopsFile, which modules/family/profile.nix forces to
+  # secrets/family.yaml -- the only file these machines' age key can read.
   sops.secrets.${self.secret} = { };
 
   networking.wg-quick.interfaces.${fam.interface} = {

@@ -49,7 +49,7 @@
 # `--network=host` also reaches ReVa but exposes every host-local service; rejected.
 #
 # Requires rootless podman and the subUid/subGid ranges for sheath, both already set up in
-# modules/virtualisation.nix (imported by hosts/sulfur.nix and hosts/osmium.nix).
+# modules/virtualisation.nix (imported by hosts/sulfur.nix).
 let
   image = import ../packages/re-container.nix { inherit pkgs; };
   imageName = "localhost/re-agents:latest";

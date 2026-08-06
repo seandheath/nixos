@@ -107,7 +107,7 @@ Now the boundary is a private key:
 
 - `openFirewall = false` on the service; 25565 is opened only on hydrogen's own
   WireGuard interfaces (`hosts/hydrogen.nix`, `modules/family/vpn-hub.nix`):
-  - `wgfam` (`10.41.0.0/24`, port 51821) — the kids' laptops, phones, osmium, surface
+  - `wgfam` (`10.41.0.0/24`, port 51821) — the kids' laptops and phones
   - `wgadm` (`10.42.0.0/24`, port 51822) — sulfur
 - **Not `br0`.** A device on the LAN with no key gets nothing. The couch clients are
   unaffected: they connect over `127.0.0.1`, and `server-ip` is deliberately unset so

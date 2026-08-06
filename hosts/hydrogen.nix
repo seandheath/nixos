@@ -415,10 +415,9 @@
   # one thing this host no longer does. The same ports are listed under wgadm above, so
   # sulfur syncs over the admin tunnel and nothing else can reach the daemon.
   #
-  # CONSEQUENCE: osmium can no longer sync with hydrogen directly — it is a wgfam
-  # peer, and wgfam does not carry 22000. It will fall back to Syncthing's relays or
-  # stall. If that matters, either add 22000/21027 back under interfaces."br0" or give
-  # osmium a wgadm peer.
+  # sulfur is the only peer that syncs with this host, and it is on wgadm, so nothing is
+  # lost. Should another machine ever need to sync, give it a wgadm peer rather than
+  # re-opening these ports on br0.
   services.syncthing.openDefaultPorts = false;
 
   # Disk layout, initrd modules, swap, hostPlatform and microcode all come from the

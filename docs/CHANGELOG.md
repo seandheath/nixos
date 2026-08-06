@@ -23,10 +23,9 @@
   tunnel config or a failed sops decrypt is then recoverable without walking to the machine.
 - **Removed 6789/7878/8096/8989** from hydrogen's global firewall — sabnzbd/radarr/jellyfin/
   sonarr ports for `modules/usenet.nix`, which no host has imported in a long time.
-- `services.syncthing.openDefaultPorts = false` on hydrogen; 22000/21027 are on `wgadm` only.
-  **Consequence:** osmium can no longer sync with hydrogen directly (it is a `wgfam`
-  peer) and will fall back to relays. Fix is one line if it matters — see the note in
-  `hosts/hydrogen.nix`.
+- `services.syncthing.openDefaultPorts = false` on hydrogen; 22000/21027 are on `wgadm`
+  only. sulfur is the only machine that syncs with it and is a `wgadm` peer, so nothing
+  is lost.
 
 ### Added (four family laptops)
 - `modules/family/profile.nix` — the kids' laptop counterpart to `modules/workstation.nix`:

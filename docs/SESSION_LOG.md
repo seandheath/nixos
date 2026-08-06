@@ -22,10 +22,13 @@
   `syncthing.openDefaultPorts = false`.
 - `hosts/sulfur.nix`: `wgadm` peer, `networking.hosts` for the service names, Minecraft
   server address moved from `10.0.0.10:25565` to `mc.luckyobserver.com:25565`.
-- `hosts/osmium.nix`: `wgfam` peer.
-- **surface retired.** `hosts/surface.nix`, `hardware/surface.nix` and
-  `modules/surface-tablet.nix` deleted, flake entry and the microsoft-surface-go
-  nixos-hardware module dropped. 10.41.0.4 is left unallocated rather than recycled.
+- **osmium and surface retired.** Both hosts, their `hardware/` files,
+  `modules/surface-tablet.nix`, their flake entries and the microsoft-surface-go
+  nixos-hardware module are gone; `wg-priv-osmium-fam` was removed from
+  `secrets/secrets.yaml`. 10.41.0.3 and .4 are left unallocated rather than recycled.
+  With both gone, `modules/family/vpn-peer.nix` is imported only by the family profile,
+  and hydrogen's Syncthing no longer loses a peer: sulfur is the only machine that syncs
+  with it and is on `wgadm`, which carries 22000.
 - `home/sheath.nix`: `enablePi` also excludes family hosts (they cannot decrypt
   `secrets/secrets.yaml` by design).
 - `install.sh`: picks `secrets/family-age-key.enc` for the four family hostnames.
@@ -89,7 +92,6 @@ silently keeps one.
 ### Known Issues
 - **Nothing has been switched yet.** All seven configurations build clean, but hydrogen,
   sulfur and osmium still run the old generation.
-- Syncthing between hydrogen and osmium will break on switch (see CHANGELOG).
 - 5353/udp (mDNS) remains open on every interface — GNOME enables avahi with
   `openFirewall`. Unrelated to the service boundary, left alone.
 - `users.mutableUsers = false` with sops `neededForUsers` is new here. It is now load
