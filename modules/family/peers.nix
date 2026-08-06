@@ -38,6 +38,11 @@ rec {
   lanEndpoint = "10.0.0.10";
   lanSubnet = "10.0.0.0/24";
 
+  # The router. modules/family/dns.nix forwards everything that is not one of our own
+  # service names here, which is AdGuard Home -- so a phone using the tunnel's resolver
+  # gets the household filtering wherever it happens to be.
+  lanGateway = "10.0.0.1";
+
   hubs = {
     # Family tunnel: web services + Minecraft, nothing else. Peers are isolated from
     # each other and from the LAN by hydrogen's FORWARD policy.
@@ -122,9 +127,24 @@ rec {
     # is a good way to misread a `wg show` later.
   };
 
-  # 10.41.0.20+ is reserved for phones and tablets. Add them here with a public key
-  # and they are peers like any other; their private key never has to enter this repo
-  # (generate on the device, paste the public half).
+  # Hand-configured wgfam peers: phones and tablets. Same tunnel and the same isolation
+  # as the laptops, but nothing about them is NixOS-managed, so they carry no `secret`
+  # (their private key is generated on the device and never enters this repo) and no
+  # `minecraftName`.
+  #
+  # LEAVE ENTRIES OUT UNTIL YOU HAVE THE REAL PUBLIC KEY. `wg setconf` rejects a
+  # malformed key and fails the whole interface, so a placeholder here does not merely
+  # not-work -- it takes wgfam down for the four laptops too.
+  #
+  # To add one:
+  #   1. Install WireGuard on the device and create a tunnel; it generates the keypair.
+  #   2. Profile: Address 10.41.0.<n>/32, AllowedIPs 10.41.0.1/32,
+  #      DNS 10.41.0.1, Endpoint hub.luckyobserver.com:51821, PersistentKeepalive 25.
+  #   3. Paste the device's PUBLIC key below, rebuild hydrogen, switch.
+  #
+  # Reserved: .20 sheath's phone, .21 spouse's phone, .22+ tablets.
+  mobile = { };
+
 
   # Service names every peer resolves to its hub's address. These are the vhosts in
   # modules/{nextcloud,immich,paperless,calibre}.nix; `mc` is Minecraft, which has no

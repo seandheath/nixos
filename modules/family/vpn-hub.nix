@@ -86,7 +86,10 @@ in
       ips = [ "${fam.address}/24" ];
       listenPort = fam.port;
       privateKeyFile = config.sops.secrets.${fam.secret}.path;
-      peers = map mkPeer (lib.attrValues peers.family);
+      # Laptops (NixOS-managed) and hand-configured devices (phones/tablets) are the
+      # same kind of peer here -- the split exists only because the latter have no
+      # Nix config to generate.
+      peers = map mkPeer (lib.attrValues peers.family ++ lib.attrValues peers.mobile);
     };
 
     ${adm.interface} = {
