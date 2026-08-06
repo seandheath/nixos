@@ -22,7 +22,6 @@
 { config, lib, pkgs, ... }:
 let
   cfg = config.family.wgEndpoint;
-  peers = import ./peers.nix;
 
   script = pkgs.writeShellScript "wg-endpoint" ''
     set -u
@@ -35,8 +34,8 @@ let
       if [ -z "$hs" ] || [ "$hs" = "0" ]; then echo 999999; else echo $(( $(date +%s) - hs )); fi
     }
 
-    configure() { # interface publicKey port
-      iface=$1; key=$2; port=$3
+    configure() { # interface publicKey port lanHost publicHost
+      iface=$1; key=$2; port=$3; lan=$4; pub=$5
 
       # Nothing to do if wg-quick has not brought the interface up yet; the timer will
       # come back around.
@@ -49,7 +48,7 @@ let
         return 0
       fi
 
-      # Try hydrogen's LAN address first, UNCONDITIONALLY -- no "am I on 10.0.0.0/24?"
+      # Try the peer's LAN address first, UNCONDITIONALLY -- no "am I on 10.0.0.0/24?"
       # test. That test was wrong: the kids' laptops live on the router's Kids VLAN
       # (10.20.0.0/24) and reach hydrogen through a pinhole, so they never hold a
       # 10.0.0.x address and would have skipped straight to the public endpoint -- which
@@ -58,47 +57,64 @@ let
       #
       # Probing is the honest test anyway: a foreign network that happens to use the
       # same subnet cannot complete a WireGuard handshake with hydrogen's key.
-      wg set "$iface" peer "$key" endpoint "${peers.lanEndpoint}:$port" 2>/dev/null || true
+      wg set "$iface" peer "$key" endpoint "$lan:$port" 2>/dev/null || true
 
       # persistentKeepalive is 25s, but a freshly-set endpoint triggers a handshake
       # immediately, so a few seconds distinguishes "at home" from "not".
       sleep 5
       if [ "$(handshake_age "$iface" "$key")" -lt 180 ]; then
-        echo "$iface: endpoint ${peers.lanEndpoint}:$port (LAN)"
+        echo "$iface: endpoint $lan:$port (LAN)"
         return 0
       fi
 
-      wg set "$iface" peer "$key" endpoint "${peers.endpointHost}:$port" 2>/dev/null || true
-      echo "$iface: endpoint ${peers.endpointHost}:$port (public)"
+      wg set "$iface" peer "$key" endpoint "$pub:$port" 2>/dev/null || true
+      echo "$iface: endpoint $pub:$port (public)"
     }
 
-    ${lib.concatStringsSep "\n" (lib.mapAttrsToList
-      (iface: e: ''configure ${iface} "${e.publicKey}" ${toString e.port}'')
-      cfg)}
+    ${lib.concatMapStringsSep "\n"
+      (e: ''configure ${e.interface} "${e.publicKey}" ${toString e.port} ${e.lanHost} ${e.publicHost}'')
+      cfg}
   '';
 in
 {
   options.family.wgEndpoint = lib.mkOption {
-    type = lib.types.attrsOf (lib.types.submodule {
+    type = lib.types.listOf (lib.types.submodule {
       options = {
+        interface = lib.mkOption {
+          type = lib.types.str;
+          description = "WireGuard interface carrying this peer.";
+        };
         publicKey = lib.mkOption {
           type = lib.types.str;
-          description = "Public key of the hub peer whose endpoint should be re-targeted.";
+          description = "Public key of the peer whose endpoint should be re-targeted.";
         };
         port = lib.mkOption {
           type = lib.types.port;
-          description = "Hub listen port for this interface.";
+          description = "The peer's listen port.";
+        };
+        lanHost = lib.mkOption {
+          type = lib.types.str;
+          description = ''
+            Address to try first: where this peer lives on the home LAN. Per peer, not
+            per interface -- sulfur's wgadm carries both hydrogen (10.0.0.10) and the
+            router (10.0.0.1), and probing one address for both would leave whichever
+            lost the coin toss unreachable at home.
+          '';
+        };
+        publicHost = lib.mkOption {
+          type = lib.types.str;
+          description = "Address or name to fall back to when the LAN probe fails.";
         };
       };
     });
-    default = { };
+    default = [ ];
     description = ''
-      WireGuard interfaces whose hub endpoint should follow the host between the home
-      LAN and the outside world. Keyed by interface name.
+      WireGuard peers whose endpoint should follow this host between the home LAN and
+      the outside world.
     '';
   };
 
-  config = lib.mkIf (cfg != { }) {
+  config = lib.mkIf (cfg != [ ]) {
     systemd.services = {
       wg-endpoint = {
         description = "Point WireGuard endpoints at the LAN or public address";
@@ -117,12 +133,12 @@ in
     # be resolved at boot -- is gone now that the configured endpoint is an IP literal,
     # but "no tunnel until an adult intervenes" is a bad enough failure mode to defend
     # against twice.)
-    // lib.mapAttrs' (iface: _: lib.nameValuePair "wg-quick-${iface}" {
+    // lib.listToAttrs (map (e: lib.nameValuePair "wg-quick-${e.interface}" {
       serviceConfig = {
         Restart = "on-failure";
         RestartSec = 10;
       };
-    }) cfg;
+    }) cfg);
 
     # Re-run on every connectivity change. The dispatcher only kicks the unit rather
     # than doing the work: NetworkManager runs these scripts serially and this one

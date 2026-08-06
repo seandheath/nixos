@@ -64,9 +64,12 @@ in
     }];
   };
 
-  family.wgEndpoint.${fam.interface} = {
+  family.wgEndpoint = [{
+    interface = fam.interface;
     inherit (fam) publicKey port;
-  };
+    lanHost = peers.lanEndpoint;
+    publicHost = peers.endpointHost;
+  }];
 
   # Replies arrive on the tunnel while the route back may point at the default gateway.
   networking.firewall.checkReversePath = lib.mkDefault "loose";

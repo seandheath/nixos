@@ -46,6 +46,11 @@ let
     "-i ${fam.interface} -j DROP"
     # Nothing reaches a family peer unsolicited either, from any direction.
     "-o ${fam.interface} -j DROP"
+    # And nothing on the admin tunnel is forwarded onto the LAN. sulfur reaches the
+    # router as a direct peer of its own, so hydrogen never needs to carry that traffic
+    # -- and FORWARD's policy is ACCEPT, so without this a client that widened its own
+    # allowedIPs would quietly get the whole 10.0.0.0/24.
+    "-i ${adm.interface} -o br0 -j DROP"
   ];
 
   # A DEDICATED CHAIN, rebuilt as a unit -- not four independent rules appended to

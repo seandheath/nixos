@@ -66,6 +66,23 @@ rec {
     };
   };
 
+  # The router's management tunnel (nixrouter modules/wireguard-mgmt.nix).
+  #
+  # sulfur peers with this DIRECTLY, not through hydrogen. Routing the router's
+  # administration through hydrogen would make the thing everything depends on depend on
+  # a service host; WireGuard has no hubs, only pairs, so sulfur simply holds two peer
+  # relationships and neither outage implies the other.
+  #
+  # Addressed at 10.0.0.1 rather than its tunnel address, so kids.lan resolves and works
+  # identically at home and away with no second name.
+  routerMgmt = {
+    address = "10.42.0.3";
+    lanAddress = "10.0.0.1";
+    port = 51823;
+    publicKey = "/4/zGHCJN/J2IrGEprkcPk+35Mij+kzY2UxNK+8Y5Qs=";
+    secret = "wg-priv-sulfur-adm";   # sulfur reuses its wgadm key for this peer
+  };
+
   # The one admin peer. Its address is referenced by name in three places (the hub's
   # FORWARD rule, the laptops' allowedIPs, hydrogen's peer list) -- never retype it.
   admin = {

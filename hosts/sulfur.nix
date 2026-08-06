@@ -4,6 +4,7 @@ let
   dock-monitors = import ../packages/dock-monitors.nix { inherit pkgs; };
   peers = import ../modules/family/peers.nix;
   adm = peers.hubs.adm;
+  rtr = peers.routerMgmt;
 in
 {
   imports = [
@@ -289,21 +290,52 @@ in
     address = [ "${peers.admin.sulfur.address}/32" ];
     privateKeyFile = config.sops.secrets.${peers.admin.sulfur.secret}.path;
 
-    peers = [{
-      publicKey = adm.publicKey;
-      allowedIPs = [ "${adm.address}/32" peers.hubs.fam.subnet ];
-      # Bootstrap only, and an IP literal on purpose -- modules/family/wg-endpoint.nix
-      # owns endpoint selection and rewrites this at boot. A hostname here would make
-      # DNS a hard dependency of interface creation: wg-quick resolves the endpoint in
-      # `wg setconf`, and a failed lookup takes the whole unit down with it.
-      endpoint = "${peers.lanEndpoint}:${toString adm.port}";
-      persistentKeepalive = 25;
-    }];
+    # TWO peers on one interface, and that is the whole point. hydrogen and the router
+    # are peers of sulfur, not of each other -- WireGuard has no hubs, only pairs -- so
+    # losing hydrogen costs nothing on the router and vice versa. The router's own
+    # administration used to sit on brLan; it is on its tunnel now.
+    peers = [
+      {
+        publicKey = adm.publicKey;
+        allowedIPs = [ "${adm.address}/32" peers.hubs.fam.subnet ];
+        # Bootstrap only, and an IP literal on purpose -- modules/family/wg-endpoint.nix
+        # owns endpoint selection and rewrites this at boot. A hostname here would make
+        # DNS a hard dependency of interface creation: wg-quick resolves the endpoint in
+        # `wg setconf`, and a failed lookup takes the whole unit down with it.
+        endpoint = "${peers.lanEndpoint}:${toString adm.port}";
+        persistentKeepalive = 25;
+      }
+      {
+        # The router. 10.0.0.1 is its brLan address, which is where kids.lan and
+        # adguard.lan already live -- reaching it by tunnel needs no second name.
+        publicKey = rtr.publicKey;
+        allowedIPs = [ "${rtr.lanAddress}/32" "${rtr.address}/32" ];
+        endpoint = "${rtr.lanAddress}:${toString rtr.port}";
+        persistentKeepalive = 25;
+      }
+    ];
   };
 
-  family.wgEndpoint.${adm.interface} = {
-    inherit (adm) publicKey port;
-  };
+  # Per-PEER endpoint selection, not per-interface: these two live at different
+  # addresses on the home LAN, and probing one for both would leave the loser
+  # unreachable from the house.
+  family.wgEndpoint = [
+    {
+      interface = adm.interface;
+      inherit (adm) publicKey port;
+      lanHost = peers.lanEndpoint;          # hydrogen, 10.0.0.10
+      publicHost = peers.endpointHost;      # hub.luckyobserver.com
+    }
+    {
+      interface = adm.interface;
+      inherit (rtr) publicKey port;
+      lanHost = rtr.lanAddress;             # the router, 10.0.0.1
+      # vpn., not hub.: that name always resolves to the WAN address, which is exactly
+      # right here. The router peer only has to work when away -- at home kids.lan is
+      # plain nginx on brLan, no tunnel involved.
+      publicHost = "vpn.luckyobserver.com";
+    }
+  ];
 
   # hydrogen's vhosts, resolved to the admin tunnel. Same names as the public ones, so
   # the wildcard cert in modules/reverse-proxy.nix still matches.
