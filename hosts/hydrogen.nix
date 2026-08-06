@@ -91,9 +91,8 @@
   #   wgfam (10.41.0.0/24, port 51821)  family devices -- web + Minecraft, nothing else
   #
   # The router's own hub (vpn.luckyobserver.com:51820, 10.40.0.0/24) still exists and
-  # still reaches the LAN, but it is NOT listed here and therefore reaches no service.
-  # It is the break-glass path: combined with 22 on br0 below, a broken wgadm config or
-  # a failed sops decrypt cannot lock you out of the box.
+  # still reaches the LAN, but it is NOT listed here and reaches no service -- as of
+  # 2026-08-06 that includes sshd, so it is no longer a way into this host at all.
   #
   # Only the two WireGuard listen ports face the internet. The router forwards 51820,
   # 51821 and 51822/udp and nothing else -- verify that from off-tunnel after any router
@@ -110,10 +109,18 @@
     51822   # wgadm -- sulfur
   ];
 
-  # Break-glass only. sshd is the one thing still reachable by LAN address, so that a
-  # mistake in the tunnel configuration is recoverable without walking to the machine.
-  # It is key-based with PermitRootLogin = "no" (see services.openssh below).
-  networking.firewall.interfaces."br0".allowedTCPPorts = [ 22 ];
+  # br0 carries NOTHING. Not even SSH.
+  #
+  # 22 lived here until 2026-08-06 as break-glass -- a way back in when the tunnel
+  # configuration itself was the broken thing. Removing it was a deliberate call: all
+  # administration is on wgadm now, so there is no address on this LAN that answers.
+  #
+  # WHAT THAT COSTS, so nobody has to rediscover it at a bad moment: if wgadm fails to
+  # come up -- a bad switch, a rotated key, a sops decrypt that did not happen -- there
+  # is no remote way in. Recovery is the physical console. That is survivable here
+  # because this is a laptop with a working panel, GDM autologins sheath, and sheath has
+  # NOPASSWD sudo, so a keyboard is a root shell. Do not remove any of those three
+  # without restoring a network path first.
   environment.systemPackages = with pkgs; [
     rustdesk-flutter   # RustDesk host (this box is remote-controlled); LAN direct-IP
     rustup

@@ -22,6 +22,7 @@
 let
   peers = import ./peers.nix;
   fam = peers.hubs.fam;
+  adm = peers.hubs.adm;
 in
 {
   services.dnsmasq = {
@@ -34,9 +35,12 @@ in
     resolveLocalQueries = false;
 
     settings = {
-      # Bind the tunnel address and nothing else. bind-interfaces (rather than the
+      # Bind the tunnel addresses and nothing else. bind-interfaces (rather than the
       # default wildcard bind) is what keeps this off br0.
-      interface = [ fam.interface ];
+      #
+      # Both tunnels, because phones on either one need a resolver: the NixOS hosts use
+      # networking.hosts and never ask anybody.
+      interface = [ fam.interface adm.interface ];
       bind-interfaces = true;
 
       # The service names, answered authoritatively. Enumerated rather than wildcarded
@@ -68,8 +72,12 @@ in
     wants = [ "wireguard-${fam.interface}.service" ];
   };
 
-  # 53 on the family tunnel only. Not on br0, not on wgadm, not globally.
+  # 53 on the two tunnels. Not on br0, not globally.
   networking.firewall.interfaces.${fam.interface} = {
+    allowedUDPPorts = [ 53 ];
+    allowedTCPPorts = [ 53 ];
+  };
+  networking.firewall.interfaces.${adm.interface} = {
     allowedUDPPorts = [ 53 ];
     allowedTCPPorts = [ 53 ];
   };
