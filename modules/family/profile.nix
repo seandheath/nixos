@@ -108,9 +108,21 @@ in
     users.users.${username} = {
       isNormalUser = true;
       description = username;
-      # No wheel. networkmanager so they can join wifi at a friend's house; video/audio/
-      # input for the desktop and for game controllers.
-      extraGroups = [ "networkmanager" "video" "audio" "input" ];
+      # wheel: the kids administer their own machines. sudo still prompts for their
+      # password (security.sudo.wheelNeedsPassword defaults true) -- unlike sheath's
+      # NOPASSWD rule below, which exists for unattended pushes from sulfur.
+      #
+      # WHAT THIS DOES AND DOES NOT GIVE AWAY. It does not weaken the content filtering:
+      # that is enforced by the router, per SSID, and no amount of root on the laptop
+      # changes which VLAN the wifi puts it on. It does hand over the machine itself --
+      # they can disable their own tunnel, install things, and read any file on disk.
+      #
+      # Including /home/sheath/.config/sops/age/keys.txt, which decrypts
+      # secrets/family.yaml. See the note above sheath's hashedPasswordFile.
+      #
+      # networkmanager so they can join wifi at a friend's house; video/audio/input for
+      # the desktop and for game controllers.
+      extraGroups = [ "wheel" "networkmanager" "video" "audio" "input" ];
       hashedPasswordFile = config.sops.secrets."${username}-password-hash".path;
     };
     users.groups.${username} = { };
@@ -120,6 +132,16 @@ in
     # console at all -- and the console is the recovery path when the network is the
     # thing that is broken. The same hash is used on hydrogen and sulfur; it lives in
     # secrets/family.yaml because that file is readable by both age keys.
+    #
+    # WORTH RECONSIDERING NOW THAT THE KIDS HAVE WHEEL. The family age key sits at
+    # /home/sheath/.config/sops/age/keys.txt on this machine, and root can read it. A
+    # child with sudo can therefore decrypt secrets/family.yaml, which holds every
+    # sibling's WireGuard key and password hash -- and THIS hash, which is also sheath's
+    # password on hydrogen and sulfur. Offline cracking of one hash is the whole attack.
+    #
+    # The fix is to stop sharing it: give the laptops their own admin hash, so a child
+    # who reads this file learns a password that works on four laptops they already have
+    # root on, and nothing else.
     users.users.sheath.hashedPasswordFile = config.sops.secrets."sheath-password-hash".path;
 
     # root stays locked deliberately: no hashedPasswordFile, so no console root login.
@@ -181,6 +203,25 @@ in
       playerName = self.minecraftName;
       server = "mc.luckyobserver.com:25565";
     };
+
+    # ---------------------------------------------------------------------------
+    # Shell helpers, matching sheath's (home/bash.nix).
+    #
+    # System-wide rather than home-manager: the kids have no home-manager config, and
+    # these are useful to whoever is logged in. The flake path is absolute rather than
+    # $HOME/nixos -- install.sh leaves the checkout in sheath's home, and a child's
+    # $HOME/nixos does not exist. They do not need read access to it either, since
+    # nixos-rebuild runs under sudo as root.
+    programs.bash.interactiveShellInit = ''
+      alias ns="nix search nixpkgs"
+      alias dmesg="dmesg --color=always"
+
+      # nr: switch now. nb: stage for next boot (kernel/bootloader changes).
+      # Deliberately no `nu` -- bumping flake inputs from a child's laptop would
+      # rewrite flake.lock for every host in the fleet.
+      nr() { sudo nixos-rebuild switch --no-write-lock-file --flake /home/sheath/nixos#${hostName}; }
+      nb() { sudo nixos-rebuild boot   --no-write-lock-file --flake /home/sheath/nixos#${hostName}; }
+    '';
 
     # ---------------------------------------------------------------------------
     # Base system
