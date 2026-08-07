@@ -36,10 +36,29 @@ in
     ../printing.nix
     ../sops.nix
     ../auto-update.nix
-    ../minecraft-client.nix
     ../steam.nix
+    ../minecraft-client.nix
     ./vpn-peer.nix
   ];
+
+  options.family.minecraft = lib.mkOption {
+    type = lib.types.bool;
+    default = true;
+    description = ''
+      Ship the pinned Minecraft client. Turn this OFF for the initial install and back
+      on afterwards.
+
+      The payload is ~500 MiB fetched from Mojang and Modrinth as fixed-output
+      derivations -- 115 libraries plus one FOD pulling 4403 asset objects in parallel --
+      and a laptop that cannot complete that fails the whole `nixos-install`. Sulfur
+      already holds the entire closure, so the reliable path is to install without it and
+      then push the real configuration with `nixos-rebuild --target-host`, which copies
+      those paths over SSH from sulfur's store and never contacts Mojang.
+
+      That also sidesteps the kids' VLAN, where cache.nixos.org resolves to 0.0.0.0 and
+      no fetch of any kind succeeds.
+    '';
+  };
 
   options.family.enable = lib.mkOption {
     type = lib.types.bool;
@@ -142,8 +161,14 @@ in
     # lockstep with the server is enforced by the assertions in modules/minecraft-client.nix
     # rather than by memory. Connects by name over the tunnel; 25565 is no longer
     # reachable from the LAN.
+    #
+    # Imported unconditionally and gated here rather than by a conditional import: the
+    # module system forbids referencing `config` from `imports` (infinite recursion, and
+    # it says so by name). That is fine -- the module only declares its package as an
+    # option default, so with enable = false nothing references the derivation and the
+    # 500 MiB payload never enters the closure.
     services.minecraftClient = {
-      enable = true;
+      enable = config.family.minecraft;
       playerName = self.minecraftName;
       server = "mc.luckyobserver.com:25565";
     };
