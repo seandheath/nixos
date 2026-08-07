@@ -85,13 +85,26 @@ rec {
     secret = "wg-priv-sulfur-adm";   # sulfur reuses its wgadm key for this peer
   };
 
-  # The one admin peer. Its address is referenced by name in three places (the hub's
-  # FORWARD rule, the laptops' allowedIPs, hydrogen's peer list) -- never retype it.
+  # wgadm peers -- sheath's own devices, and nothing else.
+  #
+  # sulfur's address is referenced by name in three places (the hub's FORWARD rule, the
+  # laptops' allowedIPs, hydrogen's peer list) -- never retype it.
+  #
+  # Only entries with a `secret` are NixOS hosts that build their own wg config from it;
+  # a phone carries its key on the device and needs nothing here but a public half.
+  # Being on wgadm gives these devices network reach to sshd, RustDesk and Syncthing --
+  # all key- or password-authenticated, but it is why this list is not the place for
+  # anyone else's phone. Those go on wgfam under `mobile`.
   admin = {
     sulfur = {
       address = "10.42.0.2";
       publicKey = "B3JEHLQkYPzrbiJAlDcd7fi50j2egYo9enu257jvBSU=";
       secret = "wg-priv-sulfur-adm";
+    };
+
+    sheath-phone = {
+      address = "10.42.0.4";
+      publicKey = "3IB2mSQy5JlTNb/JR2717gzNHAoiqACLgIZBiIlGlHE=";
     };
   };
 
