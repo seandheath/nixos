@@ -306,10 +306,20 @@ in
         persistentKeepalive = 25;
       }
       {
-        # The router. 10.0.0.1 is its brLan address, which is where kids.lan and
-        # adguard.lan already live -- reaching it by tunnel needs no second name.
+        # The router, addressed at its TUNNEL address (10.42.0.3) and never at
+        # 10.0.0.1.
+        #
+        # THIS COST AN OUTAGE, so it is worth being explicit. wg-quick installs a route
+        # for every allowedIPs entry. Listing 10.0.0.1/32 here put a more-specific route
+        # to this machine's own DEFAULT GATEWAY AND DNS SERVER inside the tunnel: name
+        # resolution died, the default route could not resolve its next hop, and all
+        # internet access stopped. It was circular too -- the endpoint below is
+        # 10.0.0.1, which was then routed into the tunnel it was trying to build.
+        #
+        # Any address a client might also need off-tunnel must stay off this list. For
+        # the LAN gateway that is not a preference, it is a hard rule.
         publicKey = rtr.publicKey;
-        allowedIPs = [ "${rtr.lanAddress}/32" "${rtr.address}/32" ];
+        allowedIPs = [ "${rtr.address}/32" ];
         endpoint = "${rtr.lanAddress}:${toString rtr.port}";
         persistentKeepalive = 25;
       }

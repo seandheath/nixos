@@ -73,8 +73,10 @@ rec {
   # a service host; WireGuard has no hubs, only pairs, so sulfur simply holds two peer
   # relationships and neither outage implies the other.
   #
-  # Addressed at 10.0.0.1 rather than its tunnel address, so kids.lan resolves and works
-  # identically at home and away with no second name.
+  # Peers address it at `address` (10.42.0.3), NEVER at lanAddress. lanAddress is only
+  # the endpoint to dial when at home; putting it in a peer's allowedIPs routes the
+  # client's own default gateway and resolver into the tunnel and takes its network out.
+  # That is not hypothetical -- it happened to sulfur on 2026-08-06.
   routerMgmt = {
     address = "10.42.0.3";
     lanAddress = "10.0.0.1";

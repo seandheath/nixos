@@ -48,7 +48,13 @@ in
       # real public records pointing at the WAN address, and a wildcard would swallow
       # them -- including the endpoint a client needs to resolve to build the very
       # tunnel it is asking over.
-      address = map (n: "/${n}/${fam.address}") peers.serviceNames;
+      address = map (n: "/${n}/${fam.address}") peers.serviceNames
+        # The router's own admin UIs, answered at its TUNNEL address rather than the
+        # 10.0.0.1 the router's own resolver hands out. A phone with the tunnel up must
+        # not route 10.0.0.1 into it -- that is its gateway whenever it is on home wifi.
+        # Without the tunnel, at home, the router answers 10.0.0.1 itself and that is
+        # correct; this entry only ever applies to clients already inside.
+        ++ map (n: "/${n}/${peers.routerMgmt.address}") [ "kids.lan" "adguard.lan" ];
 
       # Everything else goes to the router, which is AdGuard Home. That is the whole
       # point: a phone on cellular gets the same filtering as a device at home.
