@@ -175,7 +175,12 @@ rec {
   #   3. Paste the device's PUBLIC key below, rebuild hydrogen, switch.
   #
   # Reserved: .20 sheath's phone, .21 spouse's phone, .22+ tablets.
-  mobile = { };
+  mobile = {
+    spouse-phone = {
+      address = "10.41.0.21";
+      publicKey = "PrXXMEAU1mVsZLz/0CLZ14mXYJqwEppaV5OUEr0c504=";
+    };
+  };
 
 
   # Service names every peer resolves to its hub's address. These are the vhosts in
