@@ -71,11 +71,16 @@ in
     };
   };
 
-  # dnsmasq binds a specific address, so the interface has to exist first. Without this
-  # it starts, fails to bind, and stays down until something restarts it.
+  # dnsmasq binds specific addresses, so BOTH interfaces have to exist first. Without
+  # this it starts, fails to bind, and stays down until something restarts it -- and
+  # bind-interfaces makes that fatal rather than partial.
+  #
+  # wgadm was missing from this list until 2026-08-06 and the race simply had not been
+  # lost yet: dnsmasq happened to start after both. A boot that ordered them the other
+  # way would have left the admin tunnel with no resolver and no obvious reason why.
   systemd.services.dnsmasq = {
-    after = [ "wireguard-${fam.interface}.service" ];
-    wants = [ "wireguard-${fam.interface}.service" ];
+    after = [ "wireguard-${fam.interface}.service" "wireguard-${adm.interface}.service" ];
+    wants = [ "wireguard-${fam.interface}.service" "wireguard-${adm.interface}.service" ];
   };
 
   # 53 on the two tunnels. Not on br0, not globally.
