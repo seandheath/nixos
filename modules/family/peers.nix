@@ -45,7 +45,7 @@ rec {
       interface = "wgfam";
       port = 51821;
       subnet = "10.41.0.0/24";
-      address = "10.41.0.1";
+      address = "10.41.0.2";
       publicKey = "ALwEaWzOtlZ7NspsMoFy9l9aTOG1bXdvXgmzf3xVc2Y=";
       secret = "wg-priv-wgfam-hub";
     };
@@ -55,7 +55,7 @@ rec {
       interface = "wgadm";
       port = 51822;
       subnet = "10.42.0.0/24";
-      address = "10.42.0.1";
+      address = "10.42.0.2";
       publicKey = "wxLQ7mv3IGFVecZnrtZ0LrqtEbHr5j/nh0yYHq4SXjs=";
       secret = "wg-priv-wgadm-hub";
     };
@@ -68,12 +68,12 @@ rec {
   # a service host; WireGuard has no hubs, only pairs, so sulfur simply holds two peer
   # relationships and neither outage implies the other.
   #
-  # Peers address it at `address` (10.42.0.3), NEVER at lanAddress. lanAddress is only
+  # Peers address it at `address` (10.42.0.1), NEVER at lanAddress. lanAddress is only
   # the endpoint to dial when at home; putting it in a peer's allowedIPs routes the
   # client's own default gateway and resolver into the tunnel and takes its network out.
   # That is not hypothetical -- it happened to sulfur on 2026-08-06.
   routerMgmt = {
-    address = "10.42.0.3";
+    address = "10.42.0.1";
     lanAddress = "10.0.0.1";
     port = 51823;
     publicKey = "/4/zGHCJN/J2IrGEprkcPk+35Mij+kzY2UxNK+8Y5Qs=";
@@ -92,7 +92,7 @@ rec {
   # anyone else's phone. Those go on wgfam under `mobile`.
   admin = {
     sulfur = {
-      address = "10.42.0.2";
+      address = "10.42.0.3";
       publicKey = "B3JEHLQkYPzrbiJAlDcd7fi50j2egYo9enu257jvBSU=";
       secret = "wg-priv-sulfur-adm";
     };

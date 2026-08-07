@@ -58,7 +58,7 @@ MGMT_PORT=51823
 # router, because 51823 is open on brLan.
 HYDROGEN_HOST="hub.luckyobserver.com"
 ROUTER_HOST="vpn.luckyobserver.com"
-ROUTER_TUNNEL_ADDR="10.42.0.3"
+ROUTER_TUNNEL_ADDR="10.42.0.1"
 
 die() { echo "error: $*" >&2; exit 1; }
 
@@ -86,10 +86,10 @@ done
 case "$CLASS" in
   adult)
     # wgadm: the services, plus SSH/RustDesk/Syncthing reach. Yours.
-    read -rp "  tunnel address for ${NAME} (e.g. 10.42.0.4): " ADDR
+    read -rp "  tunnel address for ${NAME} (e.g. 10.42.0.4 -- .1/.2/.3 are router/hydrogen/sulfur): " ADDR
     HUB_KEY=$HYDROGEN_ADM_KEY
     HUB_PORT=$ADM_PORT
-    HUB_ALLOWED="10.42.0.1/32, 10.41.0.1/32"   # admin address + the service address
+    HUB_ALLOWED="10.42.0.2/32, 10.41.0.2/32"   # admin address + the service address
     DNS_ADDR="${ROUTER_TUNNEL_ADDR}, 1.1.1.1"
     ;;
   family)
@@ -97,7 +97,7 @@ case "$CLASS" in
     read -rp "  tunnel address for ${NAME} (e.g. 10.41.0.21): " ADDR
     HUB_KEY=$HYDROGEN_FAM_KEY
     HUB_PORT=$FAM_PORT
-    HUB_ALLOWED="10.41.0.1/32"
+    HUB_ALLOWED="10.41.0.2/32"
     DNS_ADDR="${ROUTER_TUNNEL_ADDR}, 1.1.1.1"
     ;;
   *) die "class must be 'adult' or 'family'" ;;
