@@ -80,7 +80,8 @@
   # THE ACCESS BOUNDARY. Read this whole block before changing any port anywhere.
   #
   # Every service on this box is reachable only over a WireGuard interface. Being on
-  # the home wifi grants nothing but SSH. That is a deliberate change from how this
+  # the home wifi grants NOTHING -- not a service, not sshd. That is a deliberate change
+  # from how this
   # host worked until now, and the reason is modules/minecraft-server.nix: that server
   # runs online-mode=false and verifies no identity, so whatever can reach 25565 may
   # claim to be any child. Scoping it to br0 meant "any device on the LAN", including
@@ -109,11 +110,26 @@
     51822   # wgadm -- sulfur
   ];
 
+  # sshd's own firewall opener, OFF.
+  #
+  # services.openssh.openFirewall defaults to TRUE and adds 22 to the GLOBAL
+  # allowedTCPPorts -- every interface, including br0. Removing the br0 entry below did
+  # nothing for three days because of it: `nc -vz 10.0.0.10 22` from a LAN machine with
+  # no key kept succeeding while every other port was correctly blocked, and the comment
+  # here claimed the opposite.
+  #
+  # The lesson generalises past this option: an interface-scoped rule cannot subtract
+  # from a global one. If a port must be reachable on exactly one interface, check that
+  # nothing else is opening it globally first. 22 is in the wgadm list below, which is
+  # now the only place it appears.
+  services.openssh.openFirewall = false;
+
   # br0 carries NOTHING. Not even SSH.
   #
   # 22 lived here until 2026-08-06 as break-glass -- a way back in when the tunnel
   # configuration itself was the broken thing. Removing it was a deliberate call: all
   # administration is on wgadm now, so there is no address on this LAN that answers.
+  # (Removing it only actually took effect once openFirewall was disabled above.)
   #
   # WHAT THAT COSTS, so nobody has to rediscover it at a bad moment: if wgadm fails to
   # come up -- a bad switch, a rotated key, a sops decrypt that did not happen -- there
