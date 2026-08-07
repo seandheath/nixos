@@ -38,6 +38,61 @@ if [[ "${1:-}" == "--resume" ]]; then
         fi
     fi
 
+    # Re-sync the configuration before retrying.
+    #
+    # WHY THIS EXISTS. --resume used to go straight to nixos-install against the copy at
+    # /mnt/home/sheath/nixos made during the FIRST run. Pulling new commits into the
+    # checkout you are standing in changed nothing, so a resume rebuilt the identical
+    # configuration and failed identically -- and the failure looked exactly like the
+    # original, which is the worst kind. Resume means "try again with what I have now".
+    #
+    # hardware/<host>.nix is preserved across the copy. install.sh generated the real one
+    # into that tree at install time, overwriting the committed placeholder; a plain
+    # re-copy would put the placeholder back and produce a system whose root filesystem
+    # is a dummy by-label device.
+    resync_config() {
+        local dest=/mnt/home/sheath/nixos
+        local hw="hardware/${hostname}.nix"
+        local saved=""
+
+        [[ "$dest" == /mnt/home/sheath/nixos ]] || { echo "refusing to sync to '$dest'"; exit 1; }
+
+        if [[ ! -f flake.nix ]]; then
+            echo "Not in the repository root -- leaving ${dest} as it is."
+            return 0
+        fi
+
+        if [[ -f "${dest}/${hw}" ]]; then
+            saved=$(mktemp)
+            sudo cp "${dest}/${hw}" "$saved"
+        else
+            echo "WARNING: ${dest}/${hw} is missing. The committed placeholder will be"
+            echo "         used, and it has a dummy root filesystem. Expect this to fail."
+        fi
+
+        echo "Re-syncing configuration to ${dest}..."
+        sudo rm -rf "$dest"
+        sudo mkdir -p "$(dirname "$dest")"
+        sudo cp -r . "$dest"
+
+        if [[ -n "$saved" ]]; then
+            sudo cp "$saved" "${dest}/${hw}"
+            rm -f "$saved"
+            echo "Preserved the generated ${hw}."
+        fi
+
+        # Cheap guard against the failure this function exists to prevent: a placeholder
+        # installs cleanly and then will not boot.
+        if sudo grep -q 'PLACEHOLDER' "${dest}/${hw}" 2>/dev/null; then
+            echo
+            echo "ERROR: ${hw} is still the placeholder, not this machine's hardware."
+            echo "Re-run install.sh from the start rather than resuming."
+            exit 1
+        fi
+    }
+
+    resync_config
+
     # Family laptops set both passwords declaratively from sops (see
     # modules/family/profile.nix), so there is no `passwd` in the system profile to run.
     # Same list as the main path below; kept in step with modules/family/peers.nix.
