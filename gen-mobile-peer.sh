@@ -7,6 +7,18 @@
 # Prints a QR the WireGuard app scans, then the two config snippets to paste into
 # modules/family/peers.nix and the nixrouter repo.
 #
+# THE SECOND DNS SERVER IS NOT OPTIONAL. With only the tunnel resolver listed, a phone
+# whose hydrogen peer is down has no DNS at all -- not degraded, gone -- and presents as
+# "the internet is broken" to someone who will not debug it. That happened on 2026-08-06:
+# a phone paired before the router's split-horizon record was deployed pinned a stale
+# endpoint, never handshook with hydrogen, and lost all name resolution while the network
+# itself was fine. The fallback turns that into "Immich does not resolve", which is a
+# complaint rather than an outage.
+#
+# The cost is that on failover the phone briefly resolves through 1.1.1.1 instead of
+# AdGuard, losing filtering until the tunnel recovers. For an adult's phone that is the
+# right trade; do not copy this to a child's device.
+#
 # RUN THIS IN A PLAIN TERMINAL, NOT THROUGH AN AGENT AND NOT VIA `!`.
 # The QR encodes the whole config, private key included. Rendered as terminal blocks it
 # is just as readable to a camera as to a phone, and anything that captures your terminal
@@ -70,7 +82,7 @@ case "$CLASS" in
     HUB_KEY=$HYDROGEN_ADM_KEY
     HUB_PORT=$ADM_PORT
     HUB_ALLOWED="10.42.0.1/32, 10.41.0.1/32"   # admin address + the service address
-    DNS_ADDR="10.42.0.1"
+    DNS_ADDR="10.42.0.1, 1.1.1.1"
     ;;
   family)
     # wgfam: web services and Minecraft only, isolated from every other peer.
@@ -78,7 +90,7 @@ case "$CLASS" in
     HUB_KEY=$HYDROGEN_FAM_KEY
     HUB_PORT=$FAM_PORT
     HUB_ALLOWED="10.41.0.1/32"
-    DNS_ADDR="10.41.0.1"
+    DNS_ADDR="10.41.0.1, 1.1.1.1"
     ;;
   *) die "class must be 'adult' or 'family'" ;;
 esac
