@@ -43,10 +43,19 @@ in
 
   options.family.minecraft = lib.mkOption {
     type = lib.types.bool;
-    default = true;
+    default = false;
     description = ''
-      Ship the pinned Minecraft client. Turn this OFF for the initial install and back
-      on afterwards.
+      Ship the pinned Minecraft client.
+
+      DEFAULT IS OFF as of 2026-08-07, for all four laptops, until an install is known
+      good. vizualwanderer's died fetching libraries.minecraft.net and the cause is not
+      yet established -- most likely the AAAA record on a LAN with no working IPv6, or
+      the asset derivation's 4403 parallel fetches. Debugging that is worth doing, but
+      not while it is also the thing blocking every install.
+
+      Flip this back to true once installs are stable, and push the result from sulfur
+      with `nixos-rebuild --target-host` rather than letting each laptop fetch from
+      Mojang itself -- sulfur already holds all 403 store paths.
 
       The payload is ~500 MiB fetched from Mojang and Modrinth as fixed-output
       derivations -- 115 libraries plus one FOD pulling 4403 asset objects in parallel --
