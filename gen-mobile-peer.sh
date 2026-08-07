@@ -7,6 +7,14 @@
 # Prints a QR the WireGuard app scans, then the two config snippets to paste into
 # modules/family/peers.nix and the nixrouter repo.
 #
+# DNS COMES FROM THE ROUTER, over the router peer -- not from hydrogen. There is exactly
+# one authority for these names. hydrogen briefly ran a second dnsmasq for the same zone,
+# which is how split-horizon DNS starts giving two different answers to one question.
+#
+# So the phone asks 10.42.0.3 for a name, is told the app lives at 10.41.0.1, and reaches
+# it over the hydrogen peer. Two peers, each doing its own job, and neither box's outage
+# implies the other's.
+#
 # THE SECOND DNS SERVER IS NOT OPTIONAL. With only the tunnel resolver listed, a phone
 # whose hydrogen peer is down has no DNS at all -- not degraded, gone -- and presents as
 # "the internet is broken" to someone who will not debug it. That happened on 2026-08-06:
@@ -82,7 +90,7 @@ case "$CLASS" in
     HUB_KEY=$HYDROGEN_ADM_KEY
     HUB_PORT=$ADM_PORT
     HUB_ALLOWED="10.42.0.1/32, 10.41.0.1/32"   # admin address + the service address
-    DNS_ADDR="10.42.0.1, 1.1.1.1"
+    DNS_ADDR="${ROUTER_TUNNEL_ADDR}, 1.1.1.1"
     ;;
   family)
     # wgfam: web services and Minecraft only, isolated from every other peer.
@@ -90,7 +98,7 @@ case "$CLASS" in
     HUB_KEY=$HYDROGEN_FAM_KEY
     HUB_PORT=$FAM_PORT
     HUB_ALLOWED="10.41.0.1/32"
-    DNS_ADDR="10.41.0.1, 1.1.1.1"
+    DNS_ADDR="${ROUTER_TUNNEL_ADDR}, 1.1.1.1"
     ;;
   *) die "class must be 'adult' or 'family'" ;;
 esac

@@ -38,11 +38,6 @@ rec {
   lanEndpoint = "10.0.0.10";
   lanSubnet = "10.0.0.0/24";
 
-  # The router. modules/family/dns.nix forwards everything that is not one of our own
-  # service names here, which is AdGuard Home -- so a phone using the tunnel's resolver
-  # gets the household filtering wherever it happens to be.
-  lanGateway = "10.0.0.1";
-
   hubs = {
     # Family tunnel: web services + Minecraft, nothing else. Peers are isolated from
     # each other and from the LAN by hydrogen's FORWARD policy.
@@ -183,7 +178,17 @@ rec {
   };
 
 
-  # Service names every peer resolves to its hub's address. These are the vhosts in
+  # Service names. THE ROUTER IS THE ONLY RESOLVER -- hydrogen briefly ran a second
+  # dnsmasq for this same zone and that is how split-horizon DNS starts giving two
+  # different answers to one question. This list now feeds only the NixOS hosts'
+  # networking.hosts; the router keeps its own copy in localServices.names, and the two
+  # must be kept in step by hand.
+  #
+  # Phones have no networking.hosts, so they set DNS to the router's tunnel address
+  # (10.42.0.3) and get these answers from it over the router tunnel -- then reach the
+  # services themselves over the hydrogen tunnel. Two peers, each doing its own job.
+  #
+  # These are the vhosts in
   # modules/{nextcloud,immich,paperless,calibre}.nix; `mc` is Minecraft, which has no
   # vhost and exists only as a name for the kids to type.
   #
