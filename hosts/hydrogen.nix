@@ -123,16 +123,6 @@
   # now the only place it appears.
   services.openssh.openFirewall = false;
 
-  # TEMPORARY -- REMOVE AFTER THE 2026-08-07 RENUMBER IS VERIFIED.
-  #
-  # The .1/.2/.3 rotation cannot be done without a break window: the router takes
-  # 10.42.0.1 while this host still holds it, and two peers on one interface cannot
-  # share an allowedIPs entry, so the addresses cannot coexist. With administration on
-  # wgadm only, a mistake mid-rotation means the physical console.
-  #
-  # This is the net. Delete it, and this comment, once `ssh sheath@10.42.0.2` works.
-  networking.firewall.interfaces."br0".allowedTCPPorts = [ 22 ];
-
   # br0 carries NOTHING. Not even SSH.
   #
   # 22 lived here until 2026-08-06 as break-glass -- a way back in when the tunnel
