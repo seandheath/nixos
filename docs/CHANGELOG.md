@@ -1,31 +1,53 @@
 # Changelog
 
 ## [Unreleased]
-### Fixed (sulfur: DNS died whenever Mullvad was connected)
-- **The symptom.** With Mullvad up and sulfur away from home, name resolution stalled for
-  seconds per lookup and the machine appeared to have no network. Disconnecting Mullvad
-  restored it immediately, which made the VPN look like the culprit.
-- **Two bugs, one symptom.** `mullvad dns set custom 10.0.0.1 1.1.1.1` put the *home
-  router* first in `/etc/resolv.conf` on every connect. glibc has no concept of a resolver
-  being unreachable — only of one being slow — so it tried 10.0.0.1 first and ate a 5s
-  timeout on every query before falling through to 1.1.1.1. Off the home LAN, the only
-  route to 10.0.0.1 is `wg0` — and `wg0` lost a boot race often enough to matter (up on
-  2026-08-06 and -07, failed on -08 and -09).
-- **Why `wg0` was dead.** It resolves `vpn.luckyobserver.com` during `wg setconf`, and
-  `network-online.target` is not a promise of connectivity: NixOS satisfies it with
-  `nm-online -s -q`, where `-s` waits only for NetworkManager to finish *startup*. The
-  target fired mid-association, the lookup failed, and wg-quick — a plain oneshot — deleted
-  its link and stayed failed for the whole boot. `wgadm` survives the identical race only
-  because its endpoint is an IP literal *and* `modules/family/wg-endpoint.nix` grants it
-  `Restart=on-failure`; `wg0` had neither.
-- **The fix.** Mullvad now sets `custom 1.1.1.1` — nothing tunnel-dependent may be first in
-  `resolv.conf`. The five split-horizon names already come from `networking.hosts`, so no
-  internal name regressed; the router's ad/tracker filtering while connected was
-  deliberately given up. `wg0` gained unlimited retry (`startLimitIntervalSec = 0`,
-  `RestartSec = 30` — the systemd default of 5 starts per 10s gives up ~50s in, shorter
-  than a slow WPA association) plus a NetworkManager dispatcher hook that restarts it on
-  network change, but only when it is actually failed, and which filters out events on
-  `wg0`/`wgadm`/`fleet` so bringing the tunnel up cannot trigger its own restart.
+### Fixed (sulfur: NetworkManager was silently gutting the wgadm tunnel)
+- **The symptom.** Name resolution failed on sulfur and came back after "turning WireGuard
+  off". The tunnel that was toggled was `wgadm`, from GNOME's network panel.
+- **Root cause.** NetworkManager has managed WireGuard devices since 1.16, so a tunnel that
+  `wg-quick` created still appears as an NM device — and as a toggle in GNOME. Switching it
+  off *deactivates* the device: NM flushes the address and every route. `wg-quick-wgadm.service`
+  knows nothing about this and stays `active (exited)`.
+- **Why it stayed hidden.** The result is a tunnel that looks alive from every angle. The
+  unit reads active, and `wg show` reports recent handshakes for both peers — because
+  keepalives are sent to the peer's endpoint over the *underlying* default route and never
+  need the tunnel's own address. Observed on sulfur 2026-08-09: `wgadm` was `link/none`
+  with no `10.41`/`10.42` routes at all, so every service behind it was unreachable while
+  nothing logged an error.
+- **The fix.** `modules/family/wg-endpoint.nix` now marks every `networking.wg-quick.interfaces`
+  entry `unmanaged` in NetworkManager, derived from the attrset so a tunnel added later is
+  covered automatically. NM can no longer flush them, and they vanish from the GNOME panel,
+  so there is no toggle to hit by mistake. Applies to sulfur (`wg0`, `wgadm`, `fleet`) and
+  the four family laptops (`wgfam`), which had the identical latent bug. hydrogen is
+  unaffected — it does not run NetworkManager, and its derivation is unchanged.
+- **`wg-endpoint` now runs after the tunnels exist.** Its boot run started in the same second
+  as `wg-quick`, found no interface, and returned early from every `configure()` call, so the
+  endpoint kept its bootstrap LAN literal until the `OnBootSec=2min` timer. Away from home
+  that was two minutes of a tunnel dialling `10.0.0.10`.
+
+### Changed (sulfur: wg0 is a manual break-glass tunnel, not a boot-time one)
+- `autostart = false`, matching `modules/fleet-vpn.nix`. `wgadm` is the everyday tunnel;
+  `wg0` exists to reach the whole home LAN — and hydrogen's sshd on `br0` — when `wgadm` or
+  hydrogen's sops decrypt is itself what broke. Recovery access that depends on the thing
+  being recovered is not recovery access, so it stays declared.
+- Its boot cost was real: the endpoint is a hostname, `wg-quick` resolves it during
+  `wg setconf`, and on a boot that beat the Wi-Fi the lookup failed and left the unit dead
+  for the session (2026-08-08 and -09; fine on -06 and -07). Started by hand on an
+  already-connected machine, that failure mode does not exist, so the retry and dispatcher
+  scaffolding added earlier the same day was removed again.
+
+### Fixed (sulfur: Mullvad would have pointed DNS at an unreachable resolver)
+- `mullvad dns set custom 10.0.0.1 1.1.1.1` put the home router first in `/etc/resolv.conf`
+  on every connect. glibc has no concept of a nameserver being unreachable, only of one being
+  slow, so off the home LAN it would try 10.0.0.1 first and eat a 5s timeout per lookup.
+  Now `custom 1.1.1.1`.
+- **This was not the outage above.** It was found while chasing it and initially blamed for
+  it; the daemon log then showed Mullvad never connected on either boot, so the setting was
+  never applied. Fixed on its own merits as a latent bug. The rule is worth keeping: a
+  resolver whose reachability depends on a tunnel must never be first in `resolv.conf`.
+- Cost: the router's ad/tracker filtering is unavailable while Mullvad is connected. The five
+  split-horizon names still resolve from `networking.hosts` — `nsswitch` reads `files` before
+  `dns` — so local services resolve identically at home, remote, and under Mullvad.
 
 ### Security (hydrogen's services are behind WireGuard; the LAN is no longer a credential)
 - **What was wrong.** Every service on hydrogen was scoped to `br0`, and the only WireGuard
