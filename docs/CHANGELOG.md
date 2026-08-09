@@ -1,6 +1,25 @@
 # Changelog
 
 ## [Unreleased]
+### Security (hydrogen's WireGuard hubs were exposed to the same NetworkManager flush)
+- **What was missed.** The previous fix derived `networking.networkmanager.unmanaged` from
+  `networking.wg-quick.interfaces` only, and lived in `modules/family/wg-endpoint.nix`. hydrogen
+  imports neither — it builds `wgadm` and `wgfam` with `networking.wireguard.interfaces`
+  (`modules/family/vpn-hub.nix`) — so it kept an empty unmanaged list while running GNOME, and
+  therefore NetworkManager, for RustDesk.
+- **Why that is the worst case.** A flush on a laptop costs that laptop its tunnel. A flush on
+  hydrogen drops both hubs at once: every family device and sulfur lose every service
+  simultaneously, with the same silent signature — units still `active`, handshakes still
+  reported, no address and no routes.
+- **The fix.** New `modules/wg-unmanaged.nix`, imported for every host via `commonModules` in
+  `flake.nix`, deriving the unmanaged list from **both** `wg-quick.interfaces` and
+  `networking.wireguard.interfaces`. hydrogen now marks `fleet`, `wgadm` and `wgfam`; the four
+  family laptops mark `wgfam`; sulfur marks `fleet`, `wg0` and `wgadm`. The `mkMerge` block
+  added to `wg-endpoint.nix` is removed again — that module is about endpoint selection, not NM
+  ownership.
+- hydrogen never roams, which is why it needs no endpoint selection. That is not why it is
+  safe: the exposure comes from NM managing the device at all, not from changing networks.
+
 ### Fixed (sulfur: NetworkManager was silently gutting the wgadm tunnel)
 - **The symptom.** Name resolution failed on sulfur and came back after "turning WireGuard
   off". The tunnel that was toggled was `wgadm`, from GNOME's network panel.

@@ -50,6 +50,10 @@
         sops-nix.nixosModules.sops
         nix-flatpak.nixosModules.nix-flatpak
         ./modules/nix-settings.nix
+        # Every host, deliberately: NetworkManager will flush a WireGuard interface it
+        # thinks it owns, and the hosts that most need protecting are the ones nobody
+        # is watching. See the module header.
+        ./modules/wg-unmanaged.nix
         {
           home-manager.useGlobalPkgs = true;
           home-manager.useUserPackages = true;

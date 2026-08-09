@@ -120,39 +120,7 @@ in
     '';
   };
 
-  config = lib.mkMerge [
-
-    # ------------------------------------------------------------------------
-    # Keep NetworkManager's hands off every wg-quick interface.
-    #
-    # Unconditional -- outside the `cfg != []` gate below -- because this is not about
-    # endpoint selection. Any host that runs wg-quick under NetworkManager needs it,
-    # whether or not it has a peer that roams.
-    #
-    # NetworkManager has managed WireGuard devices since 1.16, so a tunnel wg-quick
-    # created still shows up as a device it believes it owns -- and as a toggle in
-    # GNOME's network panel. Switching that toggle off, or NM deciding the device has
-    # no matching connection profile, DEACTIVATES it: the address and every route are
-    # flushed. wg-quick's unit knows nothing about this and stays `active (exited)`.
-    #
-    # The result is a tunnel that is convincingly alive and completely useless.
-    # Observed on sulfur 2026-08-09: wgadm carried no address and no 10.41/10.42 routes,
-    # yet the unit read active and `wg show` reported recent handshakes for both peers.
-    # The handshakes are not a contradiction -- keepalives are sent to the peer's
-    # endpoint over the UNDERLYING default route and never need the tunnel's own
-    # address -- which is exactly what makes the failure so quiet. Nothing logs, nothing
-    # fails, and every service on the far side is simply unreachable.
-    #
-    # Marking the interfaces unmanaged fixes both halves: NM cannot flush them, and they
-    # disappear from the GNOME panel so there is no toggle to switch off by mistake.
-    # Deriving the list from networking.wg-quick.interfaces means an interface added
-    # later is covered without anyone remembering this file exists.
-    {
-      networking.networkmanager.unmanaged =
-        map (n: "interface-name:${n}") (lib.attrNames config.networking.wg-quick.interfaces);
-    }
-
-    (lib.mkIf (cfg != [ ]) {
+  config = lib.mkIf (cfg != [ ]) {
     systemd.services = {
       wg-endpoint = {
         description = "Point WireGuard endpoints at the LAN or public address";
@@ -205,6 +173,5 @@ in
         Unit = "wg-endpoint.service";
       };
     };
-    })
-  ];
+  };
 }
