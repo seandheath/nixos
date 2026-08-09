@@ -130,7 +130,11 @@ in
         # from every configure() call -- so the endpoint kept its bootstrap LAN literal
         # until the OnBootSec=2min timer fired. Away from home that is two minutes of a
         # tunnel dialling 10.0.0.10, which is someone else's machine.
-        after = [ "network-online.target" ] ++ wgQuickUnits;
+        #
+        # Both kinds of tunnel are named: wg-quick units on the kids' laptops, and
+        # NetworkManager-ensure-profiles on sulfur, where wgQuickUnits is now empty.
+        # Ordering against a unit a given host does not have is a harmless no-op.
+        after = [ "network-online.target" "NetworkManager-ensure-profiles.service" ] ++ wgQuickUnits;
         wants = [ "network-online.target" ];
         wantedBy = [ "multi-user.target" ];
         serviceConfig = {
@@ -145,12 +149,18 @@ in
     # be resolved at boot -- is gone now that the configured endpoint is an IP literal,
     # but "no tunnel until an adult intervenes" is a bad enough failure mode to defend
     # against twice.)
-    // lib.listToAttrs (map (e: lib.nameValuePair "wg-quick-${e.interface}" {
+    //
+    # Only for interfaces wg-quick actually builds. sulfur's wgadm is a NetworkManager
+    # profile now (hosts/sulfur.nix) and has no wg-quick unit at all -- without this
+    # filter we would declare systemd.services.wg-quick-wgadm carrying a serviceConfig
+    # and no ExecStart, which is a broken unit describing a tunnel nobody starts that
+    # way. NM does its own retrying for the profiles it owns.
+    lib.listToAttrs (map (e: lib.nameValuePair "wg-quick-${e.interface}" {
       serviceConfig = {
         Restart = "on-failure";
         RestartSec = 10;
       };
-    }) cfg);
+    }) (lib.filter (e: config.networking.wg-quick.interfaces ? ${e.interface}) cfg));
 
     # Re-run on every connectivity change. The dispatcher only kicks the unit rather
     # than doing the work: NetworkManager runs these scripts serially and this one

@@ -1,6 +1,41 @@
 # Changelog
 
 ## [Unreleased]
+### Changed (sulfur: the tunnels are NetworkManager profiles, and the panel toggle is safe)
+- **Why.** NetworkManager manages WireGuard devices whether or not we want it to, so the real
+  choice is not "NM or not" but "NM as a spectator or NM as the owner" — and the spectator is
+  the dangerous one, offering a GNOME toggle that flushes address and routes out from under a
+  systemd unit that goes on reporting success. Handing NM the whole configuration makes the
+  same toggle correct: deactivating tears the tunnel down, activating rebuilds it from config
+  NM actually holds. It also puts real status in the panel, which during the 2026-08-09
+  incident was the only source that told the truth while `systemctl` and `wg show` both
+  reported health.
+- `wg0`, `wgadm` and `fleet` on sulfur move from `networking.wg-quick.interfaces` to
+  `networking.networkmanager.ensureProfiles.profiles`. `wgadm` is `autoconnect = true`; `wg0`
+  and `fleet` stay manual, switched from the panel or `nmcli connection up/down`.
+- **Keys did not move.** `wireguard.private-key-flags = 1` marks them agent-owned and
+  `nm-file-secret-agent` hands each one to NM from the sops path that tunnel already used as
+  its `privateKeyFile`. No new secret, no `secrets.yaml` edit, no `gen-family-secrets.sh`
+  change, and the key never lands in a connection file. `environmentFiles` was rejected for
+  the opposite reason — it would have required a new `KEY=value` secret and written the key
+  into the profile.
+- `wg0` keeps a hostname endpoint, which is now safe. Under `wg-quick` it was not: `wg-quick`
+  resolves during `wg setconf`, so a boot that beat the Wi-Fi killed the unit for the session
+  (2026-08-08 and -09). NM resolves asynchronously and retries the activation. Its
+  `table = "off"` plus the `postUp`/`postDown` metric-1000 pair collapse into one
+  `ipv4.route-metric = 1000`.
+- **hydrogen deliberately keeps `wg-quick` for `fleet`** — it is a server, nobody switches it
+  from a panel, and there is no reason to move a working tunnel on the machine everything
+  depends on. Its copy is protected by `modules/wg-unmanaged.nix` instead. The peer key and
+  endpoint are now shared `let` bindings so the two implementations cannot drift.
+- `modules/family/wg-endpoint.nix`: the `Restart=on-failure` overrides are filtered to
+  interfaces `wg-quick` actually builds — without that, sulfur would declare a
+  `wg-quick-wgadm` unit with a `serviceConfig` and no `ExecStart`. The roaming script is
+  unchanged; it still writes `wg set … endpoint` to the kernel device, and the existing NM
+  dispatcher hook re-runs it after any reactivation.
+- **Do not edit these connections in the GNOME UI.** Toggling is safe and is the point;
+  editing promotes the profile to `/etc` and leaves two competing copies.
+
 ### Security (hydrogen's WireGuard hubs were exposed to the same NetworkManager flush)
 - **What was missed.** The previous fix derived `networking.networkmanager.unmanaged` from
   `networking.wg-quick.interfaces` only, and lived in `modules/family/wg-endpoint.nix`. hydrogen

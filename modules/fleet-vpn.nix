@@ -6,16 +6,33 @@
 # The grant is ONE device record — a single key/address. It cannot be live on
 # sulfur and hydrogen at the same time (the hub keys the endpoint by public
 # key; concurrent use flaps the handshake). Both hosts therefore declare the
-# identical tunnel with autostart DISABLED, and it is switched by hand — exactly
-# one host up at a time:
-#   sudo systemctl start wg-quick-fleet    # bring up on THIS host
-#   sudo systemctl stop  wg-quick-fleet    # take down before using the other host
+# identical tunnel with autoconnect/autostart DISABLED, and it is switched by
+# hand — exactly one host up at a time:
+#   sulfur:    nmcli connection up fleet     / nmcli connection down fleet
+#              (or the GNOME network panel toggle — same thing)
+#   hydrogen:  sudo systemctl start wg-quick-fleet
+#              sudo systemctl stop  wg-quick-fleet
+#
+# TWO IMPLEMENTATIONS OF ONE TUNNEL, and the split is deliberate. sulfur builds
+# it as a NetworkManager profile so it appears in the GNOME panel — a hand-
+# switched tunnel is exactly what a toggle is good for, and NM owning the config
+# makes that toggle safe (see the header in hosts/sulfur.nix). hydrogen keeps
+# wg-quick: it is a server, nobody is switching this from its panel, and there
+# is no reason to move a working tunnel on the machine everything depends on.
+# hydrogen's copy is protected from NM by modules/wg-unmanaged.nix instead.
 #
 # We connect to the server by IP, so no tunnel-provided DNS is configured
 # (keeps hydrogen clear of resolvconf).
 { config, lib, ... }:
 let
   isHydrogen = config.networking.hostName == "hydrogen";
+
+  # Declared once and shared by both implementations below, so the two copies of this
+  # tunnel cannot drift apart in the way that matters -- a peer key or endpoint that
+  # differs between hosts is a tunnel that silently fails on one of them.
+  fleetPeerKey = "JA/8p6kwD1fIripjtt27UGoN/cpyt9Fi4JpADIiCTT0=";
+  fleetEndpoint = "173.212.3.77:51821";
+
   # The `ssh jellyfin` login key. sulfur already carries it on disk; hydrogen
   # is an impermanent server with no ~/.ssh, so it gets the key from sops.
   fleetSshKey =
@@ -32,25 +49,73 @@ in
     mode = "0400";
   };
 
-  networking.wg-quick.interfaces.fleet = {
-    autostart = false; # never up at boot; manual switch (see header)
-    address = [ "172.20.20.6/32" ];
-    mtu = 1420;
-    privateKeyFile = config.sops.secrets.wg-priv-fleet.path;
+  # hydrogen: wg-quick, unchanged.
+  networking.wg-quick.interfaces = lib.mkIf isHydrogen {
+    fleet = {
+      autostart = false; # never up at boot; manual switch (see header)
+      address = [ "172.20.20.6/32" ];
+      mtu = 1420;
+      privateKeyFile = config.sops.secrets.wg-priv-fleet.path;
 
-    peers = [
-      {
-        publicKey = "JA/8p6kwD1fIripjtt27UGoN/cpyt9Fi4JpADIiCTT0=";
-        endpoint = "173.212.3.77:51821";
-        # The issued conf ships AllowedIPs empty (routes are left to the client /
-        # the optional FleetConnect renderer). Supply exactly what we need to
-        # reach: the management VPN + hub (172.20.20.0/24) and the Jellyfin host
-        # (100.64.0.80/32). These are narrow and don't overlap the 10.0.0.0/24
-        # home LAN, so no `table = "off"` route-suppression is needed.
-        allowedIPs = [ "172.20.20.0/24" "100.64.0.80/32" ];
-        persistentKeepalive = 25;
-      }
-    ];
+      peers = [
+        {
+          publicKey = fleetPeerKey;
+          endpoint = fleetEndpoint;
+          # The issued conf ships AllowedIPs empty (routes are left to the client /
+          # the optional FleetConnect renderer). Supply exactly what we need to
+          # reach: the management VPN + hub (172.20.20.0/24) and the Jellyfin host
+          # (100.64.0.80/32). These are narrow and don't overlap the 10.0.0.0/24
+          # home LAN, so no `table = "off"` route-suppression is needed.
+          allowedIPs = [ "172.20.20.0/24" "100.64.0.80/32" ];
+          persistentKeepalive = 25;
+        }
+      ];
+    };
+  };
+
+  # sulfur: the same tunnel as a NetworkManager profile, so it is switchable from the
+  # GNOME panel. Key stays in sops and is handed to NM by nm-file-secret-agent, never
+  # written into the connection file.
+  networking.networkmanager.ensureProfiles = lib.mkIf (!isHydrogen) {
+    profiles.fleet = {
+      connection = {
+        id = "fleet";
+        uuid = "b76bf7f9-25a0-4ea5-a7d4-88e3f46eec1f";
+        type = "wireguard";
+        interface-name = "fleet";
+        autoconnect = false; # NEVER at boot -- one host at a time, see header
+      };
+
+      wireguard = {
+        private-key-flags = 1;
+        mtu = 1420;
+        peer-routes = true;
+      };
+
+      # Same narrow allowed-ips as the wg-quick copy above, and for the same reason:
+      # they don't overlap the 10.0.0.0/24 home LAN, so no route suppression is needed.
+      "wireguard-peer.${fleetPeerKey}" = {
+        allowed-ips = "172.20.20.0/24;100.64.0.80/32;";
+        endpoint = fleetEndpoint;
+        persistent-keepalive = 25;
+      };
+
+      ipv4 = {
+        method = "manual";
+        address1 = "172.20.20.6/32";
+        never-default = true;
+      };
+      ipv6.method = "disabled";
+    };
+
+    secrets.entries = [{
+      matchId = "fleet";
+      matchType = "wireguard";
+      matchSetting = "wireguard";
+      key = "private-key";
+      file = config.sops.secrets.wg-priv-fleet.path;
+      trim = true;
+    }];
   };
 
   # WireGuard reply traffic returns on the tunnel iface; loosen reverse-path

@@ -218,47 +218,85 @@ in
     };
   };
 
-  # WireGuard configuration for home LAN access -- MANUAL, not at boot.
+  # ==========================================================================
+  # The tunnels, as NetworkManager profiles rather than wg-quick interfaces.
   #
-  # wgadm below is the everyday tunnel and is meant to be up all the time. wg0 is the
-  # break-glass path: it reaches the whole home LAN (10.0.0.0/24), which is how you get
-  # to hydrogen's sshd on br0 if wgadm itself, or hydrogen's sops decrypt, is what
-  # broke. Recovery access whose availability depends on the thing being recovered is
-  # not recovery access, so it stays declared -- but there is no reason to carry it, and
-  # its boot-time cost was real: the endpoint is a hostname, wg-quick resolves it during
-  # `wg setconf`, and on a boot that beat the Wi-Fi the lookup failed and left the unit
-  # dead for the session (2026-08-08 and -09; it came up fine on -06 and -07).
+  # WHY NM OWNS THESE NOW. NM manages WireGuard devices whether or not we want it to
+  # (see modules/wg-unmanaged.nix for what that cost). The choice is therefore not
+  # "NM or not" but "NM as a spectator or NM as the owner", and a spectator is the
+  # dangerous one: it offers a toggle in GNOME that flushes the address and routes out
+  # from under a systemd unit that goes on reporting success. Handing NM the whole
+  # configuration makes the same toggle correct -- deactivating tears the tunnel down,
+  # activating rebuilds it from config NM actually holds -- and puts real status in the
+  # panel, which during the 2026-08-09 incident was the only source that told the truth
+  # while systemctl and `wg show` both reported health.
   #
-  # Started by hand, when the network is already up, that failure mode does not exist:
-  #   sudo systemctl start wg-quick-wg0    # break glass
-  #   sudo systemctl stop  wg-quick-wg0
+  # DO NOT EDIT these connections in the GNOME UI. Toggling is safe and is the point;
+  # editing is not. These profiles are rendered to /run/NetworkManager/system-connections
+  # and NM responds to an edit by copying the connection to /etc and treating it as
+  # ad-hoc -- so the next time NetworkManager-ensure-profiles runs you have two profiles
+  # for one interface, competing. Change them here instead.
   #
-  # Same arrangement, and the same reasoning, as modules/fleet-vpn.nix.
+  # Private keys are NOT in these profiles. wireguard.private-key-flags = 1 marks the key
+  # agent-owned, and nm-file-secret-agent (ensureProfiles.secrets below) hands it to NM
+  # from the existing sops path on demand. So the key stays exactly where it already was
+  # and never lands in a connection file -- no new secret, and secrets.yaml is untouched.
+  #
+  # Peer sections must be ONE attribute name containing a literal dot. Nesting it as
+  # wireguard-peer."${key}" is a type error, not a section: pkgs.formats.ini is two levels
+  # deep and the peer key belongs in the section name, where base64's / + = pass through
+  # untouched.
+  # ==========================================================================
+
+  # --------------------------------------------------------------------------
+  # wg0 -- the break-glass path to the home LAN. MANUAL, never at boot.
+  #
+  # wgadm below is the everyday tunnel. wg0 exists to reach the whole home LAN
+  # (10.0.0.0/24), and through it hydrogen's sshd on br0, when wgadm itself or hydrogen's
+  # sops decrypt is what broke. Recovery access whose availability depends on the thing
+  # being recovered is not recovery access, so it stays declared -- but autoconnect is
+  # off, and it is switched on from the GNOME panel or with:
+  #   nmcli connection up wg0 / nmcli connection down wg0
+  #
+  # The endpoint is a hostname again, and that is now safe. Under wg-quick it was not:
+  # wg-quick resolves the endpoint during `wg setconf`, so a boot that beat the Wi-Fi
+  # killed the unit outright and left it dead for the session (2026-08-08 and -09). NM
+  # resolves asynchronously and retries the activation instead of destroying the
+  # interface.
   sops.secrets.wg-priv-sulfur = { };
 
-  networking.wg-quick.interfaces.wg0 = {
-    autostart = false;
-    address = [ "10.40.0.3/24" ];
-    privateKeyFile = config.sops.secrets.wg-priv-sulfur.path;
-    table = "off"; # Prevent wg-quick from auto-adding routes to the main table
-    
-    peers = [
-      {
-        publicKey = "ILwElzleBCCQ8vrGGiV2gUY0B33IHB456MQtgT2ZUTE=";
-        allowedIPs = [ "10.0.0.0/24" "10.40.0.0/24" ];
-        endpoint = "vpn.luckyobserver.com:51820";
-        persistentKeepalive = 25;
-      }
-    ];
+  networking.networkmanager.ensureProfiles.profiles.wg0 = {
+    connection = {
+      id = "wg0";
+      uuid = "3e85818d-68f1-4d86-ba79-94df12d8412d"; # pinned: without it NM invents a new one per boot and duplicates the profile
+      type = "wireguard";
+      interface-name = "wg0";
+      autoconnect = false; # break glass, by hand
+    };
 
-    postUp = ''
-      # Add route to home LAN with high metric (1000) so local Wi-Fi route takes precedence when at home
-      ip route add 10.0.0.0/24 dev wg0 metric 1000
-    '';
+    wireguard = {
+      private-key-flags = 1; # agent-owned; supplied by nm-file-secret-agent below
+      mtu = 1420;
+      peer-routes = true;
+    };
 
-    postDown = ''
-      ip route del 10.0.0.0/24 dev wg0 metric 1000 || true
-    '';
+    "wireguard-peer.ILwElzleBCCQ8vrGGiV2gUY0B33IHB456MQtgT2ZUTE=" = {
+      allowed-ips = "10.0.0.0/24;10.40.0.0/24;";
+      endpoint = "vpn.luckyobserver.com:51820";
+      persistent-keepalive = 25;
+    };
+
+    ipv4 = {
+      method = "manual";
+      address1 = "10.40.0.3/24";
+      # route-metric replaces the old `table = "off"` plus a postUp/postDown pair that
+      # added and removed `10.0.0.0/24 dev wg0 metric 1000` by hand. Same outcome, one
+      # line: the tunnel's route to the home LAN sits below the Wi-Fi route (metric 600),
+      # so being on the LAN still beats going through the tunnel to reach it.
+      route-metric = 1000;
+      never-default = true;
+    };
+    ipv6.method = "disabled";
   };
 
 
@@ -294,54 +332,95 @@ in
   # This is now the ONLY way into hydrogen's services. As of 2026-08-06 that host
   # scopes every service port to a WireGuard interface and keeps nothing but sshd on
   # br0, so SSH, RustDesk, Syncthing, Immich, Nextcloud, Paperless and Minecraft all
-  # arrive here. wg0 above stays as it is -- it reaches the LAN, which is the
-  # break-glass path if this tunnel or hydrogen's sops decrypt ever breaks.
+  # arrive here. wg0 above remains the break-glass path to the LAN if this tunnel or
+  # hydrogen's sops decrypt ever breaks.
   #
   # 10.41.0.0/24 is in allowedIPs because sulfur administers the kids' laptops over
   # SSH; hydrogen forwards exactly port 22 in that direction and drops the rest.
   sops.secrets.${peers.admin.sulfur.secret} = { };
 
-  networking.wg-quick.interfaces.${adm.interface} = {
-    # /32 with explicit host/route entries, so nothing here can shadow the local
-    # network the way a /24 would -- no `table = "off"` dance needed, unlike wg0.
-    address = [ "${peers.admin.sulfur.address}/32" ];
-    privateKeyFile = config.sops.secrets.${peers.admin.sulfur.secret}.path;
+  networking.networkmanager.ensureProfiles.profiles.${adm.interface} = {
+    connection = {
+      id = adm.interface;
+      uuid = "e34208d7-8dd2-4274-bbed-520d43fd7994";
+      type = "wireguard";
+      interface-name = adm.interface;
+      autoconnect = true; # the everyday tunnel: up at boot, up always
+    };
+
+    wireguard = {
+      private-key-flags = 1; # agent-owned; supplied by nm-file-secret-agent below
+      mtu = 1420;
+      peer-routes = true;
+    };
 
     # TWO peers on one interface, and that is the whole point. hydrogen and the router
     # are peers of sulfur, not of each other -- WireGuard has no hubs, only pairs -- so
     # losing hydrogen costs nothing on the router and vice versa. The router's own
     # administration used to sit on brLan; it is on its tunnel now.
-    peers = [
-      {
-        publicKey = adm.publicKey;
-        allowedIPs = [ "${adm.address}/32" peers.hubs.fam.subnet ];
-        # Bootstrap only, and an IP literal on purpose -- modules/family/wg-endpoint.nix
-        # owns endpoint selection and rewrites this at boot. A hostname here would make
-        # DNS a hard dependency of interface creation: wg-quick resolves the endpoint in
-        # `wg setconf`, and a failed lookup takes the whole unit down with it.
-        endpoint = "${peers.lanEndpoint}:${toString adm.port}";
-        persistentKeepalive = 25;
-      }
-      {
-        # The router, addressed at its TUNNEL address (10.42.0.3) and never at
-        # 10.0.0.1.
-        #
-        # THIS COST AN OUTAGE, so it is worth being explicit. wg-quick installs a route
-        # for every allowedIPs entry. Listing 10.0.0.1/32 here put a more-specific route
-        # to this machine's own DEFAULT GATEWAY AND DNS SERVER inside the tunnel: name
-        # resolution died, the default route could not resolve its next hop, and all
-        # internet access stopped. It was circular too -- the endpoint below is
-        # 10.0.0.1, which was then routed into the tunnel it was trying to build.
-        #
-        # Any address a client might also need off-tunnel must stay off this list. For
-        # the LAN gateway that is not a preference, it is a hard rule.
-        publicKey = rtr.publicKey;
-        allowedIPs = [ "${rtr.address}/32" ];
-        endpoint = "${rtr.lanAddress}:${toString rtr.port}";
-        persistentKeepalive = 25;
-      }
-    ];
+    #
+    # The endpoint is a bootstrap value: modules/family/wg-endpoint.nix owns endpoint
+    # selection and rewrites it with `wg set` once the interface is up. It stays the LAN
+    # literal rather than the public name because being merely wrong when away costs one
+    # wg-endpoint run to correct, and that run is triggered by the same NM connectivity
+    # event that would have reset it.
+    "wireguard-peer.${adm.publicKey}" = {
+      allowed-ips = "${adm.address}/32;${peers.hubs.fam.subnet};";
+      endpoint = "${peers.lanEndpoint}:${toString adm.port}";
+      persistent-keepalive = 25;
+    };
+
+    # The router, addressed at its TUNNEL address (10.42.0.1) and never at 10.0.0.1.
+    #
+    # THIS COST AN OUTAGE, so it is worth being explicit, and it survives the move from
+    # wg-quick unchanged: NM installs a route for every allowed-ips entry exactly as
+    # wg-quick did (peer-routes = true above). Listing 10.0.0.1/32 here put a
+    # more-specific route to this machine's own DEFAULT GATEWAY AND DNS SERVER inside the
+    # tunnel: name resolution died, the default route could not resolve its next hop, and
+    # all internet access stopped. It was circular too -- the endpoint below is 10.0.0.1,
+    # which was then routed into the tunnel it was trying to build.
+    #
+    # Any address a client might also need off-tunnel must stay off this list. For the
+    # LAN gateway that is not a preference, it is a hard rule.
+    "wireguard-peer.${rtr.publicKey}" = {
+      allowed-ips = "${rtr.address}/32;";
+      endpoint = "${rtr.lanAddress}:${toString rtr.port}";
+      persistent-keepalive = 25;
+    };
+
+    ipv4 = {
+      # /32 with explicit host routes from allowed-ips, so nothing here can shadow the
+      # local network the way a /24 would -- no route-metric games needed, unlike wg0.
+      method = "manual";
+      address1 = "${peers.admin.sulfur.address}/32";
+      never-default = true;
+    };
+    ipv6.method = "disabled";
   };
+
+  # The private keys, handed to NM over D-Bus by nm-file-secret-agent rather than written
+  # into any connection file. `file` points at the sops path each tunnel already used as
+  # its privateKeyFile, so nothing about secret storage changed: same secret, same path,
+  # same permissions, and secrets.yaml is untouched. trim strips the trailing newline
+  # sops leaves on the value.
+  networking.networkmanager.ensureProfiles.secrets.entries = [
+    {
+      matchId = adm.interface;
+      matchType = "wireguard";
+      matchSetting = "wireguard";
+      key = "private-key";
+      file = config.sops.secrets.${peers.admin.sulfur.secret}.path;
+      trim = true;
+    }
+    {
+      matchId = "wg0";
+      matchType = "wireguard";
+      matchSetting = "wireguard";
+      key = "private-key";
+      file = config.sops.secrets.wg-priv-sulfur.path;
+      trim = true;
+    }
+  ];
 
   # Per-PEER endpoint selection, not per-interface: these two live at different
   # addresses on the home LAN, and probing one for both would leave the loser
