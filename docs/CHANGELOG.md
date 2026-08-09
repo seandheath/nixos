@@ -1,6 +1,31 @@
 # Changelog
 
 ## [Unreleased]
+### Fixed (sulfur: DNS died whenever Mullvad was connected)
+- **The symptom.** With Mullvad up and sulfur away from home, name resolution stalled for
+  seconds per lookup and the machine appeared to have no network. Disconnecting Mullvad
+  restored it immediately, which made the VPN look like the culprit.
+- **Two bugs, one symptom.** `mullvad dns set custom 10.0.0.1 1.1.1.1` put the *home
+  router* first in `/etc/resolv.conf` on every connect. glibc has no concept of a resolver
+  being unreachable — only of one being slow — so it tried 10.0.0.1 first and ate a 5s
+  timeout on every query before falling through to 1.1.1.1. Off the home LAN, the only
+  route to 10.0.0.1 is `wg0` — and `wg0` was dead.
+- **Why `wg0` was dead.** It resolves `vpn.luckyobserver.com` during `wg setconf`, and
+  `network-online.target` is not a promise of connectivity: NixOS satisfies it with
+  `nm-online -s -q`, where `-s` waits only for NetworkManager to finish *startup*. The
+  target fired mid-association, the lookup failed, and wg-quick — a plain oneshot — deleted
+  its link and stayed failed for the whole boot. `wgadm` survives the identical race only
+  because its endpoint is an IP literal *and* `modules/family/wg-endpoint.nix` grants it
+  `Restart=on-failure`; `wg0` had neither.
+- **The fix.** Mullvad now sets `custom 1.1.1.1` — nothing tunnel-dependent may be first in
+  `resolv.conf`. The five split-horizon names already come from `networking.hosts`, so no
+  internal name regressed; the router's ad/tracker filtering while connected was
+  deliberately given up. `wg0` gained unlimited retry (`startLimitIntervalSec = 0`,
+  `RestartSec = 30` — the systemd default of 5 starts per 10s gives up ~50s in, shorter
+  than a slow WPA association) plus a NetworkManager dispatcher hook that restarts it on
+  network change, but only when it is actually failed, and which filters out events on
+  `wg0`/`wgadm`/`fleet` so bringing the tunnel up cannot trigger its own restart.
+
 ### Security (hydrogen's services are behind WireGuard; the LAN is no longer a credential)
 - **What was wrong.** Every service on hydrogen was scoped to `br0`, and the only WireGuard
   hub lived on the router, forwarding to hydrogen's LAN address — so a tunnel peer *was* a

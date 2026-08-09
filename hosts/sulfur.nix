@@ -246,6 +246,74 @@ in
   };
 
   # --------------------------------------------------------------------------
+  # Keeping wg0 alive across a boot that beats the Wi-Fi.
+  #
+  # wg-quick resolves the peer endpoint during `wg setconf`, so the hostname above makes
+  # DNS a hard dependency of bringing the interface up. network-online.target does not
+  # protect us: NixOS satisfies it with `nm-online -s -q`, and -s waits only for
+  # NetworkManager to finish STARTUP, not for a usable route. On this laptop the target
+  # therefore fires while the radio is still associating -- observed 2026-08-09, where
+  # wg-quick-wg0, wg-quick-wgadm and mullvad-daemon all began in the same second and
+  # mullvad logged "Initial offline state - offline" while wgadm's route adds returned
+  # "Network is unreachable".
+  #
+  # wg0 then failed with `Name or service not known: vpn.luckyobserver.com:51820`,
+  # deleted its own link, and -- as a plain oneshot -- STAYED failed for the rest of the
+  # boot. That is what removed the only off-LAN route to 10.0.0.1 and set up the DNS
+  # outage documented in mullvad-configure below. Two bugs, one visible symptom.
+  #
+  # wgadm survives the identical race for two reasons this interface has neither of:
+  # its configured endpoint is an IP literal (no lookup to fail), and being listed in
+  # family.wgEndpoint earns it Restart=on-failure from modules/family/wg-endpoint.nix.
+  # Rather than move wg0 into that module -- it wants a LAN/public pair, and wg0's whole
+  # job is to be the break-glass path that does not depend on the wgadm machinery -- give
+  # it the same defence directly, in two layers.
+  #
+  # Layer 1: retry, without a give-up. startLimitIntervalSec = 0 disables the rate
+  # limiter entirely; the default of 5 starts per 10s would exhaust itself about 50s in,
+  # which is comfortably shorter than a slow WPA association or a login-then-connect
+  # network. 30s between attempts rather than wg-endpoint.nix's 10s because this one
+  # never stops -- a laptop closed on a plane would otherwise write journal lines all
+  # flight.
+  systemd.services.wg-quick-wg0 = {
+    startLimitIntervalSec = 0;
+    serviceConfig = {
+      Restart = "on-failure";
+      RestartSec = 30;
+    };
+  };
+
+  # Layer 2: react to the actual event instead of only to the clock, so moving between
+  # networks repairs the tunnel in seconds rather than up to half a minute. This is the
+  # same dispatcher hook modules/family/wg-endpoint.nix uses, and the same reason applies
+  # for keeping it non-blocking: NetworkManager runs dispatcher scripts serially, so
+  # anything slow here stalls every script behind it.
+  networking.networkmanager.dispatcherScripts = [{
+    type = "basic";
+    source = pkgs.writeShellScript "wg0-revive" ''
+      # $1 = interface, $2 = action.
+      #
+      # Filter our own tunnels out first: bringing wg0 up is itself an "up" event on
+      # wg0, and without this the handler would answer its own success by restarting the
+      # interface again, forever.
+      case "$1" in wg0|wgadm|fleet) exit 0 ;; esac
+      case "$2" in up|dhcp4-change|connectivity-change) ;; *) exit 0 ;; esac
+
+      # Revive only a unit that is actually dead. An unconditional restart here would
+      # tear down a perfectly healthy tunnel on every DHCP lease renewal -- and a
+      # restart means a fresh handshake, so that is a real gap in connectivity, not a
+      # no-op.
+      if ${pkgs.systemd}/bin/systemctl is-failed --quiet wg-quick-wg0.service; then
+        ${pkgs.systemd}/bin/systemctl restart --no-block wg-quick-wg0.service
+      fi
+
+      # Never exit non-zero: NetworkManager logs a failed dispatcher script on every
+      # event, and "wg0 was already healthy" is the normal case, not an error.
+      exit 0
+    '';
+  }];
+
+  # --------------------------------------------------------------------------
   # sheath's login password, from sops rather than /persist/secrets/sheath-password.
   #
   # modules/impermanence.nix already sets users.mutableUsers = false and points this at a
@@ -368,7 +436,26 @@ in
           sleep 1
         done
         ${config.services.mullvad-vpn.package}/bin/mullvad lan set allow
-        ${config.services.mullvad-vpn.package}/bin/mullvad dns set custom 10.0.0.1 1.1.1.1
+
+        # 1.1.1.1 ALONE, and the address that is NOT here is the point.
+        #
+        # This used to read `custom 10.0.0.1 1.1.1.1`. When Mullvad connects it rewrites
+        # /etc/resolv.conf to exactly the listed servers, in order, and 10.0.0.1 is the
+        # home router -- reachable only on the home LAN or through wg0. Away from home
+        # with wg0 down (which was its permanent state, see the wg-quick-wg0 block
+        # above), glibc still tried it first and ate a 5s timeout on every single
+        # lookup before falling through to 1.1.1.1. The machine looked like it had no
+        # DNS, and disconnecting Mullvad "fixed" it because talpid then restores the
+        # DHCP servers.
+        #
+        # The rule this encodes: a resolver whose reachability depends on a tunnel must
+        # never be first in resolv.conf, because resolv.conf has no notion of a server
+        # being down -- only of one being slow.
+        #
+        # What is lost is the router's ad/tracker filtering while connected; that was a
+        # deliberate call, not an oversight. The five split-horizon names still resolve
+        # from networking.hosts below, so nothing internal depends on the router here.
+        ${config.services.mullvad-vpn.package}/bin/mullvad dns set custom 1.1.1.1
       '';
     };
   };
