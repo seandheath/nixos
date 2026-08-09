@@ -9,7 +9,8 @@
   router* first in `/etc/resolv.conf` on every connect. glibc has no concept of a resolver
   being unreachable — only of one being slow — so it tried 10.0.0.1 first and ate a 5s
   timeout on every query before falling through to 1.1.1.1. Off the home LAN, the only
-  route to 10.0.0.1 is `wg0` — and `wg0` was dead.
+  route to 10.0.0.1 is `wg0` — and `wg0` lost a boot race often enough to matter (up on
+  2026-08-06 and -07, failed on -08 and -09).
 - **Why `wg0` was dead.** It resolves `vpn.luckyobserver.com` during `wg setconf`, and
   `network-online.target` is not a promise of connectivity: NixOS satisfies it with
   `nm-online -s -q`, where `-s` waits only for NetworkManager to finish *startup*. The

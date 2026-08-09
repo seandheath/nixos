@@ -442,8 +442,9 @@ in
         # This used to read `custom 10.0.0.1 1.1.1.1`. When Mullvad connects it rewrites
         # /etc/resolv.conf to exactly the listed servers, in order, and 10.0.0.1 is the
         # home router -- reachable only on the home LAN or through wg0. Away from home
-        # with wg0 down (which was its permanent state, see the wg-quick-wg0 block
-        # above), glibc still tried it first and ate a 5s timeout on every single
+        # on a boot where wg0 lost its race (it won on 2026-08-06 and -07, lost on -08
+        # and -09; see the wg-quick-wg0 block above), glibc still tried it first and ate
+        # a 5s timeout on every single
         # lookup before falling through to 1.1.1.1. The machine looked like it had no
         # DNS, and disconnecting Mullvad "fixed" it because talpid then restores the
         # DHCP servers.
