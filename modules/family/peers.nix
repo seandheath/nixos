@@ -177,6 +177,38 @@ rec {
     };
   };
 
+  # Guests: people outside the household, here for Minecraft and nothing else.
+  #
+  # A separate attrset from `mobile` because the two say different things. `mobile` is
+  # "a household device with no Nix config"; this is "not the household". The isolation
+  # is identical -- hydrogen's FORWARD policy does not distinguish them, so a guest
+  # reaches this host and no sibling, no LAN, no router -- but who holds the key is the
+  # thing a reader needs to see at a glance, and an address in the middle of the family
+  # phones would not show it.
+  #
+  # WHAT A GUEST KEY ACTUALLY REACHES, stated plainly because it is more than the name
+  # suggests: wgfam's firewall list in hosts/hydrogen.nix is per-INTERFACE, not per-peer,
+  # so this key reaches 80/443 as well as 25565 -- the Nextcloud, Immich, Paperless and
+  # Calibre vhosts. Those are password-authenticated, so it is a login page that becomes
+  # reachable rather than any data. Accepted deliberately. If that ever stops being an
+  # acceptable trade the answer is a third hub (wgguest) carrying only 25565, NOT a rule
+  # here that matches on source address -- see the header on why the hubs are split by
+  # interface in the first place.
+  #
+  # No `secret`: the private half is generated on their own machine and never enters this
+  # repo. No `minecraftName` either -- they type their own username in-game, and it must
+  # not collide with a handle in `family` above. An offline-mode UUID is a hash of the
+  # username, so a collision does not clash, it silently lands them in that child's
+  # character with that child's inventory.
+  #
+  # Numbered from .30 so the .20s stay with the household mobiles above.
+  guests = {
+    brother-laptop = {
+      address = "10.41.0.30";
+      publicKey = "UvmwoRJlvWncUI9ldgh3r1xG48kmz0N6Nv1c5MNr9mw=";
+    };
+  };
+
 
   # Service names. THE ROUTER IS THE ONLY RESOLVER -- hydrogen briefly ran a second
   # dnsmasq for this same zone and that is how split-horizon DNS starts giving two

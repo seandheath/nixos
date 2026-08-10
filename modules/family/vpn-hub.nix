@@ -91,10 +91,17 @@ in
       ips = [ "${fam.address}/24" ];
       listenPort = fam.port;
       privateKeyFile = config.sops.secrets.${fam.secret}.path;
-      # Laptops (NixOS-managed) and hand-configured devices (phones/tablets) are the
-      # same kind of peer here -- the split exists only because the latter have no
-      # Nix config to generate.
-      peers = map mkPeer (lib.attrValues peers.family ++ lib.attrValues peers.mobile);
+      # Laptops (NixOS-managed), hand-configured household devices, and guests are the
+      # same kind of peer HERE -- one /32, one key, the same isolation. The three
+      # attrsets exist because they differ in ways this file does not act on: whether
+      # there is a Nix config to generate, and whose hands the private key is in.
+      # Anything that ever needs to tell them apart belongs in the FORWARD rules above,
+      # not in this list.
+      peers = map mkPeer (
+        lib.attrValues peers.family
+        ++ lib.attrValues peers.mobile
+        ++ lib.attrValues peers.guests
+      );
     };
 
     ${adm.interface} = {
