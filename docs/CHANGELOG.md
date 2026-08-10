@@ -1,6 +1,96 @@
 # Changelog
 
 ## [Unreleased]
+### Added
+- `modules/family/peers.nix`: a `guests` attrset, and the first entry in it — a
+  wgfam peer at `10.41.0.30` for a relative who wants to play Minecraft from
+  outside the house. Separate from `mobile` because that set means "a household
+  device with no Nix config" and this means "not the household"; who holds the
+  private key is the thing a reader needs to see at a glance. `vpn-hub.nix` folds
+  the new set into wgfam's peer list.
+- Their key was generated on their own machine and only the public half entered
+  this repo, so unlike `gen-mobile-peer.sh` there is no moment where the private
+  key exists on an admin box or crosses a chat window.
+- **What a guest key actually reaches, recorded because it is more than the name
+  suggests:** wgfam's port list in `hosts/hydrogen.nix` is per-INTERFACE, not
+  per-peer, so this key reaches `80`/`443` as well as `25565` — the Nextcloud,
+  Immich, Paperless and Calibre vhosts. Those are password-authenticated, so what
+  becomes reachable is a login page rather than any data. Accepted deliberately.
+  If that stops being an acceptable trade the answer is a third hub (`wgguest`)
+  carrying only `25565`, NOT a source-address match on wgfam — the hubs are split
+  by interface precisely so `iptables -S` shows the boundary.
+
+### Changed (fleet: nixpkgs 25.11 -> 26.05, because 25.11 is EOL)
+- **Why.** Signal Desktop refused to start: it hard-expires roughly 90 days after
+  release and the fleet was pinned to `signal-desktop` 8.9.1. The channel, not the
+  package, was the problem — `nixos-25.11` stopped receiving commits on 2026-06-30,
+  so no backport of any kind was ever going to arrive, for Signal or for anything
+  else. `nixos-26.05` (tip 2026-08-09) carries 8.21.0, five days behind upstream.
+- `flake.nix`: `nixpkgs` -> `github:nixos/nixpkgs/nixos-26.05`, `home-manager` ->
+  `release-26.05`. Every input that `follows` nixpkgs moved with it; `nix-gaming`,
+  `chaotic` and `pi-flake` deliberately do not follow and were left alone.
+- Deliberately NOT nixpkgs-unstable. Both branches ship the same Signal today, and
+  four of these hosts are the kids' laptops on an unattended nightly `autoUpgrade` —
+  unstable turns every night into a chance of a broken rebuild nobody is watching.
+  The failure here was staying six weeks past EOL, not stable moving too slowly.
+
+### Fixed (26.05 migration fallout)
+- `home/neovim.nix`: `nodePackages.bash-language-server` -> top-level
+  `bash-language-server` (the `nodePackages` set was removed), and
+  `programs.neovim.extraLuaConfig` -> `initLua` (home-manager rename).
+- `hosts/sulfur.nix`: dropped `services.asusd.enableUserService`; asusd no longer
+  needs a per-user service and defining the option is now a hard assertion failure.
+- `hosts/hydrogen.nix`: `networking.wireless.enable` needs `lib.mkForce false`.
+  26.05's NetworkManager module defines it `true` outright (dbus-controlled
+  wpa_supplicant) rather than as a default, and GNOME pulls NetworkManager in on
+  hydrogen, so a plain `false` is now a definition conflict. hydrogen has no wifi.
+- `modules/immich.nix`: dropped `database.enableVectors`. The option is gone in 26.05
+  along with pgvecto.rs; VectorChord is the only backend and is on by default.
+- `modules/minecraft-server.nix`: overlay holding `minecraft-server` at 1.21.10.
+  26.05 ships 1.21.11, which the version-lockstep assertions correctly refused —
+  Fabric intermediary mappings, the Modrinth mod pins and the client payload are all
+  still 1.21.10. 1.21.11 builds do exist on Modrinth for the pinned mods, so the
+  migration is possible; it is deliberately deferred to its own change rather than
+  riding along on a channel bump. nixpkgs no longer exposes a per-patch attribute for
+  1.21.10, hence the explicit jar `src`.
+- `packages/minecraft-client-launcher.nix`: rewritten for portablemc 5.0.3, a Rust
+  rewrite of the 4.4.1 Python tool. `minecraft-client` died at
+  `error: unexpected argument '--work-dir' found` — a runtime break a build check was
+  never going to catch, on sulfur and on every couch client. Four flags moved:
+  `--work-dir` -> `start --mc-dir`, `-s`/`-p` -> `--join-server`/`--join-server-port`,
+  `--timeout` deleted outright, and only `--main-dir` is still a global option.
+- **`--bin-dir` is the trap.** 5.0.3 documents it as derived from `--mc-dir` and then
+  gives the default as `<main-dir>/bin/`; the second is what it does, so with only
+  `--mc-dir` set the LWJGL natives extract into the read-only payload and the launch
+  dies on `Read-only file system (os error 30)`. Under 4.x the bin dir came off the
+  work dir and this cost nothing. Now stated explicitly.
+- The offline guarantee got *stronger* in the process. `--timeout 10` only bounded how
+  long the version-manifest fetch could stall a launch; `--fetch-exclude-all` means the
+  call is never made. Re-verified in a network namespace: resolves both versions,
+  78 libraries, 4403 assets, loads the JVM, exits 0.
+- Every "why" comment citing portablemc's Python internals (`standard.py`,
+  `download.py`, `auth.py`, `cli/__init__.py`) was replaced with observed 5.0.3
+  behaviour — those line numbers describe a program that no longer exists. Same for
+  the `use-builtin-java.patch` note: 5.0.3 carries no patches, and `--jvm` now also
+  serves to keep `--jvm-policy` from fetching a JVM.
+- `modules/auto-update.nix`: `--override-input nixpkgs` still pointed at
+  `nixos-25.11`, six weeks after that branch went EOL. It is imported by
+  `hosts/hydrogen.nix` and `modules/family/profile.nix`, so five of six hosts were
+  rebuilding nightly against a frozen tree — and the job never failed, which is why
+  nothing surfaced it. Post-migration the drift would have been worse than stale: the
+  override beats `flake.lock`, so a nightly run would have pulled the fleet back onto
+  EOL nixpkgs, silently undoing this migration on the four laptops nobody watches.
+
+### Known issues
+- `hosts/sulfur.nix`: `../modules/farcry2.nix` is commented out. Its mod archive is a
+  `requireFile` pin and the 7z was garbage-collected — the extracted tree survived but
+  the source did not, so the 26.05 stdenv change (new derivation hash) has nothing to
+  build from. Re-download `FC2-RealismPlusRedux-326-v1.2.5.7z` from
+  nexusmods.com/farcry2/mods/326, `nix-store --add-fixed sha256 <file>`, uncomment.
+  Installed game files are unaffected; only `fc2-apply-mods` is missing.
+- home-manager warns that `programs.vscode.package` is a VSCodium fork while
+  `programs.vscode` now writes to Visual Studio Code's paths. Migrating to
+  `programs.vscodium` moves the config location, so it was left for a separate change.
 ### Changed (sulfur: the tunnels are NetworkManager profiles, and the panel toggle is safe)
 - **Why.** NetworkManager manages WireGuard devices whether or not we want it to, so the real
   choice is not "NM or not" but "NM as a spectator or NM as the owner" — and the spectator is

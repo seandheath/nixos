@@ -46,7 +46,9 @@ payload pinned by hash — `packages/minecraft-client/`, built from `libraries.j
 which `update.sh` generates from Mojang's version manifest. `minecraft-client` hands
 that read-only store path to [portablemc](https://github.com/mindstorm38/portablemc)
 as its main directory and portablemc, finding every file already present at the right
-size, downloads nothing.
+size, downloads nothing. `--fetch-exclude-all` closes the last gap: the re-validation
+of the version metadata against Mojang's manifest, which used to go out on every launch
+and merely fall back to the local copy when it failed.
 
 Verified, and worth re-verifying after any bump — an empty game directory inside a
 network namespace:
@@ -54,9 +56,12 @@ network namespace:
 ```console
 $ unshare -rn minecraft-client --name LuckyObserver --game-dir /tmp/mc --offline -- --dry
 [  OK  ] Loaded version fabric-loader-0.19.3-1.21.10
-[  OK  ] Checked version jar
-[  OK  ] Checked 4403 assets version 27
-[  OK  ] Checked 78 class and 0 native libraries
+[  OK  ] Loaded version 1.21.10
+[  OK  ] Loaded client
+[  OK  ] Loaded and verified 78+0 libraries
+[  OK  ] Loaded logger client-1.21.2.xml
+[  OK  ] Loaded and verified 4403 assets 27
+[  OK  ] Loaded JVM (21.0.12)
 ```
 
 Not one download, no Microsoft account, no instance to create. That is the whole
@@ -166,7 +171,7 @@ In practice that means one child logging in as a sibling.
 
 ### sulfur (desktop)
 
-Click **Minecraft**, or run `minecraft-client`. It connects to `10.0.0.10:25565` as
+Click **Minecraft**, or run `minecraft-client`. It connects to `mc.luckyobserver.com:25565` as
 `LuckyObserver` (`services.minecraftClient` in `hosts/sulfur.nix`). Nothing to
 install, nothing to configure.
 
@@ -367,7 +372,7 @@ The assertions catch 1 vs 2 vs 3 vs 4 at eval. Nothing catches 5.
                           └─ minecraft-client --name <name> --game-dir …/<name>
                                              --server 127.0.0.1:25565
                               └─ portablemc --main-dir /nix/store/…-minecraft-client-1.21.10
-                                            --work-dir …/<name>
+                                     start … --mc-dir …/<name> --bin-dir …/<name>/bin
                                   └─ java -cp … KnotClient
 
 per player, all that is on disk:
@@ -378,7 +383,10 @@ per player, all that is on disk:
 Five decisions worth knowing when debugging:
 
 **The game is one shared read-only store path.** Every client points `--main-dir` at
-it; only `--work-dir` is per player. Under Prism this was four data directories with
+it; `--mc-dir` and `--bin-dir` are per player. Both of the latter must be stated
+explicitly — portablemc 5.x defaults `--mc-dir` to `--main-dir`, and `--bin-dir` to
+`<main-dir>/bin` regardless of `--mc-dir`, so omitting either aims a write at the
+store. Under Prism this was four data directories with
 seven symlinked trees each, fanned out by a `minecraft-couch-sync` command that had to
 be re-run after every mod change — all of which existed because Prism refuses to run
 twice from one data directory (its single-instance lock is keyed on that path) and a
@@ -439,7 +447,7 @@ Wayland session, which is the pairing that has broken other things on these mach
 To try native Wayland instead, pass the JVM argument through the launcher:
 
 ```console
-$ minecraft-client -- --jvm-args '-Dorg.lwjgl.glfw.libname=/run/current-system/sw/lib/libglfw.so'
+$ minecraft-client -- --jvm-arg '-Dorg.lwjgl.glfw.libname=/run/current-system/sw/lib/libglfw.so'
 ```
 
 …pointing at `pkgs.glfw3-minecraft` (add it to `environment.systemPackages` first;
@@ -510,7 +518,7 @@ base in it.
 | "No controllers are connected" | Pad is asleep or unpaired. Wake it, or use **Pair a controller**; `ls -l /dev/input/couchpad-*` to confirm |
 | A player is missing from the list | Add them with **Add a player** — the roster is `~/.local/share/minecraft-couch/players.json`, not Nix |
 | Launch fails: "Checking libraries… FAILED" or a download attempt | The payload is incomplete — a packaging bug, not a runtime one. Rebuild; if it persists, re-run `packages/minecraft-client/update.sh` |
-| Launch fails: read-only file system under `/nix/store` | Same cause. portablemc decided something was missing and tried to fetch it into the payload |
+| Launch fails: read-only file system under `/nix/store` | Either the payload is incomplete as above, or `--mc-dir`/`--bin-dir` went missing from the launcher and portablemc aimed per-player state at the store |
 | Pad cannot move the cursor in the pre-launcher | Its D-pad reports codes not in the accepted set. `minecraft-couch-menu --probe`, press the D-pad, and widen the list in `modules/minecraft-couch.nix`. The left stick and the keyboard both work meanwhile |
 | Projector goes black and stays there | DRM master handoff failed. `sudo chvt 2` to return to GNOME; `journalctl -u minecraft-couch` for the Hyprland log |
 | All characters move together | The bwrap isolation is not taking. Check the nodes handed to each `minecraft-couch-player` are distinct — `ls -l /dev/input/couchpad-*` should show one symlink per pad, each resolving to a different `eventN` |

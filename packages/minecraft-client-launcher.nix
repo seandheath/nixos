@@ -18,20 +18,31 @@
 # for the server, where it is a main class and eight jars) would mean re-deriving the
 # client launch contract on every Minecraft bump.
 #
-# WHY IT NEVER TOUCHES THE NETWORK. portablemc skips any file already present at the
-# expected size, and the payload is complete, so its download list comes out empty --
-# verified with an empty game directory inside a network namespace. It still tries to
-# fetch Mojang's version manifest to re-validate the metadata, and simply carries on
-# with the local copy when that fails (portablemc/standard.py:395-400). --timeout keeps
-# that attempt from stalling the launch on a network that accepts connections but never
-# answers, which is a worse failure than having no network at all.
+# WHY IT NEVER TOUCHES THE NETWORK. Every file is already in the payload at the right
+# size, so nothing is scheduled for download; --fetch-exclude-all then removes the one
+# call that remained, portablemc's re-validation of the version metadata against Mojang's
+# manifest. Verified with an empty game directory inside a network namespace:
+#
+#   unshare -rn minecraft-client --name X --game-dir /tmp/mc --offline -- --dry
+#
+# resolves fabric-loader-0.19.3-1.21.10 and the 1.21.10 it inherits from, verifies 78
+# libraries and 4403 assets, loads the JVM, and exits 0.
+#
+# Under 4.x this was a weaker claim: the manifest fetch still happened and merely fell
+# back to the local copy on failure, with --timeout bounding how long it could stall on a
+# network that accepts connections but never answers. 5.x can decline to make the call at
+# all, so the guarantee is now structural rather than a bounded wait.
+#
+# PORTABLEMC 5.x IS A RUST REWRITE. Comments here used to cite Python source locations;
+# none of them survive, so what is recorded below is observed behaviour of 5.0.3 instead.
 let
   client = import ./minecraft-client { inherit pkgs; };
   clientMods = import ./minecraft-client-mods.nix { inherit pkgs; };
 
   # Mojang states the major Java version per release; honour it rather than whatever
-  # `java` happens to be on PATH (which is what nixpkgs' portablemc would otherwise
-  # pick up via its use-builtin-java.patch).
+  # `java` happens to be on PATH. Passing --jvm explicitly also keeps 5.x's --jvm-policy
+  # out of the picture, which can otherwise decide to go and fetch a JVM -- the one
+  # remaining way a launch could reach for the network.
   jdk = pkgs."jdk${toString client.javaVersion}";
 in
 pkgs.writeShellApplication {
@@ -94,7 +105,7 @@ pkgs.writeShellApplication {
     # An offline-mode server derives this itself from the name it is given, so a
     # character's inventory follows the NAME whatever we send here. portablemc's own
     # offline session would invent a UUID from a private uuid5 namespace
-    # (portablemc/auth.py:80-105), which is nobody's idea of this player; passing the
+    # of its own, which is nobody's idea of this player; passing the
     # real one keeps client-side identity (skin lookups, local worlds) consistent with
     # the server's.
     # ---------------------------------------------------------------------
@@ -160,19 +171,35 @@ pkgs.writeShellApplication {
     connect=()
     if [ -n "$server" ]; then
       case "$server" in
-        *:*) connect=(-s "''${server%:*}" -p "''${server##*:}") ;;
-        *)   connect=(-s "$server") ;;
+        *:*) connect=(--join-server "''${server%:*}" --join-server-port "''${server##*:}") ;;
+        *)   connect=(--join-server "$server") ;;
       esac
     fi
 
-    # --main-dir/--work-dir/--timeout are GLOBAL options and must precede `start`;
-    # portablemc rejects them after the subcommand. The main dir is the read-only store
-    # payload, shared by every player on the machine; the work dir is this player's own.
+    # --main-dir is the ONLY global option here; everything else belongs to `start` and
+    # portablemc rejects it before the subcommand. That split changed in 5.x, along with
+    # three flag names -- see the header.
+    #
+    # --mc-dir IS NOT OPTIONAL. In 5.x it defaults to --main-dir, and --main-dir is the
+    # read-only store payload, so leaving it off does not fall back to something harmless
+    # -- it points the running game at /nix/store. It is what keeps this player's
+    # options, saves and screenshots on writable disk.
+    #
+    # NEITHER IS --bin-dir, and its help text will tell you otherwise. 5.0.3 documents it
+    # as "derived from the '--mc-dir' path", then gives the default as '<main-dir>/bin/'.
+    # The second one is the truth: with only --mc-dir set, extracting the LWJGL natives
+    # fails with
+    #     create dir: /nix/store/...-minecraft-client-1.21.10/bin/fabric-loader-...
+    #     I/O error: Read-only file system (os error 30)
+    # which is the loud failure the payload is designed to produce, but a failure all the
+    # same. Under 4.x the bin dir came off the work dir and this was free. Point it at the
+    # game directory to restore that.
     exec portablemc \
       --main-dir "$payload" \
-      --work-dir "$gameDir" \
-      --timeout 10 \
       start "$version" \
+      --mc-dir "$gameDir" \
+      --bin-dir "$gameDir/bin" \
+      --fetch-exclude-all \
       --jvm ${pkgs.lib.getExe' jdk "java"} \
       -u "$name" -i "$uuid" \
       "''${connect[@]}" \

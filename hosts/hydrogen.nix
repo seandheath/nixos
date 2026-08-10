@@ -57,7 +57,11 @@
   # Enable networking. Plain `false` (not mkDefault) to override the mkDefault true
   # written into the generated hardware/hydrogen.nix; the static br0 bridge is used.
   networking.useDHCP = false;
-  networking.wireless.enable = false;
+  # mkForce, not plain false: 26.05's NetworkManager module defines
+  # networking.wireless.enable = true outright (dbus-controlled wpa_supplicant)
+  # rather than as a default, and GNOME pulls NetworkManager in here. hydrogen has
+  # no wifi -- it lives on the static br0 bridge -- so keep wpa_supplicant off.
+  networking.wireless.enable = lib.mkForce false;
   networking.bridges = {
     "br0" = {
       interfaces = ["enp0s31f6"];

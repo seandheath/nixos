@@ -1,5 +1,35 @@
 # Session Log
 
+## Session: 2026-08-10
+
+### Changes Made
+- `flake.nix`: nixpkgs `nixos-25.11` -> `nixos-26.05`, home-manager `release-25.11` ->
+  `release-26.05`; `flake.lock` updated for both.
+- `home/neovim.nix`, `hosts/sulfur.nix`, `hosts/hydrogen.nix`, `modules/immich.nix`,
+  `modules/minecraft-server.nix`: 26.05 option/package migrations (see CHANGELOG).
+- `hosts/sulfur.nix`: `../modules/farcry2.nix` temporarily commented out.
+
+### Decisions
+- Diagnosis first: the expired Signal client was a symptom of the channel being EOL,
+  not of a slow package. `nixos-25.11`'s last commit is 2026-06-30, so `nix flake
+  update` on that branch would have changed nothing. The whole fleet was silently
+  without security backports, which mattered more than Signal did.
+- Stayed on stable rather than moving to nixpkgs-unstable. Same Signal version today,
+  and unstable would put the four unattended family laptops' nightly `autoUpgrade` at
+  risk. Single-package overlays are the answer if one app is ever too stale.
+- Pinned `minecraft-server` back to 1.21.10 instead of migrating the Minecraft stack.
+  The lockstep assertions are doing exactly their job; a five-component version bump
+  should be a deliberate change made when the kids are not mid-world, not a side
+  effect of a channel move.
+- Left `programs.vscode` alone despite the fork warning — switching to
+  `programs.vscodium` relocates the config and deserves its own change.
+
+### Known Issues
+- Far Cry 2 mod module is out of the build until the Nexus archive is re-added to the
+  store (`requireFile` + GC). See CHANGELOG "Known issues".
+- Minecraft stack is held at 1.21.10 by an overlay that must be removed when the
+  server, Fabric mappings, mods and client payload move to 1.21.11 together.
+
 ## Session: 2026-08-06
 
 ### Changes Made

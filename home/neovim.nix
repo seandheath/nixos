@@ -90,7 +90,8 @@ in
       vnoremap K :m '<-2<CR>gv=gv
     '';
 
-    extraLuaConfig = ''
+    # Renamed from extraLuaConfig in home-manager 26.05.
+    initLua = ''
       -- ── Colorscheme ────────────────────────────────────────────────────
       require("catppuccin").setup({
         flavour = "mocha",
@@ -493,7 +494,7 @@ in
       nil                      # Nix LSP
       lua-language-server
       clang-tools              # clangd for C/C++
-      nodePackages.bash-language-server
+      bash-language-server   # was nodePackages.bash-language-server; that set was removed in 26.05
 
       # Formatters
       nixfmt-rfc-style

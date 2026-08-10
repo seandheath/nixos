@@ -12,7 +12,14 @@ in
     ../modules/steam.nix
     ../modules/mo2.nix
     ../modules/cemu.nix
-    ../modules/farcry2.nix
+    # TEMPORARILY OUT (2026-08-10). packages/farcry2-realismredux.nix pins the mod
+    # through requireFile, and the 7z was garbage-collected: the built tree survived
+    # in the store but the source did not, so the 26.05 stdenv change -- which gives
+    # the mod derivation a new hash -- has nothing to build from. Re-download
+    # FC2-RealismPlusRedux-326-v1.2.5.7z from nexusmods.com/farcry2/mods/326,
+    #   nix-store --add-fixed sha256 FC2-RealismPlusRedux-326-v1.2.5.7z
+    # and uncomment. Installed game files are unaffected; only fc2-apply-mods is gone.
+    # ../modules/farcry2.nix
     ../modules/workstation.nix
     ../modules/virtualisation.nix
     ../modules/impermanence.nix
@@ -84,10 +91,9 @@ in
   ];
 
   # ASUS ROG services
-  services.asusd = {
-    enable = true;
-    enableUserService = true;
-  };
+  # enableUserService was dropped in 26.05 -- asusd no longer needs a per-user
+  # service, and defining the option is now a hard assertion failure.
+  services.asusd.enable = true;
 
   services.supergfxd.enable = true;
   systemd.services.supergfxd.path = [ pkgs.pciutils ];

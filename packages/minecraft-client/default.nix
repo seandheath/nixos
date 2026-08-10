@@ -10,14 +10,17 @@
 # to hydrogen (modules/minecraft-client.nix) and restored from there with no network at
 # all.
 #
-# HOW PORTABLEMC IS MADE TO NEVER DOWNLOAD. It schedules every file it wants through a
-# download list whose entries are added with verify=True, which skips any file that
-# already exists at the expected size (portablemc/download.py:144-156). With the whole
-# payload pre-placed, the list comes out empty. Two consequences shape the layout below:
+# HOW PORTABLEMC IS MADE TO NEVER DOWNLOAD. It skips any file already present at the
+# expected size, so with the whole payload pre-placed its download list comes out empty.
+# The launcher additionally passes --fetch-exclude-all, which drops the version-manifest
+# re-validation that would otherwise still go out. Two consequences shape the layout
+# below:
 #
-#   - the main dir is only ever READ, so it can be this store path directly. The one
-#     file portablemc writes -- its cached copy of Mojang's version manifest -- lives in
-#     the WORK dir instead (portablemc/cli/__init__.py:85), which is per-player state.
+#   - the main dir is only ever READ, so it can be this store path directly. Everything
+#     portablemc writes -- the extracted natives, any cached metadata -- is directed at
+#     the game directory by the launcher's --mc-dir/--bin-dir, which is per-player state.
+#     NOTE that --bin-dir defaults off --main-dir, not --mc-dir, despite what its help
+#     text says; without it, natives extraction hits this store path. See the launcher.
 #   - a missing or wrong-sized file does not silently redownload into a read-only store
 #     path, it fails the launch. That is the failure mode we want: a payload gap is a
 #     packaging bug, not something to paper over at runtime.
@@ -153,7 +156,8 @@ let
   # are load-bearing; it is one argv element, not three.
   #
   # `inheritsFrom` is what makes portablemc load the vanilla metadata underneath this
-  # one and merge the two (portablemc/standard.py:355-375). The libraries use the
+  # one and merge the two -- verified in 5.0.3, which reports loading both
+  # fabric-loader-0.19.3-1.21.10 and the 1.21.10 beneath it. The libraries use the
   # {name, url} repo-root form, which resolves to <url><maven path> -- and since every
   # one of those paths is populated below, nothing is ever fetched from it.
   # ---------------------------------------------------------------------------
@@ -180,16 +184,17 @@ let
     ++ map (l: { name = "libraries/${l.path}"; path = l.jar; }) loaderLibs;
 in
 (pkgs.linkFarm "minecraft-client-${mcVersion}" (libraryLinks ++ [
-  # The vanilla metadata, byte-for-byte as Mojang serves it: portablemc re-checks this
-  # file's sha1 against the version manifest whenever it can reach the network, and
-  # refetches it if they differ (portablemc/standard.py:393-412). A reformatted copy
-  # would be silently redownloaded -- into a read-only store path.
+  # The vanilla metadata, byte-for-byte as Mojang serves it. portablemc re-checks this
+  # file's sha1 against the version manifest whenever it can reach the network and
+  # refetches it if they differ, so a reformatted copy would be redownloaded -- into a
+  # read-only store path. The launcher's --fetch-exclude-all now suppresses that check,
+  # but keep the bytes exact anyway: it is one flag away from mattering again.
   { name = "versions/${mcVersion}/${mcVersion}.json"; path = versionJson; }
 
   { name = "versions/${versionId}/${versionId}.json"; path = fabricProfile; }
 
   # Not a mistake: the game jar is looked up under the RESOLVED version's directory
-  # (hierarchy[0].jar_file(), portablemc/standard.py:452), which is the Fabric one,
+  # which is the Fabric one,
   # while the download entry describing it comes from the vanilla metadata underneath.
   # Fabric adds no jar of its own -- it launches the vanilla one through its loader.
   { name = "versions/${versionId}/${versionId}.jar"; path = clientJar; }

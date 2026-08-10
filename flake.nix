@@ -3,10 +3,13 @@
   description = "A NixOS configuration";
 
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-25.11";
+    # nixos-25.11 went EOL: its branch stopped moving on 2026-06-30, which froze
+    # signal-desktop at 8.9.1 -- past Signal's ~90-day hard expiry -- and stopped
+    # security backports for everything else. 26.05 is the supported stable.
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-26.05";
     nixos-hardware.url = "github:NixOS/nixos-hardware/master";
     home-manager = {
-      url = "github:nix-community/home-manager/release-25.11";
+      url = "github:nix-community/home-manager/release-26.05";
       inputs.nixpkgs.follows = "nixpkgs";
     };
     sops-nix = {

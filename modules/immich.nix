@@ -12,11 +12,10 @@
     # non-default mediaLocation). Backed up via Borg (modules/backup.nix).
     mediaLocation = "/data/immich";
 
-    # Immich has fully migrated off pgvecto.rs to VectorChord. The leftover
-    # `vectors` extension is not installable on pg17 (no vectors.control) and was
-    # never created here, so stop preloading the dead vectors.so — VectorChord
-    # (enableVectorChord, default) is the only vector extension immich needs.
-    database.enableVectors = false;
+    # Immich has fully migrated off pgvecto.rs to VectorChord, and 26.05 removed
+    # database.enableVectors entirely (defining it is now a hard assertion). The
+    # dead `vectors` extension is gone for good; VectorChord is the only vector
+    # extension immich uses, and it is on by default. Nothing to set here.
   };
 
   # Don't start immich before the /data disk is mounted (media lives there now).
