@@ -126,10 +126,24 @@ in
       # The firewall scoping is the real control.
       white-list = false;
 
-      # Dominant lever on server CPU with five concurrent clients, and
-      # imperceptible at quarter-screen. Raise only if remote (full-screen)
-      # players complain about pop-in.
-      view-distance = 10;
+      # THE TWO ARE NOT THE SAME LEVER, which is why only one of them moved.
+      #
+      # view-distance is how far chunks are SENT: it costs chunk tracking, memory and
+      # bandwidth, and it is the one a player actually sees as draw distance.
+      # simulation-distance is how far chunks TICK -- mobs, redstone, crops, hoppers --
+      # and that is where the CPU goes. Raising the cheap one and leaving the expensive
+      # one alone buys the visible improvement at roughly none of the tick cost.
+      #
+      # 10 -> 12 was the vanilla client default all along, so every player on a default
+      # slider was being clipped by the server rather than by their own setting. It is
+      # +42% chunks tracked ((2*12+1)^2 vs (2*10+1)^2), not +42% CPU.
+      #
+      # Raised 2026-08-10 for the remote full-screen players -- sulfur and the guest peer
+      # on wgfam -- which is exactly the condition the previous comment here said to wait
+      # for. The couch clients are at quarter-screen and will not notice either way.
+      # If it needs to go further, 16 is the next stop, but that is 2.5x the chunks of
+      # the original and worth watching `tick` timings for first.
+      view-distance = 12;
       simulation-distance = 8;
 
       max-players = 10;
