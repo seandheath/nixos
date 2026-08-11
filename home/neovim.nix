@@ -13,6 +13,10 @@ in
     enable = true;
     defaultEditor = true;
     withPython3 = true;
+    # Adopt the 26.05 default explicitly rather than riding the stateVersion="25.05"
+    # legacy path. Nothing here uses a Ruby provider, so the gem wrapper is dead
+    # weight in the closure.
+    withRuby = false;
     viAlias = true;
     vimAlias = true;
 
@@ -497,7 +501,7 @@ in
       bash-language-server   # was nodePackages.bash-language-server; that set was removed in 26.05
 
       # Formatters
-      nixfmt-rfc-style
+      nixfmt                   # was nixfmt-rfc-style; that alias now just points here
       stylua
       black
       rustfmt

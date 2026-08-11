@@ -1,7 +1,12 @@
 { config, pkgs, ... }: {
-  programs.vscode = {
+  # Must be programs.vscodium, not programs.vscode with package = pkgs.vscodium.
+  # programs.vscode now unconditionally writes to upstream VS Code's paths
+  # (~/.config/Code/User, ~/.vscode/extensions), which VSCodium never reads -- it
+  # uses ~/.config/VSCodium/User and ~/.vscode-oss. Under the old wiring every
+  # setting and extension below was silently inert.
+  programs.vscodium = {
     enable = true;
-    package = pkgs.vscodium;
+    # package defaults to pkgs.vscodium for this module; no need to state it.
     profiles.default = {
       extensions = with pkgs.vscode-extensions; [
         ms-python.python          # debugpy, test runner, env selection (MIT)
@@ -33,9 +38,11 @@
         "claudeCode.preferredLocation" = "panel";
       };
     };
-  };
-  home.file.".vscode-oss/argv.json".text = builtins.toJSON {
-    enable-crash-reporter = false;
-    password-store = "gnome-libsecret";
+    # The module owns .vscode-oss/argv.json itself; setting it through home.file
+    # would collide with argvSettings the moment either side is non-empty.
+    argvSettings = {
+      enable-crash-reporter = false;
+      password-store = "gnome-libsecret";
+    };
   };
 }
