@@ -2,6 +2,7 @@
   config,
   pkgs,
   lib,
+  inputs,
   ...
 }:
 # Ships the offline Minecraft client on any host that plays, and mirrors everything it
@@ -25,9 +26,21 @@ let
 
   clientMods = import ../packages/minecraft-client-mods.nix { inherit pkgs; };
   client = import ../packages/minecraft-client { inherit pkgs; };
+  mcPin = import ../packages/minecraft-version.nix;
+
+  # portablemc and the JVM come from the STABLE nixpkgs on every host, including the
+  # unstable laptops. Not fussiness: commit f11c4af had to hand-rewrite this launcher
+  # when portablemc went 4.4.1 (Python) -> 5.0.3 (Rust) and four CLI flags moved --
+  # --work-dir vanished, --bin-dir started deriving from --main-dir, --timeout became
+  # --fetch-exclude-all. That is a runtime break no build catches, and on unstable it
+  # would land at 04:00 on a nine-year-old's laptop with nobody watching. Pinning the
+  # tooling to the slow channel makes the launch contract move only when hydrogen's
+  # does. The payload itself is hash-pinned in-repo and unaffected by either channel.
+  stablePkgs = inputs.nixpkgs.legacyPackages.${pkgs.stdenv.hostPlatform.system};
 
   launcher = import ../packages/minecraft-client-launcher.nix {
     inherit pkgs;
+    toolPkgs = stablePkgs;
     defaultName = cfg.playerName;
     defaultServer = cfg.server;
   };
@@ -180,24 +193,32 @@ in
           re-pin the mods (that file's header has the Modrinth query).
         '';
       }
-    ]
-    # Only meaningful where the server actually is. sulfur has no minecraft-server to
-    # compare against, but it consumes the same payload, so hydrogen failing to build
-    # is enough to catch the drift for both.
-    #
-    # The failure this prevents: a nixpkgs bump moves minecraft-server past 1.21.10
-    # while the pinned client stays put. Without this the build succeeds and the
-    # symptom is four children unable to join.
-    ++ lib.optionals config.services.minecraft-server.enable [
-      {
-        assertion = pkgs.minecraft-server.version == client.mcVersion;
-        message = ''
-          Minecraft version drift: the server is ${pkgs.minecraft-server.version} but the
-          client payload in packages/minecraft-client is ${client.mcVersion}.
 
-          Re-run packages/minecraft-client/update.sh ${pkgs.minecraft-server.version},
-          rebuild to pick up the new assets hash, and re-pin the mods. Check upstream
-          support first -- not every mod tracks a point release promptly.
+      # Fires on EVERY host that imports this module, not just the one running a
+      # server. It used to be gated on config.services.minecraft-server.enable, on the
+      # reasoning that hydrogen failing to build caught the drift for everyone. That
+      # stopped being true on 2026-08-11: hydrogen is on nixos-26.05 and the five
+      # laptops are on nixos-unstable, so hydrogen's build no longer observes anything
+      # about the channel the clients come from.
+      #
+      # Comparing against the fleet pin rather than pkgs.minecraft-server is what makes
+      # the check meaningful off-server -- the laptops have no minecraft-server to read
+      # a version from, and pulling one in from their own channel would be asserting
+      # against the very thing that drifts.
+      #
+      # The failure this prevents: the pinned client payload and the version the server
+      # is actually held at diverge, the build succeeds, and the symptom is four
+      # children unable to join.
+      {
+        assertion = client.mcVersion == mcPin.version;
+        message = ''
+          Minecraft version drift: the fleet pin in packages/minecraft-version.nix is
+          ${mcPin.version} but the client payload in packages/minecraft-client is
+          ${client.mcVersion}.
+
+          Re-run packages/minecraft-client/update.sh ${mcPin.version}, rebuild to pick
+          up the new assets hash, and re-pin the mods. Check upstream support first --
+          not every mod tracks a point release promptly.
         '';
       }
     ];

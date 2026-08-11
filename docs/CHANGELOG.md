@@ -1,6 +1,63 @@
 # Changelog
 
 ## [Unreleased]
+### Changed (fleet: split channels — 5 laptops to nixos-unstable, hydrogen stays 26.05)
+- **This supersedes the "Deliberately NOT nixpkgs-unstable" note in the 26.05 entry
+  below.** That note argued the risk was unattended nightly rebuilds on four kids'
+  laptops nobody is watching. The risk is unchanged and was accepted deliberately;
+  all five laptops track unstable in `system.autoUpgrade`.
+- `flake.nix`: added `nixpkgs-unstable` (nixos-unstable) and `home-manager-unstable`
+  (HM master, follows it). `nixpkgs` stays `nixos-26.05` and now serves hydrogen
+  alone. `sops-nix`, `disko`, `cclaude`, `nix-index-database` keep one instance each
+  following stable — they contribute modules that build against the host's `pkgs`, so
+  per-channel copies would double those lock nodes for nothing. Accepted consequence:
+  `nix-locate` on a laptop describes 26.05's package set, not its own.
+- `flake.nix`: `commonModules` became a function of the channel's home-manager, and
+  hosts are built through a new `mkHost { channel, hostName, extraModules }`. A host's
+  channel is now declared in exactly one place; hydrogen's system derivation is
+  byte-identical across the refactor (`nwv3agkb…`, verified before and after).
+- `modules/fleet-channel.nix` (new): declares `fleet.channel`, set by `mkHost`.
+- `modules/auto-update.nix`: derives BOTH the `--override-input` target name and the
+  branch from `fleet.channel`. The input name matters as much as the branch here —
+  `nixpkgs` is still a real input of this flake, so handing a laptop
+  `--override-input nixpkgs <stable>` would be accepted, would beat `flake.lock`, and
+  would drag it back to 26.05 nightly while reporting success. Same silent-success
+  shape as the six-week EOL drift; now unrepresentable.
+- `packages/minecraft-version.nix` (new): the 1.21.10 hold and the vanilla jar
+  url/sha1, lifted out of the overlay in `modules/minecraft-server.nix`. The version
+  can no longer be a property of whichever channel a host builds from.
+- `modules/minecraft-client.nix`: the client-vs-server assertion was gated on
+  `services.minecraft-server.enable`, i.e. hydrogen only, on the reasoning that
+  hydrogen failing to build caught the drift for everyone. False once hydrogen and the
+  clients are on different channels. It now compares the client payload against the
+  fleet pin and fires on every host that imports the module.
+- `packages/minecraft-client-launcher.nix`: takes a `toolPkgs` argument;
+  `modules/minecraft-client.nix` passes the **stable** nixpkgs so `portablemc` and the
+  JVM stay identical fleet-wide. f11c4af had to hand-rewrite this launcher when
+  portablemc went 4.4.1 (Python) → 5.0.3 (Rust) and four CLI flags moved — a runtime
+  break no build catches, which on unstable would land at 04:00 on a child's laptop.
+- `modules/steam.nix`: `permittedInsecurePackages` emptied. It carried
+  `electron-39.8.10` for Heroic 2.20.1; unstable ships Heroic 2.22.0 on
+  electron-41.10.3, and every host importing this file is now unstable (hydrogen does
+  not import it). Removed rather than left stale — a dead entry silently re-permits
+  that exact package if anything pulls it back.
+- `packages/jackify.nix`: `appimageTools.extractType2` → `extract` (renamed upstream).
+- `modules/packages-desktop.nix`: dropped `gemini-cli`. nixpkgs marks it for removal —
+  Google moved unpaid and AI Pro/Ultra tiers to Antigravity CLI — so it is leaving the
+  tree rather than merely going stale. `packages/qwen-code.nix` (a gemini-cli fork) and
+  `aider-chat` cover the same ground. sulfur-only: `modules/workstation.nix` is imported
+  by `hosts/sulfur.nix` alone, so hydrogen and the kids' laptops never carried it.
+- Eval is now warning-free on all six hosts except the Nextcloud notice below.
+
+### Deferred
+- **Nextcloud 32 → 33 on hydrogen.** nixpkgs warns that 33 is available and that
+  `services.nextcloud.package` is pinned to `nextcloud32`. This is not a config defect
+  and there is no separate way to silence it: declaring `nextcloud33` *is* the upgrade,
+  and it runs a schema migration against the live instance. hydrogen currently reports
+  `version: 32.0.13.1`, `needsDbUpgrade: false`, `maintenance: false` — healthy, and one
+  clean major step away from 33 (Nextcloud refuses multi-major jumps). Wants a Borg
+  restore point and a maintenance window, not a drive-by.
+
 ### Added
 - `modules/family/peers.nix`: a `guests` attrset, and the first entry in it — a
   wgfam peer at `10.41.0.30` for a relative who wants to play Minecraft from

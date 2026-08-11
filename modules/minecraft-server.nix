@@ -48,29 +48,18 @@ let
   datapacks = import ../packages/minecraft-datapacks.nix { inherit pkgs; };
   mods = import ../packages/minecraft-client-mods.nix { inherit pkgs; };
   fabricServer = import ../packages/fabric-server.nix { inherit pkgs; };
+  mcPin = import ../packages/minecraft-version.nix;
 in
 {
-  # HOLD THE VANILLA JAR AT 1.21.10 (2026-08-10). nixpkgs 26.05 ships 1.21.11, but
-  # items 2-4 of the VERSION LOCKSTEP below -- Fabric intermediary mappings, the
-  # Modrinth mod pins and the client payload -- are all still 1.21.10, so the
-  # assertions correctly refuse to build. Pinning the jar keeps all five in step and
-  # makes the 1.21.11 migration a deliberate change rather than a side effect of a
-  # channel bump; nixpkgs no longer carries a per-patch attribute for 1.21.10
-  # (minecraftServers.vanilla-1-21 is the 1.21.11 build), hence the explicit src.
-  #
-  # Mojang serves old server jars indefinitely from piston-data; url and sha1 are
-  # transcribed from nixpkgs 25.11's minecraft-servers/versions.json. Java is
-  # unchanged (21) between the two releases, so the inherited wrapper is correct.
-  #
-  # REMOVE THIS once the Minecraft stack moves to 1.21.11 as a unit.
+  # Hold the vanilla jar at the fleet-wide pin rather than whatever this host's channel
+  # ships. The version, url and sha1 all live in packages/minecraft-version.nix, which
+  # is also what the client side asserts against -- see that file's header for why the
+  # number cannot come from pkgs any more.
   nixpkgs.overlays = [
     (final: prev: {
       minecraft-server = prev.minecraft-server.overrideAttrs (_: {
-        version = "1.21.10";
-        src = prev.fetchurl {
-          url = "https://piston-data.mojang.com/v1/objects/95495a7f485eedd84ce928cef5e223b757d2f764/server.jar";
-          sha1 = "95495a7f485eedd84ce928cef5e223b757d2f764";
-        };
+        inherit (mcPin) version;
+        src = prev.fetchurl { inherit (mcPin) url sha1; };
       });
     })
   ];

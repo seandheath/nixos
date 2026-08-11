@@ -1,4 +1,8 @@
-{ pkgs, defaultName ? null, defaultServer ? null }:
+{ pkgs, toolPkgs ? pkgs, defaultName ? null, defaultServer ? null }:
+# toolPkgs supplies the two things the launcher RUNS (portablemc and the JVM), as
+# opposed to the payload it runs them against. modules/minecraft-client.nix passes the
+# stable nixpkgs here on every host, so these stay identical fleet-wide even though the
+# laptops build from nixos-unstable -- see that module's comment for why.
 # minecraft-client -- start Minecraft from the pinned payload, offline, as a named
 # player.
 #
@@ -43,12 +47,12 @@ let
   # `java` happens to be on PATH. Passing --jvm explicitly also keeps 5.x's --jvm-policy
   # out of the picture, which can otherwise decide to go and fetch a JVM -- the one
   # remaining way a launch could reach for the network.
-  jdk = pkgs."jdk${toString client.javaVersion}";
+  jdk = toolPkgs."jdk${toString client.javaVersion}";
 in
 pkgs.writeShellApplication {
   name = "minecraft-client";
 
-  runtimeInputs = with pkgs; [ coreutils portablemc ];
+  runtimeInputs = [ pkgs.coreutils toolPkgs.portablemc ];
 
   text = ''
     payload="${client}"

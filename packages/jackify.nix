@@ -9,7 +9,9 @@ let
     sha256 = "cd5adea2661a61f394ea9114959cfead53237ae4d904acf2954305d42a2611d4";
   };
 
-  appimageContents = pkgs.appimageTools.extractType2 { inherit pname version src; };
+  # extractType2 was renamed to extract on nixpkgs-unstable (it only ever handled
+  # type-2 AppImages, which is all of them in practice). Same function, same output.
+  appimageContents = pkgs.appimageTools.extract { inherit pname version src; };
 in
 pkgs.stdenv.mkDerivation {
   inherit pname version;

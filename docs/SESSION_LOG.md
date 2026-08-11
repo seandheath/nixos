@@ -1,5 +1,50 @@
 # Session Log
 
+## Session: 2026-08-11
+
+### Changes Made
+- `hosts/sulfur.nix`: `nvidia.powerManagement.finegrained` true -> false. Diagnosed a
+  session freeze that needed a forced power-off at 14:08.
+- `packages/dock-monitors.nix`: 5s D-Bus timeouts, exit 0 when undocked, catch
+  `DBusException`.
+- `home/vscode.nix`: `programs.vscode` -> `programs.vscodium`; `home/neovim.nix`:
+  `withRuby = false`, `nixfmt-rfc-style` -> `nixfmt`.
+- `flake.nix`, `modules/fleet-channel.nix`, `modules/auto-update.nix`,
+  `packages/minecraft-version.nix`, `modules/minecraft-client.nix`,
+  `modules/minecraft-server.nix`, `packages/minecraft-client-launcher.nix`,
+  `modules/steam.nix`, `packages/jackify.nix`: split the fleet across two channels.
+
+### Decisions
+- **The freeze was a compositor hang, not a panic.** The kernel kept logging for 30s
+  after the screen locked up; no Xid, OOM, MCE, lockup or thermal event. Chain: dock
+  USB disconnect -> dGPU dropped into RTD3/D3cold -> gnome-shell blocked in an NVIDIA
+  ioctl against a powered-down GPU. `finegrained` RTD3 assumes an offload-only dGPU
+  with no attached displays, but the dock's HP Z27x is on HDMI-2, a card0/nvidia-drm
+  connector. Trade-off accepted: worse idle battery, no more D3cold-under-active-output
+  race. Alternative not taken: route that display to the Intel GPU and keep RTD3.
+- **VSCodium config had been inert.** `programs.vscode` writes VS Code's paths
+  regardless of `package`; `~/.config/VSCodium/User/` had no `settings.json` at all.
+  Not a cosmetic warning — the whole file was doing nothing.
+- **Laptops to unstable, hydrogen stays 26.05.** Reverses the 26.05-era decision. The
+  unattended-nightly-unstable risk on four kids' laptops was raised and accepted.
+  hydrogen keeps the stable input so its evaluation is untouched — verified by diffing
+  its system drvPath before and after the `mkHost` refactor (unchanged).
+- **Channel is one argument, not two facts.** `mkHost` picks the nixpkgs, the
+  home-manager and `fleet.channel` together, so the nightly `--override-input` cannot
+  name a branch the host was not built from. This was the concrete risk: `nixpkgs` is
+  still a real input, so the wrong override would be accepted and would silently win
+  over `flake.lock`.
+- **Minecraft tooling pinned to stable on purpose.** `portablemc` and the JVM come from
+  the stable input even on unstable hosts, because the 4.4.1 -> 5.0.3 CLI break in
+  f11c4af was runtime-only and would now land unattended at 04:00 on a child's laptop.
+
+### Known Issues
+- `gemini-cli` is flagged for removal on unstable; still builds, left pending a call on
+  whether it is wanted.
+- Second freeze not chased: boot `-2` also ended abruptly, its log stopping at a
+  `PM: suspend entry` on 2026-08-10 13:56, 19s before the next boot. Possibly a
+  separate suspend-path fault.
+
 ## Session: 2026-08-10
 
 ### Changes Made
