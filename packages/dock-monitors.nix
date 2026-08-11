@@ -10,6 +10,19 @@ let
 import dbus
 import sys
 from dbus import SessionBus, Interface
+from dbus.exceptions import DBusException
+
+# Never inherit dbus-python's 25s default timeout. The udev rule fires this script
+# on every DRM change event, so a wedged Mutter would otherwise pin a systemd job
+# for 25s per event -- exactly what happened during the 2026-08-11 compositor hang,
+# where this unit sat blocked in GetCurrentState() until the machine was forced off.
+DBUS_TIMEOUT = 5.0
+
+# Outcomes of a configuration attempt. "Not docked" is deliberately distinct from
+# an error: it is the normal state of a laptop and must not fail the unit.
+STATUS_APPLIED = 'applied'
+STATUS_NOT_DOCKED = 'not-docked'
+STATUS_ERROR = 'error'
 
 def get_display_config():
     """Get the current display configuration from GNOME"""
@@ -71,7 +84,7 @@ def configure_triple_monitors():
     display_config = get_display_config()
 
     # Get current state
-    result = display_config.GetCurrentState()
+    result = display_config.GetCurrentState(timeout=DBUS_TIMEOUT)
     serial = result[0]
     monitors = result[1]
     logical_monitors = result[2]
@@ -82,11 +95,11 @@ def configure_triple_monitors():
     samsung, hp_left, hp_right = find_monitors(resources)
 
     if not all([samsung, hp_left, hp_right]):
-        print("Error: Could not find all three monitors!")
+        print("Dock monitor set incomplete -- nothing to do:")
         print(f"  Samsung QN90D: {'Found' if samsung else 'Not found'}")
         print(f"  HP Z27x (9WJ - Left): {'Found' if hp_left else 'Not found'}")
         print(f"  HP Z27x (PD8 - Right): {'Found' if hp_right else 'Not found'}")
-        return False
+        return STATUS_NOT_DOCKED
 
     # Build logical monitor configuration
     logical_monitors = []
@@ -163,13 +176,14 @@ def configure_triple_monitors():
             serial,
             3,  # persistent
             logical_monitors,
-            {}  # empty properties, let GNOME use defaults
+            {},  # empty properties, let GNOME use defaults
+            timeout=DBUS_TIMEOUT
         )
         print("Configuration applied successfully!")
-        return True
+        return STATUS_APPLIED
     except Exception as e:
         print(f"Error applying configuration: {e}")
-        return False
+        return STATUS_ERROR
 
 def main():
     """Main entry point"""
@@ -178,8 +192,23 @@ def main():
     print("GNOME Wayland Monitor Configuration")
     print("=" * 40)
 
-    if configure_triple_monitors():
+    try:
+        status = configure_triple_monitors()
+    except DBusException as e:
+        # Mutter is unreachable or wedged. There is nothing this script can do
+        # about that, and a raw traceback on every DRM change event only buries
+        # the real signal in the journal.
+        print(f"Mutter DisplayConfig unavailable: {e}")
+        sys.exit(1)
+
+    if status == STATUS_APPLIED:
         print("\nMonitor configuration completed successfully!")
+    elif status == STATUS_NOT_DOCKED:
+        # Undocked or partially docked is the steady state for a laptop, and the
+        # udev rule fires on every DRM change, so this must exit 0 -- otherwise
+        # the unit racks up thousands of spurious failures (3838 between
+        # 2026-08-04 and 2026-08-11).
+        print("\nLeaving display configuration alone")
     else:
         print("\nFailed to configure monitors")
         sys.exit(1)

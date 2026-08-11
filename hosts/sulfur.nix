@@ -109,7 +109,16 @@ in
       nvidiaSettings = true;
       modesetting.enable = true;
       powerManagement.enable = true;
-      powerManagement.finegrained = true;  # Fine-grained power management for laptops
+      # Fine-grained RTD3 (DynamicPowerManagement=2) must stay OFF here: the dock's
+      # HP Z27x (CNK71609WJ) hangs off HDMI-2, which is a card0/nvidia-drm connector
+      # (card1/i915 only exposes HDMI-A-1, DP-1..3, eDP-1). RTD3 assumes an
+      # offload-only dGPU with no attached displays; with one attached, a dock link
+      # drop lets the GPU fall into D3cold while Mutter still holds an active KMS
+      # output on it, and the compositor deadlocks in an NVIDIA ioctl against a
+      # powered-down GPU. That froze the session on 2026-08-11 14:08 (kernel stayed
+      # alive and logging; only gnome-shell wedged). Re-enable only if every
+      # external display is routed to the Intel GPU.
+      powerManagement.finegrained = false;
       package = config.boot.kernelPackages.nvidiaPackages.latest;
       prime = {
         offload.enable = true;
