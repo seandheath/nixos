@@ -1,6 +1,31 @@
 # Changelog
 
 ## [Unreleased]
+### Added
+- `modules/auto-update.nix`: a failed nightly `nixos-upgrade` now raises a critical
+  desktop notification. Nothing watched unit state before, so a failed rebuild left a
+  red line in a journal nobody reads — the same silent-wrongness that let the fleet sit
+  six weeks past 25.11's EOL. It matters more now: the five laptops track unstable with
+  the kernel and nvidia driver unpinned, so a failed rebuild is an expected event, and
+  an unnoticed one means the machine quietly stops updating.
+  - **Two units, because one does not work.** `nixos-upgrade-notify.service` fires via
+    `OnFailure=` and catches somebody sitting at the machine at 04:45. The user unit
+    `nixos-upgrade-failed-notify.service` (`WantedBy=graphical-session.target`)
+    re-checks `systemctl is-failed` at login, which is the case that actually happens:
+    the timer is `Persistent=true`, so a laptop that was off overnight runs its
+    catch-up during boot and fails *before* any session exists to be notified.
+  - Enumerates live `/run/user/*/bus` sockets rather than hardcoding a username, so it
+    works unmodified on the kids' laptops where the logged-in user is not `sheath`.
+  - Every notification path ends in `|| true`; a broken notifier must not turn one
+    failed unit into two. The journal line is the record, the popup is a courtesy.
+  - Reads systemd's own unit state instead of writing a marker file — a marker would
+    need its own `modules/impermanence.nix` entry to survive sulfur's tmpfs root.
+  - **Known gaps.** Unit state does not survive a reboot, so a failure followed by a
+    reboot-before-login goes unseen. And on the kids' laptops this notifies the child,
+    who cannot act on it, rather than sheath, who can — the four machines where nobody
+    is watching are precisely the ones this does not really cover. Both need an
+    off-box channel (ntfy on hydrogen is the obvious candidate); deliberately deferred.
+
 ### Fixed (unstable fallout on sulfur — the laptop would not boot)
 - **`hardware/sulfur.nix`: `pcie_aspm=off`.** 26.11 (Linux 6.18.44) would not boot: the
   Realtek RTS525A card reader at `0000:2c:00.0` stormed correctable PCIe AER errors —
