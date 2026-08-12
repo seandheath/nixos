@@ -5,7 +5,15 @@
 {
   imports = [ (modulesPath + "/installer/scan/not-detected.nix") ];
 
-  boot.initrd.availableKernelModules = [ "xhci_pci" "thunderbolt" "vmd" "nvme" "uas" "usbhid" "sd_mod" "rtsx_pci_sdmmc" ];
+  # rtsx_pci_sdmmc deliberately NOT here. install.sh's generated list scooped up every
+  # storage driver present on the installer, but root is LUKS-on-NVMe, so the Realtek
+  # RTS525A card reader is not on the boot path and the initrd has no reason to probe
+  # it. Keep it out on those grounds alone.
+  #
+  # It did NOT fix the 26.11 boot hang, and the reason is worth recording: the fault is
+  # at the PCIe link layer, below any driver. Removing the module changes nothing about
+  # whether the link retries. See pcie_aspm=off in boot.kernelParams for the actual fix.
+  boot.initrd.availableKernelModules = [ "xhci_pci" "thunderbolt" "vmd" "nvme" "uas" "usbhid" "sd_mod" ];
   boot.kernelModules = [ "kvm-intel" ];
 
   # Kernel parameters
@@ -31,6 +39,28 @@
     # it changes nothing; the real backlight fix is enable_dpcd_backlight=3 above.
     # If mutter is ever seen driving nvidia_0 after resume, mask it via udev instead.
     "nvidia.NVreg_RegistryDwords=EnableBrightnessControl=0"
+
+    # WHY 26.11 WOULD NOT BOOT (2026-08-11). Linux 6.18.44 turned this laptop's
+    # long-standing PCIe grumble into a livelock. The Realtek RTS525A card reader at
+    # 0000:2c:00.0 (device 10ec:525a, under root port 00:1c.0) storms correctable AER
+    # errors -- status=0x00001000, bit 12, Replay Timer Timeout -- roughly every 150
+    # MICROSECONDS. Four log lines per event, thousands of events per second, and the
+    # kernel spends the whole boot in the AER handler instead of finishing it.
+    #
+    # Replay Timer Timeout means the link ran out of time waiting to be acked and
+    # retried. On this Realtek reader that is the textbook symptom of ASPM L1 substates
+    # letting the link doze off too aggressively; 6.18.43 kept the same link quiet
+    # enough to produce exactly ten of these per boot, 6.18.44 does not.
+    #
+    # pcie_aspm=off disables PCIe Active State Power Management link-wide. Costs some
+    # idle battery -- that is the trade for a machine that boots. If this proves to be
+    # the fix, the follow-up is to narrow it (pcie_aspm.policy=performance, or disable
+    # the reader outright via udev since the SD slot is expendable) rather than leave
+    # ASPM off across the board.
+    #
+    # NOTE: the errors are Correctable. The hardware is recovering every one of them --
+    # nothing is silently corrupting. The failure is the cost of REPORTING them.
+    "pcie_aspm=off"
   ];
 
   # LUKS configuration

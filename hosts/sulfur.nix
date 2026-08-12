@@ -42,16 +42,38 @@ in
   };
 
   # Boot
+  # Hard-disable NVIDIA runtime power management (RTD3). NixOS has no option for
+  # "explicitly off" -- hardware.nvidia.powerManagement.finegrained = false merely omits
+  # the modparam and lets the driver pick, which on 610.57.04 means 3 (driver's choice =
+  # RTD3 on). 0x00 is the only value that actually keeps the dGPU out of D3cold while it
+  # is driving the dock's HDMI-2 display. See the nvidia block below for the full story.
+  #
+  # Check after any driver bump:
+  #   grep DynamicPowerManagement /proc/driver/nvidia/params   # must be 0
+  # The option itself lives in the single boot.extraModprobeConfig block below.
+
   boot.loader.systemd-boot.enable = true;
   boot.loader.systemd-boot.configurationLimit = 20;
   boot.loader.efi.canTouchEfiVariables = true;
 
-  # Pin to 6.18 until nvidia-open supports kernel 6.19
-  boot.kernelPackages = pkgs.linuxPackages_6_18;
+  # Kernel deliberately NOT pinned: follow whatever nixpkgs makes the default. The old
+  # `linuxPackages_6_18` pin existed because nvidia-open 595 lagged behind mainline, and
+  # it did nothing useful anyway -- unstable's default is already 6.18.44, the exact
+  # version the pin resolved to. What it WOULD have done is silently hold this laptop on
+  # 6.18 long after nvidia-open 610 could handle newer, the same way the 26.05 pin sat
+  # six weeks past EOL.
+  #
+  # The real risk moves to the nightly autoUpgrade: on unstable the default kernel will
+  # advance unattended, and nvidia-open is the thing most likely to refuse to build
+  # against a new one. That failure is loud (the rebuild fails, the running generation
+  # is untouched) rather than silent, which is the right way round -- but if it starts
+  # happening, pin the DRIVER, not the kernel.
 
-  # NVIDIA settings for RTX 50 series
+  # NVIDIA settings for RTX 50 series. One block only -- boot.extraModprobeConfig is a
+  # plain attribute here, so a second assignment in this file is a duplicate-key error,
+  # not a merge.
   boot.extraModprobeConfig = ''
-    options nvidia NVreg_PreserveVideoMemoryAllocations=1
+    options nvidia NVreg_PreserveVideoMemoryAllocations=1 NVreg_DynamicPowerManagement=0x00
   '';
 
   # Configuration
@@ -118,7 +140,24 @@ in
       # powered-down GPU. That froze the session on 2026-08-11 14:08 (kernel stayed
       # alive and logging; only gnome-shell wedged). Re-enable only if every
       # external display is routed to the Intel GPU.
+      #
+      # finegrained = false is NECESSARY BUT NOT SUFFICIENT, which cost a whole day to
+      # learn. All it does is decline to pass NVreg_DynamicPowerManagement; the driver
+      # then applies its own default. On 595.71.05 that default was 0 (off) and the fix
+      # held. On 610.57.04 -- which nvidiaPackages.latest silently became when the
+      # laptops moved to unstable -- the default is 3 ("let the driver decide"), and the
+      # driver decides to enable RTD3 on this laptop. Verified on the running system:
+      # /proc/driver/nvidia/params said DynamicPowerManagement: 3 and
+      # 0000:01:00.0/power/control said "auto" -- i.e. the freeze fix had quietly
+      # reverted itself. Pin the value explicitly below rather than trusting a default.
       powerManagement.finegrained = false;
+      # DELIBERATELY `latest`, and deliberately NOT pinned the way hydrogen pins
+      # `production`. The 595 -> 610 jump is what re-enabled RTD3 above, so the
+      # temptation after that is to freeze the driver -- decided against on
+      # 2026-08-11. Freezing trades a loud, fixable breakage for a silent stale one,
+      # which is the mistake that kept this fleet six weeks past 25.11's EOL. The
+      # RTD3 defence is the explicit modparam, which keeps working as the driver
+      # moves; that is the thing to maintain, not this version.
       package = config.boot.kernelPackages.nvidiaPackages.latest;
       prime = {
         offload.enable = true;

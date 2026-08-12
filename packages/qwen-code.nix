@@ -4,14 +4,18 @@
 # Upstream: https://github.com/QwenLM/qwen-code
 #
 # Why this package exists rather than `pkgs.qwen-code`:
-#   nixos-25.11 pins qwen-code 0.2.2; upstream stable is 0.21.1. That gap is not
-#   cosmetic — the entire settings schema this deployment depends on landed after
-#   0.2.2. Probing both bundles directly:
-#     0.2.2   no `modelProviders`, no `permissions`, no `context.fileName`;
-#             provider config is only the old OPENAI_BASE_URL/OPENAI_MODEL env vars.
-#     0.21.1  `modelProviders` + `security.auth.selectedType` + `permissions.allow`
-#             + `mcpServers.*.httpUrl`, all of which modules/qwen-code.nix uses.
-#   Delete this file and switch back to pkgs.qwen-code once nixpkgs catches up.
+#   nixpkgs is BEHIND upstream, and this deployment needs the newer settings schema.
+#   Checked 2026-08-11 on nixos-unstable: pkgs.qwen-code is 0.16.0, this is 0.21.1.
+#   (The gap used to be far worse -- nixos-25.11 shipped 0.2.2, which predated the
+#   entire schema: no `modelProviders`, no `permissions`, no `context.fileName`, only
+#   the old OPENAI_BASE_URL/OPENAI_MODEL env vars. 0.21.1 has `modelProviders` +
+#   `security.auth.selectedType` + `permissions.allow` + `mcpServers.*.httpUrl`, all
+#   of which modules/qwen-code.nix uses.)
+#
+#   DELETE THIS FILE when `pkgs.qwen-code` reaches 0.21.1 or later -- compare against
+#   the version below, not against any number written in this comment. Note the
+#   direction: nixpkgs being merely NEWER than 0.2.2 is not the bar, and reading a
+#   stale comment that way would downgrade the machine.
 #
 # Why the npm registry tarball rather than buildNpmPackage on the GitHub source:
 #   the published npm package is already fully bundled by upstream's esbuild step —

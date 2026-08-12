@@ -1,6 +1,47 @@
 # Changelog
 
 ## [Unreleased]
+### Fixed (unstable fallout on sulfur — the laptop would not boot)
+- **`hardware/sulfur.nix`: `pcie_aspm=off`.** 26.11 (Linux 6.18.44) would not boot: the
+  Realtek RTS525A card reader at `0000:2c:00.0` stormed correctable PCIe AER errors —
+  `status=0x00001000`, bit 12, Replay Timer Timeout — every ~150 µs, four log lines
+  each. The kernel spent the whole boot in the AER handler. `lspci` confirmed the cause:
+  `ASPM L0s L1 Enabled` with all L1 substates on, `T_PwrOn=60us`, i.e. the link kept
+  dozing off and failing to complete a replay in time.
+  - **The fault was not new.** 26.05 logs the identical error, same device, same bit —
+    just ten per boot, after which the reader runtime-suspends and goes quiet. 6.18.44
+    never lets it settle. The channel move did not create this; it stopped hiding it.
+  - After the fix, AER errors this boot: **zero**, down from ten per boot on 26.05.
+    That link had never been healthy.
+- `hardware/sulfur.nix`: dropped `rtsx_pci_sdmmc` from `boot.initrd.availableKernelModules`.
+  Did *not* fix the hang (the fault is below any driver) but is correct regardless —
+  root is LUKS-on-NVMe and the reader is not on the boot path.
+- **`hosts/sulfur.nix`: `NVreg_DynamicPowerManagement=0x00` set explicitly.** The morning's
+  RTD3 freeze fix had silently reverted. `powerManagement.finegrained = false` does not
+  disable RTD3 — it omits the modparam and lets the driver default apply. 595.71.05
+  defaulted to 0; 610.57.04, which `nvidiaPackages.latest` became on unstable, defaults
+  to 3 and enables RTD3. Verified on the running system: `DynamicPowerManagement: 3`,
+  `power/control: auto`. An absent modparam means "driver default", not "off".
+
+### Changed (pinning policy)
+- `hosts/sulfur.nix`: **kernel unpinned** (`boot.kernelPackages = pkgs.linuxPackages_6_18`
+  removed). The pin was already inert — unstable's default *is* 6.18.44 — and would only
+  have frozen the laptop on 6.18 long after nvidia-open could handle newer.
+- `hosts/sulfur.nix`: **`nvidiaPackages.latest` deliberately left unpinned**, unlike
+  hydrogen's `production`. Freezing the driver trades a loud breakage for a silent stale
+  one, which is the failure mode that kept this fleet six weeks past 25.11's EOL. The
+  RTD3 defence is the modparam, which survives driver bumps.
+- `packages/qwen-code.nix`, `packages/ghidra-reva.nix`: rewrote justifications that still
+  cited nixos-25.11. Both were misleading in the dangerous direction — read literally
+  they invited deleting a package that is still load-bearing. qwen-code stays because
+  nixpkgs is *behind* (unstable 0.16.0 vs local 0.21.1); ghidra-reva stays because ReVa
+  7.3.0 ships no asset for unstable's ghidra-bin 12.1.2, not because of any version floor.
+- Audited every other pin. `jackify`, `imjtool`, the Minecraft mod/payload set and
+  `minecraft-version.nix` are all `fetchurl`/hash-pinned and channel-independent;
+  hydrogen's `postgresql_17` and `nvidiaPackages.production` are untouched (still 26.05);
+  `modules/opencode.nix`'s vLLM workaround is still required — `services.vllm` remains
+  absent on unstable.
+
 ### Changed (fleet: split channels — 5 laptops to nixos-unstable, hydrogen stays 26.05)
 - **This supersedes the "Deliberately NOT nixpkgs-unstable" note in the 26.05 entry
   below.** That note argued the risk was unattended nightly rebuilds on four kids'

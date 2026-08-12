@@ -38,9 +38,35 @@
   the stable input even on unstable hosts, because the 4.4.1 -> 5.0.3 CLI break in
   f11c4af was runtime-only and would now land unattended at 04:00 on a child's laptop.
 
+### Boot failure on 26.11, and what it cost
+- sulfur would not boot on unstable. Root cause: a PCIe AER storm from the SD card
+  reader, not anything to do with the migration. Four wrong theories preceded it, worth
+  recording so they are not re-run: (1) the interrupted `nr` truncated `/boot` — killed
+  by hashing the kernel and initrd against the store, both matched; (2) the LUKS
+  passphrase prompt was invisible — killed by typing it blind, no effect; (3) the
+  `rtsx_pci_sdmmc` initrd module — killed by removing it, no change, because the fault
+  is at the link layer below any driver; (4) hardware failure — killed by btrfs stats
+  all zero, no MCE taint bit, normal temps.
+- **The diagnostic that mattered** was raising `boot.consoleLogLevel` to 7. Correctable
+  AER messages are KERN_WARNING (priority 4), and `loglevel=4` prints only priority < 4,
+  so two earlier boots produced a blank cursor and zero evidence. Raising it also made
+  that boot worse — console I/O on an already-drowning kernel — but it produced the
+  photograph that identified the device and the error bit.
+- **Lesson for next time:** on a box with plymouth off, an ephemeral root, and `/var/log`
+  on the encrypted volume, an early-boot failure leaves *nothing* — not on screen, not on
+  disk. Raise the console log level as the FIRST step of any such investigation, not the
+  fourth.
+
 ### Known Issues
-- `gemini-cli` is flagged for removal on unstable; still builds, left pending a call on
-  whether it is wanted.
+- Nightly `autoUpgrade` on the five laptops now tracks unstable unattended, with the
+  kernel and nvidia driver both unpinned. Accepted deliberately; the failure mode is a
+  failed rebuild leaving the running generation intact, which is the safe direction.
+- The card reader's PCIe link is genuinely marginal — it emitted ten correctable errors
+  per boot even on 26.05, which was dismissed as background noise for most of a day.
+  `pcie_aspm=off` is a global hammer that costs some idle battery. If that matters,
+  narrow it to L1 substates on `0000:2c:00.0`, or remove the device via udev.
+- `gemini-cli` removed from `modules/packages-desktop.nix` (nixpkgs marks it for
+  removal upstream; Google moved unpaid/Pro/Ultra tiers to Antigravity CLI).
 - Second freeze not chased: boot `-2` also ended abruptly, its log stopping at a
   `PM: suspend entry` on 2026-08-10 13:56, 19s before the next boot. Possibly a
   separate suspend-path fault.

@@ -7,9 +7,17 @@
 # by default). Upstream: https://github.com/cyberkaida/reverse-engineering-assistant
 #
 # Why this package exists at all:
-#   ReVa requires Ghidra >= 12.0, but nixos-25.11 pins Ghidra 11.4.2 in *both*
-#   `ghidra` (source-built) and `ghidra-bin` (upstream prebuilt). So Ghidra has to
-#   be bumped here before the extension can be installed.
+#   ReVa ships its extension zip built against ONE exact Ghidra release, and this
+#   deployment needs the Ghidra that matches the ReVa below -- 12.1, not merely
+#   ">= 12.0". The extension is a hard version match, not a floor.
+#
+#   The original reason was different and is now obsolete: nixos-25.11 pinned Ghidra
+#   11.4.2 in both `ghidra` and `ghidra-bin`, below ReVa's 12.0 minimum. As of
+#   2026-08-11 nixos-unstable ships ghidra-bin 12.1.2, which clears that floor -- so
+#   do NOT read the old rationale and conclude this file can be deleted. It cannot:
+#   ReVa 7.3.0 publishes no 12.1.2 asset, so stock ghidra-bin would leave the
+#   extension unloadable. Revisit when ReVa releases an asset matching whatever
+#   ghidra-bin has moved to, then drop this file and use the stock package.
 #
 # Why override `ghidra-bin` rather than `ghidra`:
 #   `ghidra-bin` is a plain fetchzip of the NSA's release build, so a version bump
