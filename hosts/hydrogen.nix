@@ -404,12 +404,26 @@
   # The Quadro P4200 is Pascal (GP104GLM), and Pascal is end-of-life: R580 is the
   # last branch NVIDIA supports for Maxwell/Pascal/Volta, with critical security
   # updates for Quadro parts through October 2028 but no further feature updates.
-  # Every branch in the current nixpkgs pin (stable/latest/beta/production) is
-  # 580.142, so this pin is a no-op TODAY — its job is to stop the nightly
-  # auto-update (modules/auto-update.nix) from silently moving the GPU onto a 590
-  # branch that does not support this card. Revisit deliberately at the next
-  # NixOS release bump; when nixpkgs grows a legacy_580 attribute, switch to it.
-  hardware.nvidia.package = config.boot.kernelPackages.nvidiaPackages.production;
+  #
+  # THIS MUST BE legacy_580, NOT production. The previous pin here was `production`,
+  # chosen when every branch in nixpkgs (stable/latest/beta/production) was 580.142 --
+  # so it was a no-op the day it was written, and its stated job was to stop the
+  # nightly from moving this card onto a 590 branch. It did not do that job. On
+  # 2026-08-13 the 26.05 branch moved production, stable AND latest to 595.71.05 in one
+  # step; the nightly picked it up, and the card lost its driver:
+  #
+  #     legacy_580 = 580.173.02      production = 595.71.05
+  #     stable     = 595.71.05       latest     = 595.71.05
+  #
+  # The lesson, since it generalises past this card: a "pin" to a moving branch name
+  # pins nothing. production is not a version, it is a pointer, and every pointer in
+  # that set crossed the 590 boundary on the same day. Only legacy_580 names the
+  # support branch itself, which is the actual constraint -- the hardware needs the
+  # last branch that supports Pascal, not whichever branch upstream currently blesses.
+  #
+  # Do NOT "modernise" this back to a rolling branch at the next release bump. This one
+  # stays until the card is replaced.
+  hardware.nvidia.package = config.boot.kernelPackages.nvidiaPackages.legacy_580;
 
   # nix-ld so generic dynamically-linked binaries run (e.g. the official Claude
   # Code CLI in ~/.local/bin). Mirrors sulfur's modules/workstation.nix config.

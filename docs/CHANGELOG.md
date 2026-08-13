@@ -26,6 +26,25 @@
     is watching are precisely the ones this does not really cover. Both need an
     off-box channel (ntfy on hydrogen is the obvious candidate); deliberately deferred.
 
+### Fixed (hydrogen would not boot — nvidia 595 dropped Pascal)
+- **`hosts/hydrogen.nix`: `nvidiaPackages.production` → `nvidiaPackages.legacy_580`.**
+  The 2026-08-13 nightly moved the Quadro P4200 (Pascal, GP104GLM) onto 595.71.05,
+  which does not support the card. hydrogen went off the network at 04:34 — three
+  syncthing connections timing out together mid-flight, no clean socket close — and did
+  not come back; the console showed the driver error on the next boot.
+  - **A pin to a moving branch name pins nothing.** The previous line pinned
+    `production` and its comment said the job was "to stop the nightly from silently
+    moving the GPU onto a 590 branch". It could never have done that: `production` is a
+    pointer, not a version, and on 2026-08-13 the 26.05 branch moved `production`,
+    `stable` and `latest` to 595.71.05 in a single step. The pin was written when all
+    four branches read 580.142, i.e. when it was provably a no-op, and nothing about it
+    was load-bearing until the day it was needed.
+  - `legacy_580` (580.173.02) names the *support branch*, which is the real constraint:
+    R580 is the last branch NVIDIA supports for Maxwell/Pascal/Volta, with security
+    updates for Quadro parts through October 2028. Verified it still compiles against
+    hydrogen's 6.18.44 kernel — built from source, not fetched from cache.
+  - Left a do-not-modernise note in the file. This one holds until the card is replaced.
+
 ### Fixed (first real catch by the nightly-failure notifier)
 - **`hosts/sulfur.nix`: force `SendSIGKILL` on `asus-shutdown.service`.** The 2026-08-13
   nightly built and switched cleanly, then exited 4 because a unit would not restart.
