@@ -53,9 +53,18 @@ let
   # as broken as one enslaved to nothing, and `ip link set ... master` fixes both.
   checks = lib.concatLists (lib.mapAttrsToList (br: brCfg:
     map (iface: ''
-      current=$(${pkgs.coreutils}/bin/basename \
-        "$(${pkgs.coreutils}/bin/readlink -f /sys/class/net/${iface}/master 2>/dev/null || true)" \
-        2>/dev/null || true)
+      # `readlink -f` is WRONG here and the first version of this used it: -f
+      # canonicalises a path whose final component does not exist and exits 0, so a
+      # detached interface reported master=master instead of master=none. The
+      # comparison below still fired correctly, but the log line is the entire point of
+      # this unit -- it is the evidence trail for a bug we have not identified -- so it
+      # has to say what was actually there. Test the symlink, then read it plainly.
+      if [ -L /sys/class/net/${iface}/master ]; then
+        current=$(${pkgs.coreutils}/bin/basename \
+          "$(${pkgs.coreutils}/bin/readlink /sys/class/net/${iface}/master)")
+      else
+        current=""
+      fi
       if [ "$current" != "${br}" ]; then
         echo "WARNING: ${iface} is not a slave of ${br} (master=''${current:-none}) -- re-attaching" >&2
         # || true: a failed repair must not leave a failed unit behind that then needs
