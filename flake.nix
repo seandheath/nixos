@@ -89,6 +89,10 @@
         # thinks it owns, and the hosts that most need protecting are the ones nobody
         # is watching. See the module header.
         ./modules/wg-unmanaged.nix
+        # Every host, same as above and for the same reason: hydrogen's br0 lost its
+        # slave during the 2026-08-13 nightly and stayed unreachable for six hours.
+        # Defines nothing on a host with no bridges. See the module header.
+        ./modules/bridge-slave-restore.nix
         {
           home-manager.useGlobalPkgs = true;
           home-manager.useUserPackages = true;

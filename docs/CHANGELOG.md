@@ -26,6 +26,29 @@
     is watching are precisely the ones this does not really cover. Both need an
     off-box channel (ntfy on hydrogen is the obvious candidate); deliberately deferred.
 
+### Added (bound an unexplained six-hour outage)
+- **`modules/bridge-slave-restore.nix`**: a 30 s watchdog that re-attaches any
+  `networking.bridges` slave found detached. hydrogen's 2026-08-13 nightly rebuild
+  *succeeded* and left the machine unreachable for six hours — `br0` lost `enp0s31f6`
+  30 ms after systemd logged "Reloaded Bridge Interface br0", and nothing put it back.
+  The host itself was fine the whole time; journald ran until the manual power-cycle.
+  - **The actor is still unidentified, and the module says so.** NetworkManager was the
+    obvious suspect — it holds autoconnecting profiles for both `br0` and `enp0s31f6`,
+    and `modules/wg-unmanaged.nix` documents NM doing exactly this to WireGuard devices
+    — but two live reproductions cleared it: restarting NM alone did nothing, and
+    reloading `br0-netdev.service` alone (under NM debug logging) reproduced only the
+    correct detach/re-attach, ending in `forwarding`, with NM merely observing. That
+    night's switch reloaded only `br0-netdev` and `dbus-broker` and restarted only
+    `home-manager-sheath` and `polkit`; NM and `systemd-udevd` were untouched.
+  - So this is a bound, not a diagnosis: whatever detaches the slave, re-attaching is
+    correct and idempotent, and a ≤30 s blip beats a six-hour outage needing physical
+    access. Every repair logs at warning level, so the bug keeps a timestamped trail —
+    the evidence the investigation lacked. Those lines appearing *is* the reproduction.
+  - `AccuracySec = "5s"` is load-bearing: systemd's 1-minute default would make a 30 s
+    period meaningless.
+  - Derived from `networking.bridges`, so a bridge added later is covered automatically;
+    defines nothing on the five laptops, which declare none.
+
 ### Fixed (hydrogen would not boot — nvidia 595 dropped Pascal)
 - **`hosts/hydrogen.nix`: `nvidiaPackages.production` → `nvidiaPackages.legacy_580`.**
   The 2026-08-13 nightly moved the Quadro P4200 (Pascal, GP104GLM) onto 595.71.05,
