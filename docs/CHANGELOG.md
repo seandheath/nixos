@@ -26,6 +26,32 @@
     is watching are precisely the ones this does not really cover. Both need an
     off-box channel (ntfy on hydrogen is the obvious candidate); deliberately deferred.
 
+### Fixed (first real catch by the nightly-failure notifier)
+- **`hosts/sulfur.nix`: force `SendSIGKILL` on `asus-shutdown.service`.** The 2026-08-13
+  nightly built and switched cleanly, then exited 4 because a unit would not restart.
+  asusctl 6.3.x ships `asus-shutdown`, which traps SIGTERM and logs *"Deferring exit
+  until deferred shutdown apply reaches a safe completion point"* — with upstream's
+  `SendSIGKILL=no` and `TimeoutStopSec=45`, systemd has no way to reap it if that point
+  never arrives. It burned 45 s in `stop-sigterm`, 45 s in `final-sigterm`, entered
+  failed mode, and left the old PID running against the old store path for 24 h. The
+  switch only needed to restart the unit because asusctl's store path moved, which on an
+  unstable channel is most nights.
+  - `restartIfChanged = false` does **not** avoid this: the unit is
+    `PartOf=asusd.service`, so an asusd restart propagates a stop no matter what we ask
+    for. The fix has to sit at the kill layer — `SendSIGKILL = mkForce true` plus
+    `TimeoutStopSec = 10`, which NixOS emits as a drop-in over the packaged unit.
+  - SIGKILLing a *shutdown* handler mid-rebuild costs nothing: at real shutdown systemd
+    kills it anyway once its own timeout expires, and asusd re-applies state on start.
+- **`hosts/sulfur.nix`: `ExecCondition` on `dock-monitors-hotplug.service`.** The udev
+  rule fires on every DRM change event, including those with no graphical session behind
+  them — at boot before login, and during a switch that restarts the GNOME session under
+  us. The script then reaches a dead session bus (`Remote peer disconnected`, or a
+  missing `/run/user/1000/bus`) and exits 1, which with `startLimitBurst = 1` leaves a
+  failed unit. That is not just journal noise: `switch-to-configuration` counts failed
+  units, so it turned an otherwise clean nightly into a failure report. A failing
+  `ExecCondition` marks the unit *skipped* rather than failed, so a genuine DBus error
+  inside a live session still surfaces.
+
 ### Fixed (unstable fallout on sulfur — the laptop would not boot)
 - **`hardware/sulfur.nix`: `pcie_aspm=off`.** 26.11 (Linux 6.18.44) would not boot: the
   Realtek RTS525A card reader at `0000:2c:00.0` stormed correctable PCIe AER errors —

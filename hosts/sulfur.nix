@@ -117,6 +117,26 @@ in
   # service, and defining the option is now a hard assertion failure.
   services.asusd.enable = true;
 
+  # asusctl 6.3.x added asus-shutdown, a handler that traps SIGTERM and defers exit
+  # "until deferred shutdown apply reaches a safe completion point". Upstream ships it
+  # with SendSIGKILL=no and TimeoutStopSec=45, so if that point is never reached
+  # systemd has no way to reap it: stop-sigterm times out, final-sigterm times out,
+  # the unit enters failed mode, and the old PID keeps running against the old store
+  # path. That is exactly what broke the 2026-08-13 nightly rebuild -- the switch only
+  # needed to restart the unit (asusctl's store path changed), spent 90s failing to
+  # stop it, and handed nixos-rebuild a non-zero exit. It recurs on every rebuild that
+  # moves that path, which on an unstable channel is most of them.
+  #
+  # restartIfChanged = false does NOT avoid this: the unit is PartOf=asusd.service, so
+  # an asusd restart propagates a stop regardless of what we ask for. The fix has to
+  # be at the kill layer. Letting systemd SIGKILL a *shutdown* handler during a
+  # rebuild costs nothing -- at real shutdown systemd kills it anyway once its own
+  # timeout expires, and asusd re-applies state on next start.
+  systemd.services.asus-shutdown.serviceConfig = {
+    SendSIGKILL = lib.mkForce true;
+    TimeoutStopSec = lib.mkForce 10;
+  };
+
   services.supergfxd.enable = true;
   systemd.services.supergfxd.path = [ pkgs.pciutils ];
 
@@ -243,6 +263,19 @@ in
     after = [ "graphical.target" ];
     serviceConfig = {
       Type = "oneshot";
+      # No session bus, nothing to reconfigure. The udev rule fires on every DRM
+      # change event including those with no graphical session behind them -- at boot
+      # before login, and during a nixos-rebuild switch that restarts the GNOME
+      # session under us. In both cases the script reaches Mutter's DBus name and
+      # gets "Remote peer disconnected" or a missing /run/user/1000/bus, exits 1, and
+      # (with startLimitBurst = 1 below) leaves a failed unit behind. A failed unit
+      # here is not merely noise: switch-to-configuration counts it, so it turns an
+      # otherwise clean nightly rebuild into a failure report.
+      #
+      # ExecCondition is the right lever rather than swallowing the error in the
+      # script: a non-zero condition marks the unit skipped, not failed, so a genuine
+      # DBus error during a real session still surfaces as a failure.
+      ExecCondition = "${pkgs.coreutils}/bin/test -S /run/user/1000/bus";
       # Wait for Mutter to detect and enumerate new displays
       ExecStartPre = "${pkgs.coreutils}/bin/sleep 5";
       ExecStart = "${dock-monitors.pythonWithDbus}/bin/python3 ${dock-monitors.script}";
