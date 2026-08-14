@@ -92,10 +92,17 @@
         }
       ];
 
+      # A host has a disk-config only once the installer has generated one; the hosts
+      # still carried by a hand-written hardware/<host>.nix simply have no file here.
+      diskConfigFor = hostName:
+        nixpkgs.lib.optional (builtins.pathExists (./disk-config + "/${hostName}.nix"))
+          (./disk-config + "/${hostName}.nix");
+
       mkHost = { hostName, extraModules ? [ ] }: nixpkgs.lib.nixosSystem {
         inherit system;
         specialArgs = { inherit inputs; };
-        modules = [ ./hosts/${hostName}.nix ] ++ extraModules ++ commonModules;
+        modules = [ ./hosts/${hostName}.nix ]
+          ++ diskConfigFor hostName ++ extraModules ++ commonModules;
       };
 
       # The kids' laptops. modules/family/profile.nix derives the username, WireGuard peer
@@ -126,7 +133,7 @@
           ./modules/family/profile.nix
           ./hardware/${hostName}.nix
           { networking.hostName = hostName; }
-        ] ++ extraModules ++ commonModules;
+        ] ++ diskConfigFor hostName ++ extraModules ++ commonModules;
       }) familyHosts;
     in {
       nixosConfigurations = hosts;

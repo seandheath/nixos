@@ -103,11 +103,13 @@ in
       description = "Btrfs swapfile size on @swap. Size it for RAM if hibernating.";
     };
 
-    # One file for every LUKS volume on the host: cryptsetup is handed the same
-    # passphrase for each, which is what lets systemd unlock them from one prompt.
+    # Read only by `disko --mode format`, never by the booted system, and never written
+    # into boot.initrd.luks. Every LUKS volume on the host is formatted from this one
+    # file, so a single passphrase opens them all and systemd prompts once at boot.
+    # The installer creates it; set null to be prompted per volume instead.
     passwordFile = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
-      default = null;
+      default = "/tmp/nixos-install/luks.key";
       description = "Format-time passphrase file. null prompts interactively.";
     };
 

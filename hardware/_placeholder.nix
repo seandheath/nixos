@@ -8,22 +8,22 @@
 
   # Every host rebuilds from the repo (modules/auto-update.nix), so an installed machine
   # still on the placeholder switches to these dummy filesystems and dies at the next
-  # boot. The labels below match what install.sh formats, which keeps that survivable --
-  # this says out loud that it is still a dummy.
-  warnings = [
-    ''
-      ${config.networking.hostName}: hardware/${config.networking.hostName}.nix is still the
-      placeholder. Commit this machine's nixos-generate-config output over it.
-    ''
-  ];
+  # boot. Once disk-config/<host>.nix exists, disko owns the mounts and both the dummies
+  # and the warning go away.
+  warnings = lib.optional (!config.fleet.disk.enable) ''
+    ${config.networking.hostName}: hardware/${config.networking.hostName}.nix is still the
+    placeholder. Commit this machine's nixos-generate-config output over it.
+  '';
 
   boot.initrd.availableKernelModules = [ "xhci_pci" "ahci" "nvme" "usbhid" "usb_storage" "sd_mod" ];
 
-  fileSystems."/" = { device = "/dev/disk/by-label/nixos"; fsType = "ext4"; };
-  fileSystems."/boot" = {
-    device = "/dev/disk/by-label/BOOT";
-    fsType = "vfat";
-    options = [ "fmask=0077" "dmask=0077" ];
+  fileSystems = lib.mkIf (!config.fleet.disk.enable) {
+    "/" = { device = "/dev/disk/by-label/nixos"; fsType = "ext4"; };
+    "/boot" = {
+      device = "/dev/disk/by-label/BOOT";
+      fsType = "vfat";
+      options = [ "fmask=0077" "dmask=0077" ];
+    };
   };
 
   networking.useDHCP = lib.mkDefault true;
