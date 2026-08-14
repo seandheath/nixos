@@ -1,41 +1,21 @@
 { pkgs, toolPkgs ? pkgs, defaultName ? null, defaultServer ? null }:
-# toolPkgs supplies the two things the launcher RUNS (portablemc and the JVM), as
-# opposed to the payload it runs them against. modules/minecraft-client.nix passes the
-# stable nixpkgs here on every host, so these stay identical fleet-wide even though the
-# laptops build from nixos-unstable -- see that module's comment for why.
-# minecraft-client -- start Minecraft from the pinned payload, offline, as a named
-# player.
+# minecraft-client -- start Minecraft from the pinned payload, offline, as a named player.
 #
 #   minecraft-client [--name NAME] [--game-dir DIR] [--server HOST[:PORT]] [-- ARGS...]
 #
-# This is the whole launcher. There is no GUI, no instance to create, no account to log
-# in to and no state that Nix does not produce: the game itself comes from
-# packages/minecraft-client (every jar and asset pinned by hash), the mods from
-# packages/minecraft-client-mods.nix, and portablemc turns the two into a JVM command
-# line. What is left in the game directory afterwards is exactly the state that belongs
-# to a player: their options, their mod configs, their screenshots.
+# The whole launcher: no GUI, no instance, no account, and no state Nix does not produce.
+# What is left in the game directory afterwards is exactly what belongs to a player --
+# options, mod configs, screenshots.
 #
-# WHY portablemc AND NOT A BARE `java -cp`. The classpath, the argument list and the
-# rule evaluation that decides which of the 115 libraries this platform actually wants
-# are Mojang's business and they change between releases. portablemc reads all of that
-# out of the pinned metadata; hand-transcribing it (as packages/fabric-server.nix does
-# for the server, where it is a main class and eight jars) would mean re-deriving the
-# client launch contract on every Minecraft bump.
+# portablemc rather than a bare `java -cp` because the classpath, argument list and the rule
+# evaluation deciding which of the 115 libraries this platform wants are Mojang's business
+# and change between releases; portablemc reads all of it out of the pinned metadata.
 #
-# WHY IT NEVER TOUCHES THE NETWORK. Every file is already in the payload at the right
-# size, so nothing is scheduled for download; --fetch-exclude-all then removes the one
-# call that remained, portablemc's re-validation of the version metadata against Mojang's
-# manifest. Verified with an empty game directory inside a network namespace:
+# It never touches the network: every file is already present at the right size, so nothing
+# is scheduled for download, and --fetch-exclude-all removes the manifest re-validation that
+# remained. Verify with an empty game dir in a network namespace:
 #
 #   unshare -rn minecraft-client --name X --game-dir /tmp/mc --offline -- --dry
-#
-# resolves fabric-loader-0.19.3-1.21.10 and the 1.21.10 it inherits from, verifies 78
-# libraries and 4403 assets, loads the JVM, and exits 0.
-#
-# Under 4.x this was a weaker claim: the manifest fetch still happened and merely fell
-# back to the local copy on failure, with --timeout bounding how long it could stall on a
-# network that accepts connections but never answers. 5.x can decline to make the call at
-# all, so the guarantee is now structural rather than a bounded wait.
 #
 # PORTABLEMC 5.x IS A RUST REWRITE. Comments here used to cite Python source locations;
 # none of them survive, so what is recorded below is observed behaviour of 5.0.3 instead.
@@ -101,18 +81,11 @@ pkgs.writeShellApplication {
 
     : "''${gameDir:=''${XDG_DATA_HOME:-$HOME/.local/share}/minecraft/$name}"
 
-    # ---------------------------------------------------------------------
-    # The offline player UUID, computed the way the game does it:
-    # UUID.nameUUIDFromBytes("OfflinePlayer:<name>") -- an MD5 digest with the version
-    # (3) and variant (RFC 4122) bits forced.
-    #
-    # An offline-mode server derives this itself from the name it is given, so a
-    # character's inventory follows the NAME whatever we send here. portablemc's own
-    # offline session would invent a UUID from a private uuid5 namespace
-    # of its own, which is nobody's idea of this player; passing the
-    # real one keeps client-side identity (skin lookups, local worlds) consistent with
-    # the server's.
-    # ---------------------------------------------------------------------
+    # The offline UUID as the game computes it: nameUUIDFromBytes("OfflinePlayer:<name>"),
+    # an MD5 with the version and variant bits forced. The server derives this itself from
+    # the name, so inventory follows the NAME regardless -- but portablemc's own offline
+    # session would invent one from a private namespace, and passing the real one keeps
+    # client-side identity consistent.
     hex="$(printf '%s' "OfflinePlayer:$name" | md5sum | cut -d' ' -f1)"
     b6=$(( 0x''${hex:12:2} & 0x0f | 0x30 ))
     b8=$(( 0x''${hex:16:2} & 0x3f | 0x80 ))
@@ -121,18 +94,10 @@ pkgs.writeShellApplication {
 
     mkdir -p "$gameDir"
 
-    # ---------------------------------------------------------------------
-    # Point this player's mods at the Nix-managed jar set and seed the mod configs.
-    #
-    # Done on every launch rather than from a systemd unit: a unit only re-runs when
-    # something in the configuration changes, which used to leave a game directory
-    # created after the last rebuild silently unlinked. Here there is no window --
-    # whatever starts the game has already fixed it.
-    #
-    # CONSEQUENCE, deliberate: mods/ is a read-only store path, so nothing can install
-    # a mod into it at runtime. That is the trade for one list driving both machines;
-    # add mods in packages/minecraft-client-mods.nix instead.
-    # ---------------------------------------------------------------------
+    # On every launch rather than from a unit: a unit only re-runs when the configuration
+    # changes, which left a game directory created after the last rebuild silently unlinked.
+    # Consequence, deliberate: mods/ is a read-only store path, so nothing can install a mod
+    # at runtime. Add them in packages/minecraft-client-mods.nix.
     mkdir -p "$gameDir/config"
     for src in "$defaults"/*; do
       [ -e "$src" ] || continue
@@ -180,24 +145,14 @@ pkgs.writeShellApplication {
       esac
     fi
 
-    # --main-dir is the ONLY global option here; everything else belongs to `start` and
-    # portablemc rejects it before the subcommand. That split changed in 5.x, along with
-    # three flag names -- see the header.
+    # --main-dir is the ONLY global option; everything else belongs to `start`.
     #
-    # --mc-dir IS NOT OPTIONAL. In 5.x it defaults to --main-dir, and --main-dir is the
-    # read-only store payload, so leaving it off does not fall back to something harmless
-    # -- it points the running game at /nix/store. It is what keeps this player's
-    # options, saves and screenshots on writable disk.
+    # --mc-dir IS NOT OPTIONAL: it defaults to --main-dir, which is the read-only payload,
+    # so leaving it off points the running game at /nix/store.
     #
-    # NEITHER IS --bin-dir, and its help text will tell you otherwise. 5.0.3 documents it
-    # as "derived from the '--mc-dir' path", then gives the default as '<main-dir>/bin/'.
-    # The second one is the truth: with only --mc-dir set, extracting the LWJGL natives
-    # fails with
-    #     create dir: /nix/store/...-minecraft-client-1.21.10/bin/fabric-loader-...
-    #     I/O error: Read-only file system (os error 30)
-    # which is the loud failure the payload is designed to produce, but a failure all the
-    # same. Under 4.x the bin dir came off the work dir and this was free. Point it at the
-    # game directory to restore that.
+    # NEITHER IS --bin-dir, whatever its help text says. 5.0.3 documents it as derived from
+    # --mc-dir and then defaults it to <main-dir>/bin/; the second is the truth, so without
+    # it the LWJGL natives extract into the store and fail read-only.
     exec portablemc \
       --main-dir "$payload" \
       start "$version" \

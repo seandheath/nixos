@@ -1,25 +1,15 @@
 { pkgs }:
-# The Fabric client mod set for hydrogen's Minecraft server (see docs/minecraft.md).
+# The Fabric client mod set. One list, two machines: hydrogen's couch clients and sulfur's
+# desktop client both point mods/ here, so they cannot drift.
 #
-# One list, two machines: hydrogen's couch clients and sulfur's desktop client both
-# get their mods/ pointed at this directory by minecraft-client
-# (packages/minecraft-client-launcher.nix), so they cannot drift apart.
+# Most are client-side, but the `server = true` entries are installed on the server too.
+# None add registry entries, so the "any unmodded phone can join over the tunnel" guarantee
+# holds -- test it rather than assuming it.
 #
-# MOST MODS HERE ARE CLIENT-SIDE, but not all: since the server gained Fabric on
-# 2026-08-04, the `server = true` entries below are installed on it as well
-# (modules/minecraft-server.nix). None of them add registry entries, so the
-# "any unmodded phone can join over the tunnel" guarantee still holds -- see the
-# header of modules/minecraft-server.nix, and test it rather than assuming it.
-#
-# TO ADD OR UPDATE A MOD:
-#   1. Find the version on Modrinth for loader=fabric, game_version=1.21.10.
-#   2. Add/edit an entry below. The hash is SRI-encoded sha512, which is exactly what
-#      the API already returns in files[].hashes.sha512 (hex -- convert it):
-#        curl -s https://api.modrinth.com/v2/version/<id> |
-#          jq -r '.files[0].hashes.sha512' |
-#          python3 -c 'import sys,base64,binascii; print("sha512-"+base64.b64encode(binascii.unhexlify(sys.stdin.read().strip())).decode())'
-#   3. Rebuild. Nothing else: minecraft-client re-points mods/ at the new store path
-#      on the next launch, on both machines.
+# TO ADD OR UPDATE: find the version on Modrinth for loader=fabric, game_version=1.21.10,
+# add an entry, rebuild. The hash is SRI sha512, which the API returns as hex:
+#   curl -s https://api.modrinth.com/v2/version/<id> | jq -r '.files[0].hashes.sha512' |
+#     python3 -c 'import sys,base64,binascii; print("sha512-"+base64.b64encode(binascii.unhexlify(sys.stdin.read().strip())).decode())'
 #
 # mcVersion below is asserted against pkgs.minecraft-server.version and against the
 # pinned client payload in modules/minecraft-client.nix, so a nixpkgs bump that moves
@@ -143,21 +133,14 @@ let
     }
 
     {
-      # Chest contents simply count as your inventory when crafting. No modifier key,
-      # no cache, nothing to press -- which is why it works on a gamepad, where
-      # Controlify has no Ctrl.
+      # Chest contents count as inventory when crafting, with no modifier key -- which is
+      # why it works on a gamepad, where Controlify has no Ctrl. Replaced Effortless
+      # Crafting, the client-only approximation used while the server was vanilla.
       #
-      # This REPLACED Effortless Crafting, which was the client-only approximation
-      # used while the server was vanilla. Since 1.21.2 container contents live
-      # server-side, so a client-only mod has to physically open each chest and shuffle
-      # items over the network, gated behind a held Ctrl. Running both would be asking
-      # two mods to mixin the same recipe book.
-      #
-      # Its Modrinth entry lists no dependencies; the jar disagrees, and the jar wins:
-      # fabric-api, recipebookaccess, yacl AND modmenu are all hard `depends`. Mod Menu
-      # is environment=client, which looked like it would break a dedicated server --
-      # it does not. Fabric loads client-env jars on a server as dependency candidates;
-      # verified by running this exact set (52 mods, "Done").
+      # Its Modrinth entry lists no dependencies; the jar disagrees and the jar wins --
+      # fabric-api, recipebookaccess, yacl AND modmenu are hard depends. Mod Menu being
+      # environment=client does not break a dedicated server: Fabric loads client-env jars
+      # as dependency candidates.
       pname = "nearby-crafting";
       server = true;
       version = "1.0.5";
@@ -185,20 +168,11 @@ let
     }
   ];
 
-  # ---------------------------------------------------------------------------
-  # Default mod configs, SEEDED ONCE into a game directory's config/ when the file
-  # is not already there (minecraft-client, on every launch, per player).
-  #
-  # Seed-once, never overwrite: these are starting points, and anything a player
-  # changes in Mod Menu afterwards is theirs to keep. Partial files are fine --
-  # Cloth Config deserializes into a default-constructed object, so unlisted fields
-  # keep the mod's own defaults.
-  # ---------------------------------------------------------------------------
-  # Empty for now: Nearby Crafting's defaults (8-block reach for both the player and
-  # the crafting table) need no adjustment, and unlike the client-only mod it replaced
-  # there is no modifier key to turn off. Kept because the seeding machinery in
-  # minecraft-client is the awkward part to re-derive, and the next mod that needs a
-  # non-default setting will want it.
+  # Seeded once into a game directory's config/ and never overwritten -- anything a player
+  # changes in Mod Menu is theirs to keep. Partial files are fine: Cloth Config deserializes
+  # into a default-constructed object, so unlisted fields keep the mod's defaults.
+  # Empty: Nearby Crafting's defaults need no adjustment. Kept because the seeding machinery
+  # is the awkward part to re-derive.
   configDefaults = pkgs.linkFarm "minecraft-client-mod-configs-${mcVersion}" [ ];
 
   serverMods = builtins.filter (m: m.server) mods;

@@ -1,44 +1,28 @@
 { pkgs }:
 
-# Ghidra 12.1 with the ReVa (Reverse Engineering Assistant) extension baked in.
+# Ghidra 12.1 with the ReVa extension baked in -- an MCP server inside Ghidra exposing
+# decompilation and rename tools over streamable HTTP on localhost:8080.
+# Upstream: https://github.com/cyberkaida/reverse-engineering-assistant
 #
-# ReVa is a Ghidra extension that runs an MCP server inside Ghidra, exposing
-# decompilation/xref/rename/etc. as LLM tools over streamable HTTP (localhost:8080
-# by default). Upstream: https://github.com/cyberkaida/reverse-engineering-assistant
+# This package exists because ReVa ships one prebuilt zip per exact Ghidra release and
+# Ghidra rejects an extension whose version does not match the running application. v7.3.0
+# covers up to 12.1 and has no asset for the 12.1.2 nixpkgs ships, so stock ghidra-bin would
+# leave the extension unloadable -- do NOT read the version numbers and conclude this file
+# is obsolete. Revisit when ReVa publishes a matching asset. Bump BOTH versions together.
 #
-# Why this package exists at all:
-#   ReVa ships its extension zip built against ONE exact Ghidra release, and this
-#   deployment needs the Ghidra that matches the ReVa below -- 12.1, not merely
-#   ">= 12.0". The extension is a hard version match, not a floor.
+# Overrides ghidra-bin, not ghidra: ghidra-bin is a plain fetchzip of the NSA's release
+# build, so a bump is a URL and hash edit, while the source build carries a full gradle
+# lock. nixpkgs' withExtensions framework is deliberately unused -- it relies on a patch
+# that only exists on the source build.
 #
-#   The original reason was different and is now obsolete: nixos-25.11 pinned Ghidra
-#   11.4.2 in both `ghidra` and `ghidra-bin`, below ReVa's 12.0 minimum. As of
-#   2026-08-11 nixos-unstable ships ghidra-bin 12.1.2, which clears that floor -- so
-#   do NOT read the old rationale and conclude this file can be deleted. It cannot:
-#   ReVa 7.3.0 publishes no 12.1.2 asset, so stock ghidra-bin would leave the
-#   extension unloadable. Revisit when ReVa releases an asset matching whatever
-#   ghidra-bin has moved to, then drop this file and use the stock package.
-#
-# Why override `ghidra-bin` rather than `ghidra`:
-#   `ghidra-bin` is a plain fetchzip of the NSA's release build, so a version bump
-#   is a URL + hash edit. The source-built `ghidra` carries a full gradle dependency
-#   lock (deps.json) that would have to be regenerated. nixpkgs' extension framework
-#   (`ghidra.withExtensions` / `buildGhidraExtension`) is deliberately *not* used: it
-#   relies on nixpkgs' NIX_GHIDRAHOME patch, which only exists on the source build.
-#
-# Why Ghidra 12.1 specifically, and not 12.1.2 (what nixpkgs master has):
-#   Ghidra refuses to load an extension whose extension.properties `version=` does
-#   not match the running application version. ReVa ships one prebuilt zip per
-#   supported Ghidra release; v7.3.0 covers 12.0, 12.0.1-12.0.4 and 12.1 — there is
-#   no 12.1.2 asset. 12.1 is therefore the newest Ghidra with an exact-match ReVa
-#   build. Bump BOTH versions together, or the extension will silently be rejected.
+# NOTE the URL below embeds a second, independent date (20260613) that does NOT track
+# ghidraDate; a version bump means editing three strings, not two.
 let
   ghidraVersion = "12.1";
   ghidraDate = "20260513";
 
   revaVersion = "7.3.0";
-  # Prebuilt extension: extension.properties + Module.manifest + lib/*.jar. No
-  # compilation, so this is fetched as an opaque zip and unpacked at install time.
+  # Prebuilt: no compilation, so this is an opaque zip unpacked at install time.
   revaSrc = pkgs.fetchurl {
     url = "https://github.com/cyberkaida/reverse-engineering-assistant/releases/download/v${revaVersion}/ghidra_${ghidraVersion}_PUBLIC_20260613_reverse-engineering-assistant.zip";
     hash = "sha256-rCYNj7g5Fos4G2Jgj9mAIuXQS5jkhjn3V0Mqj0JAa0U=";

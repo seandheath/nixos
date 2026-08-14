@@ -1,29 +1,18 @@
 { pkgs }:
-# Every byte the Minecraft client needs to run, pinned by hash and laid out exactly the
-# way portablemc expects to find an installation ("main dir", the thing normally called
-# .minecraft/).
+# Every byte the Minecraft client needs, pinned by hash and laid out the way portablemc
+# expects a "main dir" (what is normally called .minecraft/).
 #
-# WHY THIS EXISTS. Prism -- and any other launcher -- keeps this payload as undeclared
-# state and refetches it from Mojang whenever it is missing. That makes a restore
-# depend on Mojang still serving 1.21.10 and on a cached Microsoft account. Pinning it
-# means the client can be rebuilt from the flake alone, and its closure can be archived
-# to hydrogen (modules/minecraft-client.nix) and restored from there with no network at
-# all.
+# Prism and every other launcher keeps this as undeclared state and refetches it from
+# Mojang, which makes a restore depend on Mojang still serving 1.21.10. Pinning it means the
+# client rebuilds from the flake alone, and its closure can be archived to hydrogen and
+# restored with no network at all.
 #
-# HOW PORTABLEMC IS MADE TO NEVER DOWNLOAD. It skips any file already present at the
-# expected size, so with the whole payload pre-placed its download list comes out empty.
-# The launcher additionally passes --fetch-exclude-all, which drops the version-manifest
-# re-validation that would otherwise still go out. Two consequences shape the layout
-# below:
-#
-#   - the main dir is only ever READ, so it can be this store path directly. Everything
-#     portablemc writes -- the extracted natives, any cached metadata -- is directed at
-#     the game directory by the launcher's --mc-dir/--bin-dir, which is per-player state.
-#     NOTE that --bin-dir defaults off --main-dir, not --mc-dir, despite what its help
-#     text says; without it, natives extraction hits this store path. See the launcher.
-#   - a missing or wrong-sized file does not silently redownload into a read-only store
-#     path, it fails the launch. That is the failure mode we want: a payload gap is a
-#     packaging bug, not something to paper over at runtime.
+# portablemc skips any file already present at the expected size, so with the payload
+# pre-placed its download list comes out empty. Two consequences shape the layout: the main
+# dir is only ever READ, so it can be this store path directly (everything written goes to
+# --mc-dir/--bin-dir, which is per-player state); and a missing or wrong-sized file fails
+# the launch instead of silently redownloading, which is the failure mode we want -- a
+# payload gap is a packaging bug.
 #
 # TO UPDATE: ./update.sh <mc-version>, then rebuild and paste the assets hash it
 # reports back into assetObjects below. The Fabric side comes from
@@ -64,19 +53,10 @@ let
     inherit (lock.logConfig) url hash;
   };
 
-  # ---------------------------------------------------------------------------
-  # The ~4.6k asset objects (sounds, languages, panorama, icons): 424 MiB.
-  #
-  # ONE fixed-output derivation rather than a fetchurl per object. The objects are
-  # content-addressed upstream -- the URL ends in the file's own sha1 -- so the tree is
-  # bit-identical on every fetch and a single recursive output hash pins the lot. Four
-  # thousand individual fetchurls would pin it just as well but would mean four thousand
-  # store paths and an eval to match.
-  #
-  # ASSETS HASH: when the asset index changes (a new Minecraft version, essentially),
-  # this hash changes with it. Build once with the old hash, and Nix prints the correct
-  # one in the mismatch error.
-  # ---------------------------------------------------------------------------
+  # ~4.6k asset objects, 424 MiB, as ONE fixed-output derivation rather than a fetchurl
+  # each: the objects are content-addressed upstream, so the tree is bit-identical every
+  # fetch and one recursive hash pins the lot without 4000 store paths. The hash changes
+  # with the asset index -- build once with the old one and Nix prints the new one.
   assetObjects = pkgs.stdenv.mkDerivation {
     pname = "minecraft-assets";
     version = assetIndexId;
@@ -139,28 +119,15 @@ let
     outputHash = "sha256-sEAQZbWfL8ChGOc+opvlShDgmyxpZBHzMMDcBxYr1mk=";
   };
 
-  # ---------------------------------------------------------------------------
-  # The Fabric launch profile, GENERATED rather than fetched.
+  # The Fabric launch profile, GENERATED rather than fetched: meta.fabricmc.net stamps
+  # releaseTime and time with the moment of the request, so the same URL returns different
+  # bytes every time and there is no hash to pin. Generating it also reuses the library list
+  # packages/fabric-server.nix pins rather than keeping a second copy.
   #
-  # meta.fabricmc.net's /profile/json endpoint stamps `releaseTime` and `time` with the
-  # moment of the request, so the same URL returns different bytes every time and there
-  # is no hash to pin. Writing it here also means the library list is the one
-  # packages/fabric-server.nix already pins, instead of a second copy that can drift.
-  #
-  # Transcribed from
-  #   https://meta.fabricmc.net/v2/versions/loader/1.21.10/0.19.3/profile/json
-  # The only difference from the server profile is the main class -- KnotClient rather
-  # than KnotServer -- and the -DFabricMcEmu argument, which tells Fabric which class
-  # the game "really" started from so crash reports and mods that inspect the stack see
-  # net.minecraft.client.main.Main. Its leading and trailing spaces are upstream's and
-  # are load-bearing; it is one argv element, not three.
-  #
-  # `inheritsFrom` is what makes portablemc load the vanilla metadata underneath this
-  # one and merge the two -- verified in 5.0.3, which reports loading both
-  # fabric-loader-0.19.3-1.21.10 and the 1.21.10 beneath it. The libraries use the
-  # {name, url} repo-root form, which resolves to <url><maven path> -- and since every
-  # one of those paths is populated below, nothing is ever fetched from it.
-  # ---------------------------------------------------------------------------
+  # Differs from the server profile only in the main class and the -DFabricMcEmu argument,
+  # whose leading and trailing spaces are upstream's and load-bearing -- it is one argv
+  # element, not three. `inheritsFrom` is what makes portablemc merge the vanilla metadata
+  # underneath this one.
   fabricProfile = pkgs.writeText "${versionId}.json" (builtins.toJSON {
     id = versionId;
     inheritsFrom = mcVersion;

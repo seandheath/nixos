@@ -1,29 +1,17 @@
 { pkgs }:
 
-# qwen-code, QwenLM's fork of gemini-cli, at the latest upstream stable release.
-# Upstream: https://github.com/QwenLM/qwen-code
+# qwen-code, QwenLM's fork of gemini-cli. Upstream: https://github.com/QwenLM/qwen-code
 #
-# Why this package exists rather than `pkgs.qwen-code`:
-#   nixpkgs is BEHIND upstream, and this deployment needs the newer settings schema.
-#   Checked 2026-08-11 on nixos-unstable: pkgs.qwen-code is 0.16.0, this is 0.21.1.
-#   (The gap used to be far worse -- nixos-25.11 shipped 0.2.2, which predated the
-#   entire schema: no `modelProviders`, no `permissions`, no `context.fileName`, only
-#   the old OPENAI_BASE_URL/OPENAI_MODEL env vars. 0.21.1 has `modelProviders` +
-#   `security.auth.selectedType` + `permissions.allow` + `mcpServers.*.httpUrl`, all
-#   of which modules/qwen-code.nix uses.)
+# Exists because nixpkgs is BEHIND upstream and modules/qwen-code.nix needs the newer
+# settings schema (modelProviders, permissions, context.fileName, mcpServers.*.httpUrl).
+# DELETE THIS FILE once pkgs.qwen-code reaches the version below or later -- compare against
+# `version` in this file, not against any number in this comment, and note the direction:
+# nixpkgs merely being newer than some older release is not the bar.
 #
-#   DELETE THIS FILE when `pkgs.qwen-code` reaches 0.21.1 or later -- compare against
-#   the version below, not against any number written in this comment. Note the
-#   direction: nixpkgs being merely NEWER than 0.2.2 is not the bar, and reading a
-#   stale comment that way would downgrade the machine.
-#
-# Why the npm registry tarball rather than buildNpmPackage on the GitHub source:
-#   the published npm package is already fully bundled by upstream's esbuild step —
-#   it declares *zero* runtime dependencies, contains no native .node modules, and
-#   ships its own vendored ripgrep. There is nothing left for npm to resolve, so
-#   buildNpmPackage would only add an npmDepsHash to churn on every version bump
-#   (and nixpkgs' expression already has to patch node-pty/keytar out of the
-#   lockfile to build at all). This is a plain unpack-and-wrap instead.
+# The npm registry tarball rather than buildNpmPackage on the source: the published package
+# is already bundled by upstream's esbuild step, declares zero runtime dependencies, has no
+# native modules and vendors its own ripgrep. There is nothing for npm to resolve, so
+# buildNpmPackage would only add an npmDepsHash to churn on every bump.
 let
   version = "0.21.1";
 in

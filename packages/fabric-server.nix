@@ -1,33 +1,20 @@
 { pkgs }:
-# Fabric Loader as a drop-in replacement for the vanilla Minecraft server.
+# Fabric Loader as a drop-in replacement for the vanilla Minecraft server. Exposes
+# bin/minecraft-server taking the same jvmOpts as pkgs.minecraft-server, so
+# services.minecraft-server.package points straight at it and the nixpkgs module keeps
+# working untouched.
 #
-# Exposes bin/minecraft-server taking the same jvmOpts arguments as
-# pkgs.minecraft-server, so services.minecraft-server.package can point straight at
-# it and the whole nixpkgs module (declarative server.properties, the stdin FIFO the
-# borg flush writes to, the systemd hardening) keeps working untouched.
+# Needed because since 1.21.2 the recipe list and container contents are server-side, so no
+# client-only mod can reach them -- see modules/minecraft-server.nix.
 #
-# WHY THIS EXISTS. The server was deliberately the stock jar with no loader (see the
-# header of modules/minecraft-server.nix). Two things forced the change, both with
-# the same root cause -- since Minecraft 1.21.2 the recipe list and container
-# contents live server-side and are not sent to clients, so no client-only mod can
-# reach them:
-#   - no recipe viewer works (JEI says so in chat on every join; EMI stopped at
-#     1.21.1; REI's fallback is broken by the Unlock All Recipes datapack), and
-#   - crafting from nearby chests can only be approximated client-side, via a
-#     modifier key the couch gamepads do not have.
-# Both are solved by a mod ON THE SERVER, and only there.
+# NOT the installer jar from meta.fabricmc.net's /server/jar endpoint: that downloads the
+# game and its libraries into the working directory on first run, which is neither pure nor
+# offline-safe. The launch profile is transcribed here instead -- a main class and eight
+# jars, each fetched by URL and hash.
 #
-# HOW IT IS BUILT. Not the installer jar from meta.fabricmc.net's /server/jar
-# endpoint -- that downloads the game and its libraries into the working directory on
-# first run, which is neither pure nor offline-safe. Instead the launch profile from
-#     https://meta.fabricmc.net/v2/versions/loader/<mc>/<loader>/server/json
-# is transcribed here: a main class and eight jars, each fetched by URL and hash. The
-# game jar comes from pkgs.minecraft-server, which is already pinned by nixpkgs.
-#
-# TO UPDATE (new Minecraft or a new loader):
-#   curl -s https://meta.fabricmc.net/v2/versions/loader/<mc>/<loader>/server/json
-# and re-transcribe mainClass + libraries. Maven coordinates map to URLs as
-# <url><group with / instead of .>/<artifact>/<version>/<artifact>-<version>.jar.
+# TO UPDATE: curl https://meta.fabricmc.net/v2/versions/loader/<mc>/<loader>/server/json and
+# re-transcribe mainClass + libraries. Maven coordinates map to
+# <url><group with / for .>/<artifact>/<version>/<artifact>-<version>.jar.
 let
   mcVersion = "1.21.10";
   loaderVersion = "0.19.3";
