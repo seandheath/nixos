@@ -7,6 +7,7 @@
 final: prev: {
   ghidra-reva = import ./ghidra-reva.nix { pkgs = final; };
   imjtool = import ./imjtool.nix { pkgs = final; };
+  installer = import ./installer.nix { pkgs = final; };
   jackify = import ./jackify.nix { pkgs = final; };
   qwen-code = import ./qwen-code.nix { pkgs = final; };
   re-container = import ./re-container.nix { pkgs = final; };

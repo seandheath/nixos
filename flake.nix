@@ -146,11 +146,14 @@
 
       # `nix flake check` builds every host, so a change is verified against the five
       # machines you are not sitting at before it is committed.
+      # checks is hosts-only by default, so the installer is added explicitly -- otherwise
+      # a build regression in it goes unnoticed until someone needs to install a machine.
       checks.${system} =
-        nixpkgs.lib.mapAttrs (_: h: h.config.system.build.toplevel) hosts;
+        nixpkgs.lib.mapAttrs (_: h: h.config.system.build.toplevel) hosts
+        // { inherit (pkgs) installer; };
 
       packages.${system} = {
-        inherit (pkgs) ghidra-reva imjtool jackify qwen-code re-container;
+        inherit (pkgs) ghidra-reva imjtool installer jackify qwen-code re-container;
       };
 
       devShells.${system}.default = pkgs.mkShell {
