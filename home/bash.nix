@@ -47,39 +47,52 @@
           srm -rf "$dir"
       }
       
-      # Pick the host to build for: fzf-choose on the generic "nixos" installer
-      # image, otherwise the current machine.
+      # The fleet flake. nr/nb build from here, not from the local checkout, so what a
+      # host runs is always something that was pushed -- same source the nightly uses.
+      # To test uncommitted work, run nixos-rebuild against the checkout directly:
+      #   sudo nixos-rebuild switch --flake ~/nixos#$HOSTNAME
+      FLAKE="github:seandheath/nixos"
+
+      # Pick the host to build for: fzf-choose on the generic "nixos" installer image,
+      # otherwise the current machine.
       _nix_target_host() {
         if [[ "$HOSTNAME" == "nixos" ]]; then
-          ls -1 $HOME/nixos/hosts | sed 's/\.nix$//' | fzf
+          nix eval --raw --apply 'c: builtins.concatStringsSep "\n" (builtins.attrNames c)' \
+            "$FLAKE#nixosConfigurations" | fzf
         else
           echo "$HOSTNAME"
         fi
       }
 
-      # nr: deploy the current config against the pinned flake.lock. Does NOT bump
-      # inputs -- nixpkgs/security updates are handled nightly by system.autoUpgrade
-      # (modules/auto-update.nix). Use `nu` when you deliberately want to advance
-      # the lock.
-      nr() {
-        local target_host=$(_nix_target_host)
-        if [[ -n "$target_host" ]]; then
-          sudo nixos-rebuild switch --no-write-lock-file --flake $HOME/nixos#"$target_host"
-        fi
+      # --refresh is load-bearing: nix caches a github: ref for tarball-ttl (1h), so
+      # without it an nr straight after a push rebuilds the previous commit.
+      _nix_rebuild() {
+        local op="$1" target_host
+        target_host=$(_nix_target_host) || return 1
+        [[ -n "$target_host" ]] || return 1
+        sudo nixos-rebuild "$op" --refresh --flake "$FLAKE#$target_host"
       }
 
-      # nb: same as nr but stage for next boot (kernel/bootloader changes).
-      nb() {
-        local target_host=$(_nix_target_host)
-        if [[ -n "$target_host" ]]; then
-          sudo nixos-rebuild boot --no-write-lock-file --flake $HOME/nixos#"$target_host"
-        fi
-      }
+      # nr: switch now. nb: stage for next boot (kernel/bootloader changes). Neither
+      # bumps inputs -- security updates arrive nightly via system.autoUpgrade.
+      nr() { _nix_rebuild switch; }
+      nb() { _nix_rebuild boot; }
 
-      # nu: deliberately bump ALL flake inputs (nixpkgs + home-manager + ...),
-      # rewriting flake.lock, then switch. Commit the resulting lock change.
+      # nu: deliberately bump every flake input. The lock has to reach the remote before
+      # nr can build it, so this commits and pushes rather than leaving a local change
+      # nothing will pick up. Refuses to run with anything else uncommitted, so it cannot
+      # sweep up work in progress.
       nu() {
-        nix flake update --flake $HOME/nixos && nr
+        local repo="$HOME/nixos"
+        if [[ -n "$(git -C "$repo" status --porcelain | grep -v '^.. flake.lock$')" ]]; then
+          echo "nu: $repo has uncommitted changes other than flake.lock" >&2
+          return 1
+        fi
+        nix flake update --flake "$repo" || return 1
+        git -C "$repo" diff --quiet flake.lock && { echo "nu: inputs already current"; return 0; }
+        git -C "$repo" commit -q -m "chore(flake): update inputs" flake.lock || return 1
+        git -C "$repo" push -q || return 1
+        nr
       }
 
       pdfrasterize() (

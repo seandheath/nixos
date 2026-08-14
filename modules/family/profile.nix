@@ -112,16 +112,16 @@ in
       server = "mc.luckyobserver.com:25565";
     };
 
-    # System-wide rather than home-manager: the kids have no home-manager config. The flake
-    # path is absolute because a child's $HOME/nixos does not exist, and they need no read
-    # access to it -- nixos-rebuild runs under sudo.
+    # System-wide rather than home-manager: the kids have no home-manager config. Builds
+    # from the repo rather than a checkout, which on these machines is sheath's and may not
+    # exist or be current. --refresh because nix caches a github: ref for an hour.
     programs.bash.interactiveShellInit = ''
       alias ns="nix search nixpkgs"
       alias dmesg="dmesg --color=always"
 
       # No `nu`: bumping inputs from a child's laptop would rewrite the fleet's lock.
-      nr() { sudo nixos-rebuild switch --no-write-lock-file --flake /home/sheath/nixos#${hostName}; }
-      nb() { sudo nixos-rebuild boot   --no-write-lock-file --flake /home/sheath/nixos#${hostName}; }
+      nr() { sudo nixos-rebuild switch --refresh --flake github:seandheath/nixos#${hostName}; }
+      nb() { sudo nixos-rebuild boot   --refresh --flake github:seandheath/nixos#${hostName}; }
     '';
 
     networking.networkmanager.enable = true;
