@@ -153,7 +153,15 @@
         // { inherit (pkgs) installer; };
 
       packages.${system} = {
-        inherit (pkgs) ghidra-reva imjtool installer jackify qwen-code re-container;
+        inherit (pkgs)
+          ghidra-reva
+          imjtool
+          installer
+          jackify
+          minecraft-server-image
+          qwen-code
+          re-container
+          ;
       };
 
       devShells.${system}.default = pkgs.mkShell {

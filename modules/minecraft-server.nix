@@ -16,18 +16,10 @@ let
   datapacks = import ../packages/minecraft-datapacks.nix { inherit pkgs; };
   mods = import ../packages/minecraft-client-mods.nix { inherit pkgs; };
   fabricServer = import ../packages/fabric-server.nix { inherit pkgs; };
-  mcPin = import ../packages/minecraft-version.nix;
 in
 {
-  # Hold the jar at the fleet-wide pin rather than whatever the channel ships.
-  nixpkgs.overlays = [
-    (final: prev: {
-      minecraft-server = prev.minecraft-server.overrideAttrs (_: {
-        inherit (mcPin) version;
-        src = prev.fetchurl { inherit (mcPin) url sha1; };
-      });
-    })
-  ];
+  # The version pin moved to packages/default.nix, so it applies to the flake package set
+  # as well as to hosts. The assertion at the bottom of this file still enforces lockstep.
 
   services.minecraft-server = {
     enable = true;

@@ -9,6 +9,22 @@ final: prev: {
   imjtool = import ./imjtool.nix { pkgs = final; };
   installer = import ./installer.nix { pkgs = final; };
   jackify = import ./jackify.nix { pkgs = final; };
+
+  # Hold the jar at the fleet-wide pin rather than whatever the channel ships.
+  #
+  # This lived in modules/minecraft-server.nix, where it reached hydrogen but not the flake
+  # package set -- so `nix build .#minecraft-server-image` got the channel's 26.2, compiled
+  # for Java 25, against fabric-server's JDK 21: UnsupportedClassVersionError at runtime,
+  # past every assertion. packages/minecraft-version.nix says the version must "not be a
+  # property of whichever nixpkgs a host builds from", and this is where that holds.
+  minecraft-server = prev.minecraft-server.overrideAttrs (_: rec {
+    inherit (import ./minecraft-version.nix) version;
+    src = prev.fetchurl { inherit (import ./minecraft-version.nix) url sha1; };
+  });
+
+  # Takes only pkgs, so unlike the other Minecraft files it fits the overlay. The launcher
+  # and the control script both need it by name.
+  minecraft-server-image = import ./minecraft-server-image.nix { pkgs = final; };
   qwen-code = import ./qwen-code.nix { pkgs = final; };
   re-container = import ./re-container.nix { pkgs = final; };
 
