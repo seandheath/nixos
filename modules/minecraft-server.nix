@@ -1,49 +1,17 @@
 { pkgs, lib, ... }:
-# Persistent vanilla Minecraft server for hydrogen (see docs/minecraft.md).
+# Minecraft server for hydrogen (docs/minecraft.md). A system service, so the world is
+# joinable after a reboot with nobody logged in.
 #
-# Runs as a system service independent of any graphical session, so the world is
-# joinable after a reboot with nobody logged in. Two classes of client:
-#   - the couch clients (modules/minecraft-couch.nix) over 127.0.0.1, and
-#   - every other device over one of hydrogen's own WireGuard hubs
-#     (modules/family/vpn-hub.nix): the kids' laptops and phones on wgfam, sulfur on
-#     wgadm. As of 2026-08-06 the LAN is NOT one of them -- see SECURITY below.
+# Runs Fabric, not stock: since 1.21.2 the recipe list and container contents are
+# server-side and no longer sent to clients, so no recipe viewer and no chest-crafting mod
+# can work client-side. The unmodded-join guarantee still holds and is what to re-verify
+# after any change to the server mod set -- none of these mods add registry entries, so
+# Fabric API's registry sync has nothing to reject a vanilla client over.
 #
-# THE SERVER RUNS FABRIC (packages/fabric-server.nix), over the same vanilla jar.
-# It was deliberately loader-free until 2026-08-04; what changed and why:
-#
-# Since Minecraft 1.21.2 the recipe list and container contents live server-side and
-# are no longer sent to clients. Two things follow, and neither has a client-side
-# answer:
-#   - no recipe viewer works. JEI says so in chat on every join, EMI never shipped
-#     past 1.21.1, and REI's local fallback is broken by our own Unlock All Recipes
-#     datapack (shedaniel/RoughlyEnoughItems#2063, fix merged but unreleased).
-#   - crafting from nearby chests can only be approximated, by a client mod that
-#     opens each chest over the network behind a held Ctrl -- a key the couch
-#     gamepads do not have, so on a pad the feature was unreachable.
-# Both are solved by a mod ON THE SERVER, and only there. See docs/minecraft.md.
-#
-# THE UNMODDED-JOIN GUARANTEE STILL HOLDS, and is the thing to re-verify after any
-# change to the server mod set: a phone/laptop/tablet must still join over the
-# tunnel with nothing installed. It holds because none of the server mods add
-# registry entries (Nearby Crafting is 7 classes and touches no registry; JEI adds
-# no content), so Fabric API's registry sync -- the mechanism that can actually
-# reject a vanilla client -- has nothing to synchronise. Test it, do not assume it.
-#
-# Datapacks are unaffected either way: vanilla data-driven content out of
-# world/datapacks, no loader and no client install involved.
-#
-# SECURITY: online-mode=false means the server performs NO identity verification --
-# anything that can reach 25565 may claim any username, and a whitelist does not
-# help because it matches on names that are themselves unauthenticated. The
-# network boundary is therefore the authentication boundary.
-#
-# That boundary USED TO BE THE HOME LAN, which is a weak thing to authenticate with:
-# openFirewall is off here and the port was scoped to br0, so any device on the wifi --
-# a guest phone, anything that ever learned the passphrase -- could join as any child.
-# Since 2026-08-06 the port is scoped to hydrogen's own WireGuard interfaces instead
-# (hosts/hydrogen.nix, modules/family/vpn-hub.nix), so joining requires a private key
-# rather than proximity. Residual risk is unchanged and still accepted: one child can
-# log in as a sibling, because they are peers of equal standing on wgfam.
+# SECURITY: online-mode=false means NO identity verification -- anything reaching 25565 may
+# claim any username, and a whitelist matches on unauthenticated names. The network boundary
+# is the authentication boundary, and it is hydrogen's WireGuard interfaces, not the LAN.
+# Residual risk, accepted: one child can log in as a sibling.
 let
   datapacks = import ../packages/minecraft-datapacks.nix { inherit pkgs; };
   mods = import ../packages/minecraft-client-mods.nix { inherit pkgs; };
@@ -51,10 +19,7 @@ let
   mcPin = import ../packages/minecraft-version.nix;
 in
 {
-  # Hold the vanilla jar at the fleet-wide pin rather than whatever this host's channel
-  # ships. The version, url and sha1 all live in packages/minecraft-version.nix, which
-  # is also what the client side asserts against -- see that file's header for why the
-  # number cannot come from pkgs any more.
+  # Hold the jar at the fleet-wide pin rather than whatever the channel ships.
   nixpkgs.overlays = [
     (final: prev: {
       minecraft-server = prev.minecraft-server.overrideAttrs (_: {
@@ -68,26 +33,14 @@ in
     enable = true;
     eula = true;
 
-    # Fabric Loader over the same vanilla jar (packages/fabric-server.nix), NOT the
-    # stock package. See the header for why the server stopped being loader-free.
     package = fabricServer;
-
-    # Keep server.properties in Nix rather than letting the server rewrite it.
-    # The module backs up any pre-existing stateful file as .stateful on the
-    # first declarative switch.
     declarative = true;
-
-    # NOT openFirewall -- that would open 25565 globally. See the header.
+    # NOT openFirewall: that opens 25565 globally. See the header.
     openFirewall = false;
-
-    # Root SSD (~400G free after the 2026-07 immich migration). Included in
-    # backupPaths in modules/backup.nix; the borg jobs flush the world through
-    # /run/minecraft-server.stdin first so archives aren't torn mid-save.
     dataDir = "/var/lib/minecraft";
 
-    # 31 GiB installed. Budget: 6G server + 4x3G clients + desktop/services.
-    # G1 with a bounded pause target -- a larger heap here would only lengthen
-    # collections, which surface as tick lag for every player at once.
+    # Budget on 31 GiB: 6G server + 4x3G clients + desktop/services. A larger heap would
+    # only lengthen collections, which surface as tick lag for everyone at once.
     jvmOpts = builtins.concatStringsSep " " [
       "-Xms4G"
       "-Xmx6G"
@@ -100,38 +53,20 @@ in
     serverProperties = {
       server-port = 25565;
 
-      # Required: the couch clients are offline accounts (no Microsoft auth per
-      # child). Offline UUIDs derive from a hash of the username, so the four
-      # usernames in modules/minecraft-couch.nix must stay distinct and fixed --
-      # renaming one orphans that child's inventory and advancements.
+      # Offline accounts: no Microsoft auth per child. UUIDs hash the username, so the
+      # handles in minecraft-couch.nix must stay fixed -- a rename orphans that character.
       online-mode = false;
-
-      # Must accompany online-mode=false. With secure chat enforced, an
-      # unauthenticated client has no Mojang-signed chat key and is kicked on the
-      # first message ("Chat disabled due to missing profile public key").
+      # Must accompany online-mode=false, or an unauthenticated client is kicked on its
+      # first message for having no Mojang-signed chat key.
       enforce-secure-profile = false;
-
-      # A whitelist matches on unauthenticated names, so it buys nothing here.
-      # The firewall scoping is the real control.
+      # Matches on unauthenticated names, so it buys nothing; the firewall is the control.
       white-list = false;
 
-      # THE TWO ARE NOT THE SAME LEVER, which is why only one of them moved.
-      #
-      # view-distance is how far chunks are SENT: it costs chunk tracking, memory and
-      # bandwidth, and it is the one a player actually sees as draw distance.
-      # simulation-distance is how far chunks TICK -- mobs, redstone, crops, hoppers --
-      # and that is where the CPU goes. Raising the cheap one and leaving the expensive
-      # one alone buys the visible improvement at roughly none of the tick cost.
-      #
-      # 10 -> 12 was the vanilla client default all along, so every player on a default
-      # slider was being clipped by the server rather than by their own setting. It is
-      # +42% chunks tracked ((2*12+1)^2 vs (2*10+1)^2), not +42% CPU.
-      #
-      # Raised 2026-08-10 for the remote full-screen players -- sulfur and the guest peer
-      # on wgfam -- which is exactly the condition the previous comment here said to wait
-      # for. The couch clients are at quarter-screen and will not notice either way.
-      # If it needs to go further, 16 is the next stop, but that is 2.5x the chunks of
-      # the original and worth watching `tick` timings for first.
+      # Not the same lever, which is why only one moved. view-distance is how far chunks
+      # are SENT (tracking, memory, bandwidth) and is what a player sees as draw distance;
+      # simulation-distance is how far they TICK, which is where the CPU goes. 12 is the
+      # vanilla client default, so players on a default slider were being clipped by the
+      # server. Next stop is 16, but watch `tick` timings first.
       view-distance = 12;
       simulation-distance = 8;
 
@@ -141,63 +76,35 @@ in
       gamemode = "survival";
       motd = "hydrogen";
 
-      # server-ip is deliberately UNSET. Binding to a single address would break
-      # either loopback (couch) or the LAN address (tunnel); interface scoping is
-      # the firewall's job.
+      # server-ip deliberately UNSET: binding one address breaks either loopback (couch) or
+      # the tunnel. Interface scoping is the firewall's job.
     };
   };
 
-  # ---------------------------------------------------------------------------
-  # Datapacks (packages/minecraft-datapacks.nix).
+  # Appended to the nixpkgs module's preStart, which runs as User=minecraft with
+  # WorkingDirectory=dataDir -- hence the relative paths.
   #
-  # Appended to the nixpkgs module's own preStart, which is a plain string option --
-  # it runs as User=minecraft with WorkingDirectory=dataDir, which is why the stock
-  # body can say `ln -sf ... eula.txt` unqualified and why the relative paths below
-  # are correct.
-  #
-  # DELETE-THEN-COPY, NOT JUST COPY. Dropping a pack from Nix has to remove it from
-  # the world too, or the set is merely additive and drifts. The vt- prefix bounds
-  # what this will delete, so a datapack dropped in by hand is never touched.
-  #
-  # COPY, NOT SYMLINK. Since 1.19.4 Minecraft refuses to follow symlinks inside a
-  # world directory unless they are listed in allowed_symlinks.txt, so the obvious
-  # systemd.tmpfiles "L+" approach yields a world with silently zero datapacks. This
-  # also matches how modules/veloren-server.nix installs its settings.ron.
-  #
-  # No /datapack enable is needed: vanilla auto-enables packs it finds at world load,
-  # and changing the unit means switch restarts the server anyway.
+  # DELETE-THEN-COPY: dropping a pack from Nix has to remove it from the world, or the set
+  # is merely additive. The vt- prefix bounds the delete, so a hand-dropped pack survives.
+  # COPY, NOT SYMLINK: since 1.19.4 Minecraft refuses symlinks inside a world directory
+  # unless listed in allowed_symlinks.txt, so a tmpfiles L+ yields silently zero datapacks.
   systemd.services.minecraft-server.preStart = lib.mkAfter ''
     mkdir -p world/datapacks
     find world/datapacks -maxdepth 1 -name 'vt-*.zip' -delete
     cp ${datapacks}/vt-*.zip world/datapacks/
     chmod 0644 world/datapacks/vt-*.zip
 
-    # Server-side mods. Same delete-then-copy discipline as the datapacks: dropping a
-    # mod from Nix has to remove it from the server, or the set is merely additive.
-    # Everything here is a *.jar we put there, so unlike the datapacks there is no
-    # prefix to bound the delete -- which also means a jar dropped in by hand WILL be
-    # removed. Add mods to packages/minecraft-client-mods.nix instead.
-    #
-    # Copies rather than symlinks purely for consistency with the datapacks; Fabric
-    # would follow symlinks here (the mods dir is not inside the world).
+    # Same delete-then-copy discipline, but with no prefix to bound it -- a jar dropped in
+    # by hand WILL be removed. Add mods to packages/minecraft-client-mods.nix.
     mkdir -p mods
     find mods -maxdepth 1 -name '*.jar' -delete
     cp ${mods.server}/*.jar mods/
     chmod 0644 mods/*.jar
   '';
 
-  # VERSION LOCKSTEP. Five things have to agree on the Minecraft version now, and the
-  # nightly auto-update moves the first of them without asking:
-  #   1. pkgs.minecraft-server        the game jar          (nixpkgs)
-  #   2. fabric-server.nix mcVersion  intermediary mappings (pinned by hash)
-  #   3. client mods mcVersion        Modrinth pins         (modules/minecraft-client.nix)
-  #   4. the pinned client payload    Mojang manifest pins  (packages/minecraft-client)
-  #   5. the datapacks' format window (server log only, cannot be checked here)
-  #
-  # 2 is the dangerous one: intermediary maps obfuscated names for ONE game version,
-  # so a bumped jar against stale mappings fails at runtime, in the dark, at whatever
-  # hour the auto-update ran. Catch it at eval instead. (3 and 4 are asserted in
-  # modules/minecraft-client.nix, which also covers sulfur.)
+  # Intermediary maps obfuscated names for ONE game version, so a bumped jar against stale
+  # mappings fails at runtime, in the dark, at whatever hour the nightly ran. Catch it at
+  # eval. The client-side pins are asserted in modules/minecraft-client.nix.
   assertions = [
     {
       assertion = fabricServer.mcVersion == pkgs.minecraft-server.version;
@@ -212,7 +119,4 @@ in
       '';
     }
   ];
-
-  # /data is not involved, but the world lives on root which is always mounted --
-  # no RequiresMountsFor needed here (unlike immich/borg, see modules/backup.nix).
 }

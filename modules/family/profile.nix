@@ -1,20 +1,11 @@
-# The kids' laptop profile -- what modules/workstation.nix is for sheath's machines.
+# The kids' laptop profile -- what modules/workstation.nix is for sheath's machines. A host
+# that imports this declares only its hostname; username, peer address, sops key names and
+# Minecraft handle all follow from it via modules/family/peers.nix.
 #
-# A host that imports this needs to declare almost nothing: which peer it is comes from
-# networking.hostName via modules/family/peers.nix, and the username follows the
-# hostname. See hosts/gentlemenpupil.nix for the whole of a family host file.
-#
-# WHY NOT JUST IMPORT workstation.nix. Three reasons, all of which would break:
-#   - packages-desktop.nix is a 127-line adult desktop (Ghidra, Mullvad, Signal,
-#     Discord, CAD, the RE stack). Wrong software for a nine-year-old and a large
-#     closure to build four times.
-#   - opencode.nix, qwen-code.nix and home/sheath.nix's Pi config decrypt openwebui-*
-#     out of secrets/secrets.yaml, which these machines deliberately cannot read (they
-#     carry the family age key -- see .sops.yaml).
-#   - dconf.nix hardcodes /etc/profiles/per-user/sheath/bin/ptyxis in a keybinding,
-#     which resolves to nothing for any other user.
-#
-# What they share with the workstations is imported by name below.
+# NOT workstation.nix, for three reasons that would each break: packages-desktop.nix is an
+# adult desktop and a large closure to build four times; opencode/qwen-code decrypt secrets
+# these machines deliberately cannot read; and dconf.nix hardcodes a per-user path that
+# resolves to nothing for any other user.
 { config, lib, pkgs, ... }:
 let
   peers = import ./peers.nix;
@@ -44,102 +35,54 @@ in
     type = lib.types.bool;
     default = false;
     description = ''
-      Ship the pinned Minecraft client.
-
-      DEFAULT IS OFF as of 2026-08-07, for all four laptops, until an install is known
-      good. vizualwanderer's died fetching libraries.minecraft.net and the cause is not
-      yet established -- most likely the AAAA record on a LAN with no working IPv6, or
-      the asset derivation's 4403 parallel fetches. Debugging that is worth doing, but
-      not while it is also the thing blocking every install.
-
-      Flip this back to true once installs are stable, and push the result from sulfur
-      with `nixos-rebuild --target-host` rather than letting each laptop fetch from
-      Mojang itself -- sulfur already holds all 403 store paths.
-
-      The payload is ~500 MiB fetched from Mojang and Modrinth as fixed-output
-      derivations -- 115 libraries plus one FOD pulling 4403 asset objects in parallel --
-      and a laptop that cannot complete that fails the whole `nixos-install`. Sulfur
-      already holds the entire closure, so the reliable path is to install without it and
-      then push the real configuration with `nixos-rebuild --target-host`, which copies
-      those paths over SSH from sulfur's store and never contacts Mojang.
-
-      That also sidesteps the kids' VLAN, where cache.nixos.org resolves to 0.0.0.0 and
-      no fetch of any kind succeeds.
+      Ship the pinned Minecraft client. Off since 2026-08-07 until an install is known
+      good: the payload is ~500 MiB of fixed-output derivations fetched from Mojang and
+      Modrinth, and a laptop that cannot complete that fails the whole nixos-install.
+      Install without it, then push from sulfur with `nixos-rebuild --target-host`, which
+      copies the paths over SSH and never contacts Mojang.
     '';
   };
 
   options.family.enable = lib.mkOption {
     type = lib.types.bool;
     default = false;
-    description = ''
-      Set by modules/family/profile.nix on the machines it configures. Other modules
-      read it to tell a family-managed device from one of sheath's own -- home/sheath.nix
-      uses it to skip the home-manager secrets these hosts cannot decrypt.
-    '';
+    description = "Marks a family-managed device, as opposed to one of sheath's own.";
   };
 
   config = {
     family.enable = true;
     system.stateVersion = "25.11";
 
-    # ---------------------------------------------------------------------------
-    # Secrets
-    #
-    # These machines leave the house, are used by children, and are not disk-encrypted.
-    # They therefore carry the FAMILY age key, not the main one, and can decrypt only
-    # secrets/family.yaml -- never the Nextcloud admin password, the Borg repository
-    # key or the fleet VPN SSH key. install.sh places the right key per host.
+    # These machines leave the house and are not disk-encrypted, so they carry the FAMILY
+    # age key and can decrypt only family.yaml -- never the Nextcloud admin password, the
+    # Borg key or the fleet VPN key. install.sh places the right key per host.
     sops.defaultSopsFile = lib.mkForce ../../secrets/family.yaml;
 
-    # neededForUsers decrypts into /run/secrets-for-users *before* user accounts are
-    # created, which is the only way a declarative password can come from sops. It is
-    # the first use of this in the repo; if activation ever fails here, the escape hatch
-    # is users.mutableUsers = true plus `passwd`, which is what the other hosts do.
+    # neededForUsers decrypts before accounts are created, which is the only way a
+    # declarative password can come from sops. Escape hatch if activation ever fails here:
+    # users.mutableUsers = true plus `passwd`.
     sops.secrets."${username}-password-hash".neededForUsers = true;
-
-    # ---------------------------------------------------------------------------
-    # Accounts
-    #
-    # Declarative passwords are the point: a child cannot change their own password out
-    # from under you, and a reinstall reproduces the same login.
 
     users.users.${username} = {
       isNormalUser = true;
       description = username;
-      # wheel: the kids administer their own machines. sudo still prompts for their
-      # password (security.sudo.wheelNeedsPassword defaults true) -- unlike sheath's
-      # NOPASSWD rule below, which exists for unattended pushes from sulfur.
-      #
-      # WHAT THIS DOES AND DOES NOT GIVE AWAY. It does not weaken the content filtering:
-      # that is enforced by the router, per SSID, and no amount of root on the laptop
-      # changes which VLAN the wifi puts it on. It does hand over the machine itself --
-      # they can disable their own tunnel, install things, and read any file on disk.
-      #
-      # Including /home/sheath/.config/sops/age/keys.txt, which decrypts
-      # secrets/family.yaml. See the note above sheath's hashedPasswordFile.
-      #
-      # networkmanager so they can join wifi at a friend's house; video/audio/input for
-      # the desktop and for game controllers.
+      # wheel: the kids administer their own machines, with a password prompt. It does not
+      # weaken content filtering -- that is the router, per SSID -- but it does hand over
+      # the machine, including sheath's age key, which decrypts family.yaml. See the open
+      # item in docs/CHANGELOG.md about no longer sharing that hash.
       extraGroups = [ "wheel" "networkmanager" "video" "audio" "input" ];
       hashedPasswordFile = config.sops.secrets."${username}-password-hash".path;
     };
     users.groups.${username} = { };
 
 
-    # root stays locked deliberately: no hashedPasswordFile, so no console root login.
-    # Administration is sheath over SSH plus the sudo rule below.
-
+    # root stays locked (fleet.accounts.rootPassword defaults to "none"): administration is
+    # sheath over SSH plus this rule, for unattended pushes from sulfur.
     fleet.accounts.sudoNoPassword = true;
 
-    # ---------------------------------------------------------------------------
-    # Remote administration
-    #
-    # Key-only: unlike hosts/hydrogen.nix these accept no password, because the accounts
-    # have child-chosen passwords and the machines sit on untrusted networks. sheath's
-    # authorized key arrives via users/sheath.nix.
-    #
-    # Reachable from the LAN, and from sulfur over the family tunnel -- hydrogen forwards
-    # exactly port 22 from sulfur and nothing else (modules/family/vpn-hub.nix).
+    # Key-only, unlike hydrogen: these accounts have child-chosen passwords and the machines
+    # sit on untrusted networks. Reachable from the LAN and from sulfur over the family
+    # tunnel, where hydrogen forwards port 22 and nothing else.
     services.openssh = {
       enable = true;
       settings = {
@@ -149,8 +92,6 @@ in
     };
     networking.firewall.allowedTCPPorts = [ 22 ];
 
-    # ---------------------------------------------------------------------------
-    # Software
     programs.firefox.enable = true;
 
     environment.systemPackages = with pkgs; [
@@ -162,43 +103,27 @@ in
       nextcloud-client
     ];
 
-    # Same pinned client and mod set as sulfur and hydrogen's couch clients, so version
-    # lockstep with the server is enforced by the assertions in modules/minecraft-client.nix
-    # rather than by memory. Connects by name over the tunnel; 25565 is no longer
-    # reachable from the LAN.
-    #
-    # Imported unconditionally and gated here rather than by a conditional import: the
-    # module system forbids referencing `config` from `imports` (infinite recursion, and
-    # it says so by name). That is fine -- the module only declares its package as an
-    # option default, so with enable = false nothing references the derivation and the
-    # 500 MiB payload never enters the closure.
+    # Gated here rather than by a conditional import -- the module system forbids reading
+    # `config` from `imports`. Harmless: with enable = false nothing references the
+    # derivation, so the 500 MiB payload never enters the closure.
     services.minecraftClient = {
       enable = config.family.minecraft;
       playerName = self.minecraftName;
       server = "mc.luckyobserver.com:25565";
     };
 
-    # ---------------------------------------------------------------------------
-    # Shell helpers, matching sheath's (home/bash.nix).
-    #
-    # System-wide rather than home-manager: the kids have no home-manager config, and
-    # these are useful to whoever is logged in. The flake path is absolute rather than
-    # $HOME/nixos -- install.sh leaves the checkout in sheath's home, and a child's
-    # $HOME/nixos does not exist. They do not need read access to it either, since
-    # nixos-rebuild runs under sudo as root.
+    # System-wide rather than home-manager: the kids have no home-manager config. The flake
+    # path is absolute because a child's $HOME/nixos does not exist, and they need no read
+    # access to it -- nixos-rebuild runs under sudo.
     programs.bash.interactiveShellInit = ''
       alias ns="nix search nixpkgs"
       alias dmesg="dmesg --color=always"
 
-      # nr: switch now. nb: stage for next boot (kernel/bootloader changes).
-      # Deliberately no `nu` -- bumping flake inputs from a child's laptop would
-      # rewrite flake.lock for every host in the fleet.
+      # No `nu`: bumping inputs from a child's laptop would rewrite the fleet's lock.
       nr() { sudo nixos-rebuild switch --no-write-lock-file --flake /home/sheath/nixos#${hostName}; }
       nb() { sudo nixos-rebuild boot   --no-write-lock-file --flake /home/sheath/nixos#${hostName}; }
     '';
 
-    # ---------------------------------------------------------------------------
-    # Base system
     networking.networkmanager.enable = true;
   };
 }
