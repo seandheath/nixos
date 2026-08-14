@@ -10,7 +10,6 @@ in
   imports = [
     ../hardware/sulfur.nix
     ../modules/steam.nix
-    ../modules/mo2.nix
     ../modules/cemu.nix
     # TEMPORARILY OUT (2026-08-10). packages/farcry2-realismredux.nix pins the mod
     # through requireFile, and the 7z was garbage-collected: the built tree survived

@@ -9,14 +9,12 @@
     download-buffer-size = 1073741824; # 1 GiB — avoids buffer-full stalls on big fetches
 
     # Binary caches (consolidated here so all substituters live in one place).
-    # pebble: personal cachix. nix-gaming: prebuilt Wine/Proton (used by mo2/steam).
+    # pebble: personal cachix.
     substituters = [
       "https://pebble.cachix.org"
-      "https://nix-gaming.cachix.org"
     ];
     trusted-public-keys = [
       "pebble.cachix.org-1:aTqwT2hR6lGggw/rPISRcHZctDv2iF7ewsVxf3Hq6ow="
-      "nix-gaming.cachix.org-1:nbjlureqMbRAxR1gJ/f3hxemL9svXaZF/Ees8vCUUs4="
     ];
 
     # Deduplicate identical store paths as they are written (daemon-side).

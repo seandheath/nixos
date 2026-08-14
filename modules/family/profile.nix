@@ -35,7 +35,6 @@ in
     ../bluetooth.nix
     ../printing.nix
     ../sops.nix
-    ../auto-update.nix
     ../steam.nix
     ../minecraft-client.nix
     ./vpn-peer.nix

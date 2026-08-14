@@ -28,19 +28,11 @@ let
   client = import ../packages/minecraft-client { inherit pkgs; };
   mcPin = import ../packages/minecraft-version.nix;
 
-  # portablemc and the JVM come from the STABLE nixpkgs on every host, including the
-  # unstable laptops. Not fussiness: commit f11c4af had to hand-rewrite this launcher
-  # when portablemc went 4.4.1 (Python) -> 5.0.3 (Rust) and four CLI flags moved --
-  # --work-dir vanished, --bin-dir started deriving from --main-dir, --timeout became
-  # --fetch-exclude-all. That is a runtime break no build catches, and on unstable it
-  # would land at 04:00 on a nine-year-old's laptop with nobody watching. Pinning the
-  # tooling to the slow channel makes the launch contract move only when hydrogen's
-  # does. The payload itself is hash-pinned in-repo and unaffected by either channel.
-  stablePkgs = inputs.nixpkgs.legacyPackages.${pkgs.stdenv.hostPlatform.system};
+  # The launcher hand-transcribes portablemc's CLI; see the version assertion below.
+  portablemcVersion = "5.0.3";
 
   launcher = import ../packages/minecraft-client-launcher.nix {
     inherit pkgs;
-    toolPkgs = stablePkgs;
     defaultName = cfg.playerName;
     defaultServer = cfg.server;
   };
@@ -219,6 +211,19 @@ in
           Re-run packages/minecraft-client/update.sh ${mcPin.version}, rebuild to pick
           up the new assets hash, and re-pin the mods. Check upstream support first --
           not every mod tracks a point release promptly.
+        '';
+      }
+
+      # portablemc's CLI is hand-transcribed into the launcher, so a major bump is a
+      # runtime break no build catches -- 4.4.1 -> 5.0.3 moved four flags. Fail loudly
+      # at eval instead of at 04:00 on a child's laptop.
+      {
+        assertion = pkgs.portablemc.version == portablemcVersion;
+        message = ''
+          portablemc moved from ${portablemcVersion} to ${pkgs.portablemc.version}.
+          Re-check the flags in packages/minecraft-client-launcher.nix (--main-dir,
+          --mc-dir, --bin-dir, --fetch-exclude-all, --jvm) against the new CLI, then
+          bump portablemcVersion in this file.
         '';
       }
     ];

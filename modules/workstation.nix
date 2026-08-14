@@ -4,7 +4,6 @@
     ./sops.nix
     ./dconf.nix
     ./syncthing.nix
-    ./auto-update.nix
     ./audio.nix
     ./bluetooth.nix
     ./printing.nix

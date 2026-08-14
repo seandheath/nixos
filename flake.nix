@@ -1,107 +1,71 @@
-
 {
   description = "A NixOS configuration";
 
-  # TWO CHANNELS, deliberately. hydrogen is the only stable host; the five laptops
-  # track unstable. See mkHost below -- a host's channel is declared exactly once,
-  # there, and modules/fleet-channel.nix carries it into the config so
-  # modules/auto-update.nix can override the right input at 04:00.
+  # ONE CHANNEL for the whole fleet. Two channels cost a second home-manager input, a
+  # fleet.channel option, and a branch table in modules/auto-update.nix -- all to defend
+  # against an EOL that nixos-unstable cannot have.
   inputs = {
-    # STABLE -- hydrogen only (immich, postgres 17, minecraft-server; runs 24/7).
-    # nixos-25.11 went EOL: its branch stopped moving on 2026-06-30, which froze
-    # signal-desktop at 8.9.1 -- past Signal's ~90-day hard expiry -- and stopped
-    # security backports for everything else. 26.05 is the supported stable.
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-26.05";
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
 
-    # UNSTABLE -- sulfur and the four kids' laptops.
-    nixpkgs-unstable.url = "github:nixos/nixpkgs/nixos-unstable";
-
-    nixos-hardware.url = "github:NixOS/nixos-hardware/master";
-    home-manager = {
-      url = "github:nix-community/home-manager/release-26.05";
+    nixos-hardware = {
+      url = "github:NixOS/nixos-hardware/master";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    # home-manager master is what tracks nixpkgs-unstable; release-26.05 against an
-    # unstable nixpkgs is the option-rename breakage of f11c4af waiting to happen.
-    home-manager-unstable = {
+
+    # master is the branch that tracks nixpkgs-unstable; a release-* home-manager against
+    # unstable is an option-rename break waiting to happen.
+    home-manager = {
       url = "github:nix-community/home-manager";
-      inputs.nixpkgs.follows = "nixpkgs-unstable";
+      inputs.nixpkgs.follows = "nixpkgs";
     };
+
     sops-nix = {
       url = "github:Mic92/sops-nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    impermanence.url = "github:nix-community/impermanence";
-    disko = {
-      url = "github:nix-community/disko";
+    impermanence = {
+      url = "github:nix-community/impermanence";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    chaotic.url = "github:chaotic-cx/nyx/nyxpkgs-unstable";
-    nix-gaming = {
-      url = "github:fufexan/nix-gaming";
-      # Don't follow nixpkgs — nix-gaming pins its own nixpkgs
-      # compatible with its Wine builds (supportFlags removal broke it)
-    };
-    nix-flatpak.url = "github:gmodena/nix-flatpak/?ref=v0.7.0";
+
     cclaude = {
       url = "github:seandheath/cclaude";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    # Prebuilt nix-index database (nix-locate/command-not-found/comma).
-    # DB is pinned to this input's rev and refreshes on deliberate input bumps
-    # (`nu`), not the nightly autoUpgrade (which runs --no-write-lock-file).
-    #
-    # Follows the STABLE nixpkgs on every host, including the unstable ones. This is
-    # a prebuilt database keyed to one nixpkgs rev, so a second copy for unstable
-    # would double these lock nodes to fix nothing that matters: the consequence of
-    # the skew is that `nix-locate` on a laptop describes 26.05's package set rather
-    # than its own. Cosmetic, and accepted.
+
+    # Prebuilt nix-index database (nix-locate/comma). Refreshes on deliberate input bumps
+    # (`nu`), not the nightly, which passes --no-write-lock-file.
     nix-index-database = {
       url = "github:nix-community/nix-index-database";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    pi-flake = {
-      url = "github:ChauDucToan/pi-flake";
-      # Deliberately does NOT follow nixpkgs — pi-flake targets nixpkgs-unstable
-      # and forcing the stable pin risks build breakage (mirrors nix-gaming above).
-      # Used on sulfur, which is now unstable itself, so this skew is gone.
-    };
+
+    # Does not follow nixpkgs: pi-flake pins its own.
+    pi-flake.url = "github:ChauDucToan/pi-flake";
   };
 
-  outputs = { self, nixpkgs, nixpkgs-unstable, nixos-hardware, home-manager, home-manager-unstable, sops-nix, impermanence, disko, chaotic, nix-gaming, nix-flatpak, cclaude, ... }@inputs:
+  outputs = { self, nixpkgs, nixos-hardware, home-manager, sops-nix, impermanence, ... }@inputs:
     let
-      # Parameterized by the channel's home-manager, because that is the one module
-      # in here that genuinely differs between the two: HM's NixOS module has to
-      # match the nixpkgs it will evaluate home/sheath.nix against.
-      #
-      # sops-nix, disko, cclaude and nix-index-database keep a single instance
-      # following stable nixpkgs. They contribute NixOS modules that build against
-      # the *host's* pkgs, so a per-channel copy of each would double those
-      # flake.lock nodes and change nothing.
-      commonModules = { hm }: [
-        hm.nixosModules.home-manager
+      system = "x86_64-linux";
+
+      commonModules = [
+        home-manager.nixosModules.home-manager
         sops-nix.nixosModules.sops
-        nix-flatpak.nixosModules.nix-flatpak
         ./modules/nix-settings.nix
-        # Declares fleet.channel, which mkHost sets below.
-        ./modules/fleet-channel.nix
-        # Every host, deliberately: NetworkManager will flush a WireGuard interface it
-        # thinks it owns, and the hosts that most need protecting are the ones nobody
-        # is watching. See the module header.
+        ./modules/auto-update.nix
+        # Every host: NetworkManager will flush a WireGuard interface it thinks it owns,
+        # and the hosts that most need protecting are the ones nobody is watching.
         ./modules/wg-unmanaged.nix
-        # Every host, same as above and for the same reason: hydrogen's br0 lost its
-        # slave during the 2026-08-13 nightly and stayed unreachable for six hours.
-        # Defines nothing on a host with no bridges. See the module header.
+        # Every host: hydrogen's br0 lost its slave during the 2026-08-13 nightly and
+        # stayed unreachable for six hours. Defines nothing on a host with no bridges.
         ./modules/bridge-slave-restore.nix
         {
           home-manager.useGlobalPkgs = true;
           home-manager.useUserPackages = true;
           home-manager.users.sheath = import ./home/sheath.nix;
           home-manager.extraSpecialArgs = { inherit inputs; };
-          # Rename pre-existing files aside instead of aborting activation. Without
-          # this a single unmanaged file that HM wants to own fails the whole
-          # home-manager-sheath.service, and with it the nixos-rebuild switch --
-          # a stale ~/.cache/nix-index/files did exactly that on 2026-07-21.
+          # Rename pre-existing files aside rather than failing activation, which would
+          # fail the whole nixos-rebuild switch with it.
           home-manager.backupFileExtension = "hm-bak";
           users.users.sheath = import ./users/sheath.nix;
           users.groups.sheath = {};
@@ -109,62 +73,34 @@
         }
       ];
 
-      # THE ONLY PLACE A HOST'S CHANNEL IS DECLARED. `channel` picks the nixpkgs, the
-      # matching home-manager, and the lib that builds the system, and it is also
-      # written into the config as fleet.channel so modules/auto-update.nix overrides
-      # the correct input at 04:00. Those cannot drift apart, because they are one
-      # argument.
-      mkHost = { channel, hostName, extraModules ? [ ] }:
-        let
-          np = if channel == "unstable" then nixpkgs-unstable else nixpkgs;
-          hm = if channel == "unstable" then home-manager-unstable else home-manager;
-        in np.lib.nixosSystem {
-          system = "x86_64-linux";
-          specialArgs = { inherit inputs; lib = np.lib; };
-          modules = [
-            ./hosts/${hostName}.nix
-            { fleet.channel = channel; }
-          ] ++ extraModules ++ commonModules { inherit hm; };
-        };
-    in {
-    nixosConfigurations = {
-      # The only stable host: postgres 17 and immich, up 24/7, and the one machine
-      # where an unattended nightly rebuild against a moving branch is not worth it.
-      hydrogen = mkHost { channel = "stable"; hostName = "hydrogen"; };
-
-      sulfur = mkHost {
-        channel = "unstable";
-        hostName = "sulfur";
-        extraModules = [
-          nixos-hardware.nixosModules.asus-zephyrus-gu605my
-          impermanence.nixosModules.impermanence
-          chaotic.nixosModules.default
-        ];
+      mkHost = { hostName, extraModules ? [ ] }: nixpkgs.lib.nixosSystem {
+        inherit system;
+        specialArgs = { inherit inputs; };
+        modules = [ ./hosts/${hostName}.nix ] ++ extraModules ++ commonModules;
       };
-    }
-    # The kids' laptops. Identical apart from the hostname, which is the only thing
-    # they declare: modules/family/profile.nix derives the username, WireGuard peer
-    # address, sops key names and Minecraft handle from it via
-    # modules/family/peers.nix.
-    #
-    # They still get commonModules, and therefore the sheath account and its home
-    # config -- that is what makes them administrable. What they do NOT get is
-    # modules/workstation.nix; see the header of modules/family/profile.nix.
-    #
-    # No nixos-hardware module yet: add the matching one here once the actual laptop
-    # models are known. hardware/<name>.nix is a placeholder until install.sh
-    # regenerates it on the real machine.
-    #
-    # These four MUST stay on the same channel as sulfur. Their VLAN resolves
-    # cache.nixos.org to 0.0.0.0 (modules/family/profile.nix), so they substitute
-    # nothing and get their closures pushed from sulfur's store with
-    # `nixos-rebuild --target-host`. That only works while sulfur evaluates to the
-    # same store paths they do -- i.e. same nixpkgs, same inputs.
-    // nixpkgs.lib.genAttrs [
-      "gentlemenpupil"
-      "vizualwanderer"
-      "phantomspecialst"
-      "maddreamer"
-    ] (host: mkHost { channel = "unstable"; hostName = host; });
-  };
+
+      # The kids' laptops. modules/family/profile.nix derives the username, WireGuard peer
+      # address, sops key names and Minecraft handle from the hostname via
+      # modules/family/peers.nix, so a host file declares only its hostname and hardware.
+      familyHosts = [ "gentlemenpupil" "vizualwanderer" "phantomspecialst" "maddreamer" ];
+
+      hosts = {
+        hydrogen = mkHost { hostName = "hydrogen"; };
+
+        sulfur = mkHost {
+          hostName = "sulfur";
+          extraModules = [
+            nixos-hardware.nixosModules.asus-zephyrus-gu605my
+            impermanence.nixosModules.impermanence
+          ];
+        };
+      } // nixpkgs.lib.genAttrs familyHosts (hostName: mkHost { inherit hostName; });
+    in {
+      nixosConfigurations = hosts;
+
+      # `nix flake check` builds every host, so a change is verified against the five
+      # machines you are not sitting at before it is committed.
+      checks.${system} =
+        nixpkgs.lib.mapAttrs (_: h: h.config.system.build.toplevel) hosts;
+    };
 }

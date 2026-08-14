@@ -12,7 +12,6 @@
     ../modules/scanner.nix
     ../modules/ollama.nix             # local LLM inference (loopback only), for paperless
     ../modules/backup.nix
-    ../modules/auto-update.nix        # nightly stable-branch security updates (server runs 24/7)
     ../modules/fleet-vpn.nix          # on-demand WireGuard tunnel to the Jellyfin fleet (manual switch)
     ../modules/family/vpn-hub.nix     # wgadm (sulfur) + wgfam (family devices) -- see the firewall block below
     ../modules/minecraft-server.nix   # persistent vanilla world (system service, no session needed)
