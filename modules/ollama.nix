@@ -12,11 +12,8 @@
   services.ollama = {
     enable = true;
 
-    # NOTE: `services.ollama.acceleration = "cuda"` was REMOVED upstream; the module now
-    # wants an explicitly accelerated package. Verified against this flake's locked
-    # nixpkgs (nixos-25.11, d407951), nixos/modules/services/misc/ollama.nix:35-39:
-    #   mkRemovedOptionModule [...] "acceleration"
-    #     "Set `services.ollama.package` to one of `pkgs.ollama[,-vulkan,-rocm,-cuda,-cpu]`"
+    # services.ollama.acceleration was removed upstream; the module wants an explicitly
+    # accelerated package instead.
     package = pkgs.ollama-cuda;
 
     host = "127.0.0.1";

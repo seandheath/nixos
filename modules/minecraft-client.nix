@@ -5,22 +5,10 @@
   inputs,
   ...
 }:
-# Ships the offline Minecraft client on any host that plays, and mirrors everything it
-# needs into a restorable archive on the host that keeps one.
-#
-# Imported by hosts/hydrogen.nix (the couch clients, via modules/minecraft-couch.nix)
-# and hosts/sulfur.nix (the desktop client). The game payload is
-# packages/minecraft-client, the mods packages/minecraft-client-mods.nix, and the
-# launcher packages/minecraft-client-launcher.nix; see docs/minecraft.md.
-#
-# WHAT THIS REPLACED, and why. Until 2026-08-05 both hosts ran Prism Launcher, and this
-# module (as modules/minecraft-mods.nix) did one job: keep a hand-created Prism
-# instance's mods folder symlinked at the Nix-managed jar set. Everything else the game
-# needed -- the client jar, 115 libraries, 424 MiB of assets, a JVM, and the cached
-# Microsoft account that made `--offline` work at all -- was undeclared state that Prism
-# refetched from Mojang, excluded from the backups as "re-downloadable". That is a
-# playable setup only for as long as Mojang keeps serving it. Now every byte is pinned
-# in the flake, so the client can be rebuilt from source of truth, and archived.
+# Ships the offline Minecraft client on any host that plays, and mirrors what it needs into
+# a restorable archive on the host that keeps one. Payload is packages/minecraft-client,
+# mods packages/minecraft-client-mods.nix, launcher packages/minecraft-client-launcher.nix.
+# See docs/minecraft.md.
 let
   cfg = config.services.minecraftClient;
 
@@ -65,14 +53,9 @@ let
     text = ''
       mkdir -p ${cfg.archiveDir}
 
-      # A plain local binary cache. zstd rather than the default xz: the bulk of this
-      # is already-compressed jars and oggs, so xz would spend minutes to save little.
-      # ~1.6 GB on disk -- the client closure is 1.9 GiB (538 MiB of game payload, the
-      # rest JDK, python and portablemc) and the server another 673 MiB, overlapping.
-      #
-      # Append-only. Old payloads stay behind after a version bump, which is the point
-      # -- an archive that forgets the version you were happily playing is not a
-      # restore path. `rm -rf ${cfg.archiveDir}` and re-run to prune.
+      # zstd, not the default xz: the bulk is already-compressed jars and oggs, so xz would
+      # spend minutes to save little. Append-only on purpose -- an archive that forgets the
+      # version you were happily playing is not a restore path. rm -rf and re-run to prune.
       nix copy --to "file://${cfg.archiveDir}?compression=zstd" \
         ${lib.escapeShellArgs (map toString archivePaths)}
 
@@ -144,15 +127,9 @@ in
   config = lib.mkIf cfg.enable {
     environment.systemPackages = [ launcher ] ++ lib.optional cfg.desktopEntry desktopItem;
 
-    # ---------------------------------------------------------------------------
-    # The archive.
-    #
-    # Type=oneshot + RemainAfterExit so the unit is "active" after a successful run and
-    # therefore actually restarts on change -- and because the store paths are baked
-    # into the script, a rebuild that changes the payload changes the unit, and switch
-    # re-runs it. A rebuild that does not is a no-op. Same trick the old
-    # minecraft-mods-link.service used.
-    # ---------------------------------------------------------------------------
+    # oneshot + RemainAfterExit so the unit reads "active" and therefore restarts on change.
+    # The store paths are baked into the script, so a rebuild that moves the payload changes
+    # the unit and switch re-runs it; one that does not is a no-op.
     systemd.services.minecraft-archive = lib.mkIf (cfg.archiveDir != null) {
       description = "Mirror the Minecraft payload into a restorable local binary cache";
       wantedBy = [ "multi-user.target" ];
@@ -170,10 +147,9 @@ in
     };
 
     assertions = [
-      # The payload and the mods are pinned independently -- one from Mojang's version
-      # manifest, one from Modrinth -- so nothing but this stops them drifting apart.
-      # A mismatch is a Fabric "incompatible mods" screen at launch, or worse, mods
-      # that load and then misbehave against the wrong mappings.
+      # Pinned independently -- Mojang's manifest and Modrinth -- so nothing else stops them
+      # drifting. A mismatch is an incompatible-mods screen, or mods loading against the
+      # wrong mappings.
       {
         assertion = client.mcVersion == clientMods.mcVersion;
         message = ''
@@ -186,21 +162,11 @@ in
         '';
       }
 
-      # Fires on EVERY host that imports this module, not just the one running a
-      # server. It used to be gated on config.services.minecraft-server.enable, on the
-      # reasoning that hydrogen failing to build caught the drift for everyone. That
-      # stopped being true on 2026-08-11: hydrogen is on nixos-26.05 and the five
-      # laptops are on nixos-unstable, so hydrogen's build no longer observes anything
-      # about the channel the clients come from.
-      #
-      # Comparing against the fleet pin rather than pkgs.minecraft-server is what makes
-      # the check meaningful off-server -- the laptops have no minecraft-server to read
-      # a version from, and pulling one in from their own channel would be asserting
-      # against the very thing that drifts.
-      #
-      # The failure this prevents: the pinned client payload and the version the server
-      # is actually held at diverge, the build succeeds, and the symptom is four
-      # children unable to join.
+      # Fires on EVERY host importing this module, not just the one running a server, and
+      # compares against the fleet pin rather than pkgs.minecraft-server -- the laptops have
+      # no minecraft-server to read a version from. Without it the payload and the server's
+      # actual version diverge, the build succeeds, and the symptom is four children unable
+      # to join.
       {
         assertion = client.mcVersion == mcPin.version;
         message = ''

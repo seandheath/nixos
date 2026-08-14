@@ -1,24 +1,16 @@
 # Keeps a WireGuard peer's endpoint pointed at the right side of the NAT.
 #
-# THE PROBLEM. The tunnels are meant to be up all the time, at home as well as away --
-# that is what lets hydrogen scope every service to a WireGuard interface and stop
-# treating "on the home wifi" as authorisation. But a peer at home has to reach an
-# endpoint that resolves to the *public* address, which means bouncing off the gateway
-# and back (NAT hairpin). Consumer routers vary on whether they will do that at all,
-# and when they do, every at-home byte takes a pointless round trip to the WAN port.
+# The tunnels are up all the time, at home as well as away -- that is what lets hydrogen
+# stop treating "on the home wifi" as authorisation. But a peer at home reaching a public
+# endpoint needs a NAT hairpin, which consumer routers vary on and which costs a pointless
+# round trip to the WAN port. Pointing at the LAN address fixes both, except wg-quick
+# resolves an endpoint exactly once, so a laptop that leaves the house keeps a 10.0.0.10
+# that is now someone else's printer.
 #
-# Pointing the endpoint at hydrogen's LAN address instead fixes both -- but wg-quick
-# resolves an endpoint exactly once, when the interface comes up, so a laptop that
-# leaves the house keeps a 10.0.0.10 that is now someone else's printer.
-#
-# THE FIX. Re-target the live peer on every network change. `wg set ... endpoint` swaps
-# the address without tearing the tunnel down; the next keepalive re-handshakes.
-#
-# Choosing which address is deliberately not a pure "am I on 10.0.0.0/24?" test: plenty
-# of other houses use that subnet, and being wrong there means a child's laptop silently
-# has no tunnel. Instead it TRIES the LAN address, waits for a handshake, and falls back
-# to the public name if none arrives. That also covers the case where the LAN path is
-# blocked for some reason it cannot see.
+# So: re-target the live peer on every network change with `wg set ... endpoint`, which
+# swaps the address without tearing the tunnel down. Choosing which address is a PROBE, not
+# an "am I on 10.0.0.0/24?" test -- plenty of other houses use that subnet, and being wrong
+# means a child's laptop silently has no tunnel.
 { config, lib, pkgs, ... }:
 let
   cfg = config.family.wgEndpoint;
@@ -54,15 +46,11 @@ let
         return 0
       fi
 
-      # Try the peer's LAN address first, UNCONDITIONALLY -- no "am I on 10.0.0.0/24?"
-      # test. That test was wrong: the kids' laptops live on the router's Kids VLAN
-      # (10.20.0.0/24) and reach hydrogen through a pinhole, so they never hold a
-      # 10.0.0.x address and would have skipped straight to the public endpoint -- which
-      # arrives at our own WAN address from the inside and is not DNAT'd. No hairpin, no
-      # tunnel, no services, for exactly the machines this exists to serve.
-      #
-      # Probing is the honest test anyway: a foreign network that happens to use the
-      # same subnet cannot complete a WireGuard handshake with hydrogen's key.
+      # LAN address first, UNCONDITIONALLY. A subnet test would be wrong: the kids' laptops
+      # are on the Kids VLAN and never hold a 10.0.0.x address, so they would skip to the
+      # public endpoint, which arrives at our own WAN from the inside and is not DNAT'd.
+      # Probing is the honest test -- a foreign network on the same subnet cannot complete
+      # a handshake with hydrogen's key.
       wg set "$iface" peer "$key" endpoint "$lan:$port" 2>/dev/null || true
 
       # persistentKeepalive is 25s, but a freshly-set endpoint triggers a handshake
@@ -125,15 +113,10 @@ in
       wg-endpoint = {
         description = "Point WireGuard endpoints at the LAN or public address";
 
-        # After the tunnels exist, not merely after the network does. The boot run used
-        # to start in the same second as wg-quick, find no interface, and return early
-        # from every configure() call -- so the endpoint kept its bootstrap LAN literal
-        # until the OnBootSec=2min timer fired. Away from home that is two minutes of a
-        # tunnel dialling 10.0.0.10, which is someone else's machine.
-        #
-        # Both kinds of tunnel are named: wg-quick units on the kids' laptops, and
-        # NetworkManager-ensure-profiles on sulfur, where wgQuickUnits is now empty.
-        # Ordering against a unit a given host does not have is a harmless no-op.
+        # After the tunnels EXIST, not merely after the network does: the boot run used to
+        # find no interface and return early, leaving the bootstrap LAN literal in place
+        # until the 2-minute timer fired. Both kinds are named -- wg-quick on the laptops,
+        # ensure-profiles on sulfur -- and ordering against an absent unit is a no-op.
         after = [ "network-online.target" "NetworkManager-ensure-profiles.service" ] ++ wgQuickUnits;
         wants = [ "network-online.target" ];
         wantedBy = [ "multi-user.target" ];
@@ -143,12 +126,8 @@ in
         };
       };
     }
-    # wg-quick's unit is a oneshot: if bringing the interface up fails for any reason it
-    # stays failed forever, and on a child's laptop nobody is going to notice a dead
-    # systemd unit. Retry instead. (The usual cause -- a hostname endpoint that could not
-    # be resolved at boot -- is gone now that the configured endpoint is an IP literal,
-    # but "no tunnel until an adult intervenes" is a bad enough failure mode to defend
-    # against twice.)
+    # wg-quick's unit is a oneshot, so a failed bring-up stays failed forever and nobody
+    # notices a dead unit on a child's laptop. Retry instead.
     //
     # Only for interfaces wg-quick actually builds. sulfur's wgadm is a NetworkManager
     # profile now (hosts/sulfur.nix) and has no wg-quick unit at all -- without this

@@ -1,9 +1,9 @@
 {
   description = "A NixOS configuration";
 
-  # ONE CHANNEL for the whole fleet. Two channels cost a second home-manager input, a
-  # fleet.channel option, and a branch table in modules/auto-update.nix -- all to defend
-  # against an EOL that nixos-unstable cannot have.
+  # ONE CHANNEL for the whole fleet: a second one costs another home-manager input, a
+  # channel option, and a branch table in auto-update.nix, all to defend against an EOL
+  # that nixos-unstable cannot have.
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
 
