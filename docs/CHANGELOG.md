@@ -21,6 +21,9 @@ Also the decision log. Rationale that would otherwise bloat a code comment lives
 
 ## 2026-08-14
 
+- Bumped `openwebui-model` in `secrets/secrets.yaml` to the endpoint's newer served model.
+  `contextWindow`/`maxOutput` in `modules/vllm-endpoint.nix` were left alone -- the endpoint
+  was serving no models when the change was made, so its `/models` could not be re-read.
 - Removed `gen-family-secrets.sh` and `gen-mobile-peer.sh`. Both were one-shot bootstrap
   tools that had already done their job: the family secrets exist and are edited in place
   with `sops`, and a phone's keypair is generated on the device. The enrolment settings the
