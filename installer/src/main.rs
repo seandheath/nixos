@@ -4,14 +4,15 @@ mod disks;
 mod nix;
 mod phases;
 mod profile;
+mod ui;
 
 use phases::{Ctx, Phase};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-const BY_ID: &str = "/dev/disk/by-id";
-const SCRATCH: &str = "/tmp/nixos-install";
-const TARGET: &str = "/mnt";
+pub const BY_ID: &str = "/dev/disk/by-id";
+pub const SCRATCH: &str = "/tmp/nixos-install";
+pub const TARGET: &str = "/mnt";
 
 struct Args {
     repo: String,
@@ -102,7 +103,14 @@ fn run(args: &Args) -> Result<(), String> {
         return execute(&args.repo, &host);
     }
 
-    Err("the TUI is not built yet; use --dry-run --host HOST, --run, or --list-hosts".into())
+    if !is_root() {
+        return Err("the installer must run as root".into());
+    }
+    let hosts = nix::hosts(&args.repo).map_err(|e| e.to_string())?;
+    if hosts.is_empty() {
+        return Err("the flake defines no hosts".into());
+    }
+    ui::run(&args.repo, hosts).map_err(|e| e.to_string())
 }
 
 /// Build the phase context. `disko` is only resolved when something may actually run,

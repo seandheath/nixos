@@ -56,10 +56,6 @@ impl Ctx {
         self.marks().iter().any(|d| d == phase)
     }
 
-    pub fn clear_state(&self) {
-        let _ = std::fs::remove_file(self.state_file());
-    }
-
     fn luks_key(&self) -> PathBuf {
         self.scratch.join("luks.key")
     }
@@ -531,8 +527,6 @@ mod tests {
         assert!(ctx.is_marked("partition"));
         assert!(ctx.is_marked("install"));
         assert_eq!(ctx.marks().len(), 2, "marks are not duplicated");
-        ctx.clear_state();
-        assert!(!ctx.is_marked("partition"));
         std::fs::remove_dir_all(&d).unwrap();
     }
 

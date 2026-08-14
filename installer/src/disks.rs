@@ -17,10 +17,6 @@ pub struct Disk {
 }
 
 impl Disk {
-    pub fn dev_path(&self) -> String {
-        format!("/dev/{}", self.name)
-    }
-
     pub fn label(&self) -> String {
         let model = if self.model.is_empty() {
             "unknown"
