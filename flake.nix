@@ -158,6 +158,7 @@
           imjtool
           installer
           jackify
+          minecraft-server-ctl
           minecraft-server-image
           qwen-code
           re-container

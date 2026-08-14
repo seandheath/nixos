@@ -22,9 +22,10 @@ final: prev: {
     src = prev.fetchurl { inherit (import ./minecraft-version.nix) url sha1; };
   });
 
-  # Takes only pkgs, so unlike the other Minecraft files it fits the overlay. The launcher
-  # and the control script both need it by name.
+  # Take only pkgs, so unlike the other Minecraft files these fit the overlay. The launcher
+  # and the hydrogen module both need them by name.
   minecraft-server-image = import ./minecraft-server-image.nix { pkgs = final; };
+  minecraft-server-ctl = import ./minecraft-server-ctl.nix { pkgs = final; };
   qwen-code = import ./qwen-code.nix { pkgs = final; };
   re-container = import ./re-container.nix { pkgs = final; };
 
