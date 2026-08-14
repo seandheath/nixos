@@ -62,6 +62,40 @@
   # rather than as a default, and GNOME pulls NetworkManager in here. hydrogen has
   # no wifi -- it lives on the static br0 bridge -- so keep wpa_supplicant off.
   networking.wireless.enable = lib.mkForce false;
+
+  # NETWORKMANAGER IS OFF HERE, AND THAT IS THE POINT. GNOME pulls it in
+  # (nixos/modules/services/desktop-managers/gnome.nix sets it as mkDefault true), which
+  # left this host with TWO things that each believed they owned the network: scripted
+  # networking.bridges below, which owns br0 through br0-netdev.service and reloads it on
+  # most switches, and NM, which held auto-generated "external" profiles for br0 and
+  # enp0s31f6 and nothing else.
+  #
+  # WHAT THAT COST. On 2026-08-13 the nightly rebuild succeeded and then took the machine
+  # off the network for six hours. br0-netdev reloaded correctly and left the port
+  # `forwarding` at 04:29:00.655; 30 ms later the slave was detached again and nothing put
+  # it back. The host itself was fine the whole time -- journald ran until the manual
+  # power-cycle -- it just had no link. Two owners for one interface is the bug class; that
+  # detach was a symptom.
+  #
+  # NM earned nothing here in exchange: no hand-configured profiles
+  # (ensureProfiles.profiles is empty on this host), no wifi (see the mkForce above), and
+  # it is not the DNS source -- services.resolved is off and /etc/resolv.conf is a static
+  # resolvconf file fed by networking.nameservers below. Every NM consumer in this repo is
+  # either sulfur-only (modules/fleet-vpn.nix gates ensureProfiles behind !isHydrogen),
+  # inert without NM (modules/wg-unmanaged.nix just sets an option), or not enabled here
+  # (modules/family/wg-endpoint.nix -- family.wgEndpoint is unset on hydrogen).
+  #
+  # WHAT IS GIVEN UP: the GNOME network panel and its applet. On a static-IP server with
+  # one bridge that is not a loss.
+  #
+  # HONESTLY: this is not a proven fix for that detach. Two live reproductions on
+  # 2026-08-13 cleared NM as the actor -- restarting it alone did nothing, and reloading
+  # br0-netdev alone under NM debug logging produced only the correct detach/re-attach. It
+  # removes the CLASS, not a demonstrated culprit. modules/bridge-slave-restore.nix stays
+  # armed until two consecutive nightlies pass with no repair logged; if one fires after
+  # this, the actor is scripted networking itself and br0-netdev's X-ReloadIfChanged is next.
+  networking.networkmanager.enable = lib.mkForce false;
+
   networking.bridges = {
     "br0" = {
       interfaces = ["enp0s31f6"];

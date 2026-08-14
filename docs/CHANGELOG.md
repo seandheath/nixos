@@ -26,6 +26,26 @@
     is watching are precisely the ones this does not really cover. Both need an
     off-box channel (ntfy on hydrogen is the obvious candidate); deliberately deferred.
 
+### Removed (one owner for hydrogen's network)
+- **`hosts/hydrogen.nix`: NetworkManager off (`mkForce false`).** hydrogen had two things
+  that each believed they owned the network — scripted `networking.bridges`, which owns
+  `br0` via `br0-netdev.service` and reloads it on most switches, and NetworkManager, present
+  only because GNOME sets it `mkDefault true`. Two owners for one interface is the class of
+  bug behind the 2026-08-13 six-hour outage; removing one makes it structurally impossible.
+  - NM earned nothing here: `ensureProfiles.profiles` empty, no wifi (already
+    `mkForce false`), and not the DNS source — `services.resolved` is off and
+    `/etc/resolv.conf` is a static resolvconf file fed by `networking.nameservers`. Every NM
+    consumer in the repo is sulfur-only, inert without NM, or not enabled on hydrogen.
+  - Given up: the GNOME network panel. On a static-IP server with one bridge, no loss.
+  - **Not a proven fix**, and the config says so. Two live reproductions cleared NM as the
+    actor for that specific detach. This removes the class, not a demonstrated culprit.
+  - **`modules/bridge-slave-restore.nix` is now on a retirement gate**: it stays armed until
+    two consecutive nightlies pass with zero repairs logged, then it gets deleted along with
+    its `commonModules` entry. Baseline is one WARNING, from the deliberate 16:45 test — no
+    spontaneous firing. A repair logged after this change is itself the finding: scripted
+    networking is detaching its own slave, and `br0-netdev`'s `X-ReloadIfChanged` is next.
+    The intent is that the watchdog leaves rather than becoming permanent furniture.
+
 ### Added (bound an unexplained six-hour outage)
 - **`modules/bridge-slave-restore.nix`**: a 30 s watchdog that re-attaches any
   `networking.bridges` slave found detached. hydrogen's 2026-08-13 nightly rebuild
