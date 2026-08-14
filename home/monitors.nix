@@ -1,12 +1,9 @@
 { config, pkgs, lib, ... }:
 
-let
-  dock-monitors = import ../packages/dock-monitors.nix { inherit pkgs; };
-in
 {
   home.packages = [
-    dock-monitors.pythonWithDbus
-    dock-monitors.package
+    pkgs.dock-monitors.pythonWithDbus
+    pkgs.dock-monitors.package
   ];
 
   # Automatically reapply monitor configuration after resume from sleep
@@ -20,7 +17,7 @@ in
       Type = "oneshot";
       # Wait for GNOME/Mutter to stabilize after resume before reconfiguring
       ExecStartPre = "${pkgs.coreutils}/bin/sleep 3";
-      ExecStart = "${dock-monitors.pythonWithDbus}/bin/python3 ${dock-monitors.script}";
+      ExecStart = "${pkgs.dock-monitors.pythonWithDbus}/bin/python3 ${pkgs.dock-monitors.script}";
       Environment = [
         "DISPLAY=:0"
         "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/%U/bus"

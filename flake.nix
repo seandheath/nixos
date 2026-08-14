@@ -63,6 +63,7 @@
         # Every host: hydrogen's br0 lost its slave during the 2026-08-13 nightly and
         # stayed unreachable for six hours. Defines nothing on a host with no bridges.
         ./modules/bridge-slave-restore.nix
+        { nixpkgs.overlays = [ (import ./packages) ]; }
         {
           home-manager.useGlobalPkgs = true;
           home-manager.useUserPackages = true;
@@ -114,5 +115,11 @@
       # machines you are not sitting at before it is committed.
       checks.${system} =
         nixpkgs.lib.mapAttrs (_: h: h.config.system.build.toplevel) hosts;
+
+      packages.${system} =
+        let pkgs = import nixpkgs { inherit system; config.allowUnfree = true; overlays = [ (import ./packages) ]; };
+        in {
+          inherit (pkgs) ghidra-reva imjtool jackify qwen-code re-container;
+        };
     };
 }

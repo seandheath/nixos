@@ -1,5 +1,6 @@
 { config, pkgs, inputs, lib, osConfig, ... }:
 let
+  vllm = import ../modules/vllm-endpoint.nix;
   # Pi coding agent (pi.dev) and its sops-templated Open WebUI config are
   # workstation-only. hydrogen (server) has no user-level age key at
   # ~/.config/sops/age/keys.txt, so the home sops activation for the openwebui
@@ -49,9 +50,7 @@ in
   sops = lib.mkIf enablePi {
     defaultSopsFile = ../secrets/secrets.yaml;
     age.keyFile = "${config.home.homeDirectory}/.config/sops/age/keys.txt";
-    secrets."openwebui-url" = { };
-    secrets."openwebui-model" = { };
-    secrets."openwebui-api-key" = { };
+    secrets = lib.genAttrs vllm.secretNames (_: { });
     templates."pi-models.json" = {
       path = "${config.home.homeDirectory}/.pi/agent/models.json";
       content = builtins.toJSON {
@@ -62,14 +61,8 @@ in
           models = [{
             id = config.sops.placeholder."openwebui-model";
             name = "Local (Open WebUI)";
-            # Both read from the endpoint's GET /models on 2026-07-30: max_model_len is
-            # 262144, not the 32768 guessed here originally. modules/opencode.nix states
-            # the same numbers for the same endpoint — keep the two in step.
-            contextWindow = 262144;
-            # Reserved out of contextWindow, not an independent server limit — vLLM caps
-            # only max_tokens <= max_model_len. 32768 because the served model reasons
-            # before answering; see the longer note in modules/opencode.nix.
-            maxTokens = 32768;
+            contextWindow = vllm.contextWindow;
+            maxTokens = vllm.maxOutput;
             input = [ "text" ];
           }];
         };

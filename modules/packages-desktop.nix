@@ -1,12 +1,6 @@
 # Common desktop application set for workstation hosts. Extracted from
 # workstation.nix; grouped by concern. DE-agnostic (works on any desktop).
 { pkgs, ... }:
-let
-  # Binary repack of Levin's proprietary firmware-image tool; not in nixpkgs.
-  imjtool = import ../packages/imjtool.nix { inherit pkgs; };
-  # Ghidra 12.1 + ReVa MCP extension; nixpkgs ghidra is 11.4.2 and ReVa needs >=12.0.
-  ghidra-reva = import ../packages/ghidra-reva.nix { inherit pkgs; };
-in
 {
   environment.systemPackages = with pkgs; [
     # Screenshots: gnome-shell's built-in area capture (see modules/dconf.nix).

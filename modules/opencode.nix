@@ -1,4 +1,7 @@
 { pkgs, ... }:
+let
+  vllm = import ./vllm-endpoint.nix;
+in
 
 # OpenCode wired to the remote vLLM and to Ghidra's ReVa MCP server: the client half
 # of the agentic reverse-engineering stack (docs/specification.md in ~/Downloads).
@@ -53,14 +56,12 @@
   # home-manager sops module's own evaluation. Same trick as workstation.nix's
   # claudeSettings activation script; `imports` is a list option, so both definitions of
   # home-manager.users.sheath.imports merge.
-  home-manager.users.sheath.imports = [ ({ config, ... }: {
+  home-manager.users.sheath.imports = [ ({ config, lib, ... }: {
     # Re-declared here rather than leaning on home/sheath.nix's pi block, so this feature
     # stands alone if pi is ever dropped. Identical sops.secrets submodule definitions
     # merge cleanly. `defaultSopsFile` and `age.keyFile` are NOT re-declared — those are
     # set once in home/sheath.nix for every non-hydrogen host.
-    sops.secrets."openwebui-url" = { };
-    sops.secrets."openwebui-model" = { };
-    sops.secrets."openwebui-api-key" = { };
+    sops.secrets = lib.genAttrs vllm.secretNames (_: { });
 
     sops.templates."opencode.json" = {
       path = "${config.home.homeDirectory}/.config/opencode/opencode.json";
@@ -99,7 +100,7 @@
               # 2026-07-30 (262144). OpenCode compacts against this number, so setting it
               # above the server's real limit is spec §6's "context overflow mid-task".
               # Re-check whenever the served model or vLLM's --max-model-len changes.
-              context = 262144;
+              context = vllm.contextWindow;
               # Output is a *client-side* budget: vLLM enforces only
               # max_tokens <= max_model_len, with no separate output cap (probed
               # 2026-07-30 — 262000 was accepted, 300000 rejected with
@@ -110,7 +111,7 @@
               # reasoning): reasoning over a large decompiled function then emitting a
               # tool call can run well past 8k, and hitting the cap mid-call is spec §6's
               # "truncated / malformed tool calls". Still leaves ~229k for context.
-              output = 32768;
+              output = vllm.maxOutput;
             };
           };
         };

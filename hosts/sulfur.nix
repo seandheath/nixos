@@ -1,7 +1,6 @@
 { lib, pkgs, config, ... }:
 
 let
-  dock-monitors = import ../packages/dock-monitors.nix { inherit pkgs; };
   peers = import ../modules/family/peers.nix;
   adm = peers.hubs.adm;
   rtr = peers.routerMgmt;
@@ -91,7 +90,7 @@ in
     lshw
     file
     btrfs-progs
-    (callPackage ../packages/jackify.nix {})
+    jackify
 
     # Minecraft is services.minecraftClient above, not a package here.
   ];
@@ -262,7 +261,7 @@ in
       ExecCondition = "${pkgs.coreutils}/bin/test -S /run/user/1000/bus";
       # Wait for Mutter to detect and enumerate new displays
       ExecStartPre = "${pkgs.coreutils}/bin/sleep 5";
-      ExecStart = "${dock-monitors.pythonWithDbus}/bin/python3 ${dock-monitors.script}";
+      ExecStart = "${pkgs.dock-monitors.pythonWithDbus}/bin/python3 ${pkgs.dock-monitors.script}";
       User = "sheath";
       Environment = "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus";
     };

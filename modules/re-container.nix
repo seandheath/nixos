@@ -51,7 +51,7 @@
 # Requires rootless podman and the subUid/subGid ranges for sheath, both already set up in
 # modules/virtualisation.nix (imported by hosts/sulfur.nix).
 let
-  image = import ../packages/re-container.nix { inherit pkgs; };
+  image = pkgs.re-container;
   imageName = "localhost/re-agents:latest";
   podman = "${pkgs.podman}/bin/podman";
 

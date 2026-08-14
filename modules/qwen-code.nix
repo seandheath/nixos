@@ -12,10 +12,10 @@
 # otherwise — this install is RE-only: ~/.qwen carries the ReVa MCP server and the RE
 # instructions as the global context file, so every `qwen` session is an RE session.
 let
-  qwen-code = import ../packages/qwen-code.nix { inherit pkgs; };
+  vllm = import ./vllm-endpoint.nix;
 in
 {
-  environment.systemPackages = [ qwen-code ];
+  environment.systemPackages = [ pkgs.qwen-code ];
 
   # Operating constraints as the global context file. qwen-code appends
   # $QWEN_HOME/QWEN.md to its own core system prompt (as `userMemory`) rather than
@@ -73,13 +73,13 @@ in
         generationConfig = {
           # The endpoint's advertised max_model_len. qwen-code compacts against this, so
           # setting it above the server's real limit invites context overflow mid-task.
-          contextWindowSize = 262144;
+          contextWindowSize = vllm.contextWindow;
           samplingParams = {
             # Client-side reservation out of the same 262144, not a separate server cap.
             # 32768 because the served model reasons before answering; see the longer
             # note in modules/opencode.nix. Keep this file, modules/opencode.nix and
             # home/sheath.nix in step — all three describe the same endpoint.
-            max_tokens = 32768;
+            max_tokens = vllm.maxOutput;
           };
         };
       }];
@@ -124,14 +124,12 @@ in
   # Imported as a sub-module rather than assigned by attr path so that `config` here is
   # home-manager's, not the NixOS one: `config.sops.placeholder` only exists inside the
   # home-manager sops module's own evaluation. Same trick as modules/opencode.nix.
-  home-manager.users.sheath.imports = [ ({ config, ... }: {
+  home-manager.users.sheath.imports = [ ({ config, lib, ... }: {
     # Re-declared here rather than leaning on home/sheath.nix's pi block, so this feature
     # stands alone if pi is ever dropped. Identical sops.secrets submodule definitions
     # merge cleanly. `defaultSopsFile` and `age.keyFile` are NOT re-declared — those are
     # set once in home/sheath.nix for every non-hydrogen host.
-    sops.secrets."openwebui-url" = { };
-    sops.secrets."openwebui-model" = { };
-    sops.secrets."openwebui-api-key" = { };
+    sops.secrets = lib.genAttrs vllm.secretNames (_: { });
 
     sops.templates."qwen-env" = {
       path = "${config.home.homeDirectory}/.qwen/.env";
