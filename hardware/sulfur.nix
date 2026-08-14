@@ -32,13 +32,6 @@
     #   cat /proc/cmdline   # -> ...enable_dpcd_backlight=3 must appear LAST
     "i915.enable_dpcd_backlight=3"
 
-    # NOTE (dead-but-harmless): the NVreg line below was an attempt to suppress the
-    # phantom nvidia_0 raw backlight so mutter couldn't bind to it. It does NOT work
-    # on the OPEN nvidia driver - the correct token applies (params show
-    # EnableBrightnessControl=0) yet nvidia_0 still spawns. Kept only because losing
-    # it changes nothing; the real backlight fix is enable_dpcd_backlight=3 above.
-    # If mutter is ever seen driving nvidia_0 after resume, mask it via udev instead.
-    "nvidia.NVreg_RegistryDwords=EnableBrightnessControl=0"
 
     # WHY 26.11 WOULD NOT BOOT (2026-08-11). Linux 6.18.44 turned this laptop's
     # long-standing PCIe grumble into a livelock. The Realtek RTS525A card reader at
@@ -114,7 +107,7 @@
   fileSystems."/boot" = {
     device = "/dev/disk/by-uuid/08E2-FB95";
     fsType = "vfat";
-    options = [ "fmask=0022" "dmask=0022" ];
+    options = [ "fmask=0077" "dmask=0077" ];
   };
 
   # Swap file on Btrfs (32GB for hibernation support)

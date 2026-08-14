@@ -94,7 +94,6 @@
       ];
     })
     protonup-ng
-    protontricks
     wineWow64Packages.waylandFull
     winetricks
     vulkan-loader

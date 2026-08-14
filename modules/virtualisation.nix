@@ -1,9 +1,5 @@
 { config, pkgs, lib, ... }:{
   programs.virt-manager.enable = true;
-  users.users.sheath = {
-    subUidRanges = [{ startUid = 100000; count = 65536; }];
-    subGidRanges = [{ startGid = 100000; count = 65536; }];
-  };
   users.groups.libvirtd.members = ["sheath"];
   users.groups.podman.members = ["sheath"];
   virtualisation.libvirtd = {
