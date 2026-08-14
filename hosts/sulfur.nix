@@ -11,14 +11,6 @@ in
     ../hardware/sulfur.nix
     ../modules/steam.nix
     ../modules/cemu.nix
-    # TEMPORARILY OUT (2026-08-10). packages/farcry2-realismredux.nix pins the mod
-    # through requireFile, and the 7z was garbage-collected: the built tree survived
-    # in the store but the source did not, so the 26.05 stdenv change -- which gives
-    # the mod derivation a new hash -- has nothing to build from. Re-download
-    # FC2-RealismPlusRedux-326-v1.2.5.7z from nexusmods.com/farcry2/mods/326,
-    #   nix-store --add-fixed sha256 FC2-RealismPlusRedux-326-v1.2.5.7z
-    # and uncomment. Installed game files are unaffected; only fc2-apply-mods is gone.
-    # ../modules/farcry2.nix
     ../modules/workstation.nix
     ../modules/virtualisation.nix
     ../modules/impermanence.nix
@@ -103,11 +95,6 @@ in
     btrfs-progs
     (callPackage ../packages/jackify.nix {})
 
-    # Veloren client (veloren-voxygen), for hydrogen's server in
-    # modules/veloren-server.nix. Veloren refuses cross-version connections, so this must
-    # stay the same flake pin as hydrogen — that lock-step is why the client comes from
-    # nixpkgs and not from Airshipper, which self-updates to upstream weekly nightlies.
-    veloren
     # Minecraft is services.minecraftClient above, not a package here.
   ];
 

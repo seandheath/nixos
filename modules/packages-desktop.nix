@@ -91,7 +91,6 @@ in
     wl-clipboard
 
     # Gaming
-    # blightmud  # temporarily disabled - build failure with gcc 15
     (lutris.override {
       extraLibraries = pkgs: [
         libgudev
@@ -102,8 +101,6 @@ in
     })
     protonup-ng
     protontricks
-    #wine
-    #wine64
     wineWow64Packages.waylandFull
     winetricks
     vulkan-loader

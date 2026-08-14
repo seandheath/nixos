@@ -1,13 +1,5 @@
 { config, pkgs, ... }:
 
-let
-  # Helper to build lua config inline
-  lua = code: ''
-    lua << EOF
-    ${code}
-    EOF
-  '';
-in
 {
   programs.neovim = {
     enable = true;

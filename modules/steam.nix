@@ -1,17 +1,4 @@
 { config, pkgs, ... }:{
-  # NO INSECURE PACKAGES ALLOWED HERE, deliberately empty.
-  #
-  # This used to carry "electron-39.8.10" for Heroic 2.20.1, which bundled an EOL
-  # Chromium. Every host that imports this file (sulfur and the four kids' laptops --
-  # not hydrogen) moved to nixos-unstable on 2026-08-11, where Heroic is 2.22.0 on
-  # electron-41.10.3 and the exception is no longer needed.
-  #
-  # It is removed rather than left in place because a stale entry here is worse than
-  # useless: it silently re-permits that exact insecure package the moment anything in
-  # the closure pulls it back, and nothing would report that. If a future bump needs an
-  # exception, eval fails loudly and you add the specific version then.
-  nixpkgs.config.permittedInsecurePackages = [ ];
-
   # Proper Bluetooth HID profile for Xbox One/Series/Elite controllers.
   # Stock hid_microsoft exposes BT pads as pointer devices, causing the left
   # stick to move the cursor in games. xpadneo replaces it with a gamepad-only

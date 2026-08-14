@@ -17,17 +17,6 @@
     ../modules/minecraft-server.nix   # persistent vanilla world (system service, no session needed)
     ../modules/minecraft-couch.nix    # 1-4 player split-screen launcher on the projector
     ../modules/minecraft-client.nix   # the offline client (game + mods pinned), shared with sulfur
-    # ../modules/veloren-server.nix   # DISABLED 2026-08-03 -- see below
-    #
-    # Veloren's rtsim (1867 NPCs across 196 sites) never idles: measured 20.7% of a core
-    # continuously with ZERO players connected, versus 0.10% for the Minecraft server, which
-    # does pause when empty (pause-when-empty-seconds, vanilla default 60). Nobody is playing
-    # Veloren, so that is a permanent ~0.2 cores and ~700 MiB for nothing.
-    #
-    # To re-enable: uncomment the import above and the two ports in the br0 firewall lists
-    # below. /var/lib/veloren is left in place, so characters and terrain diffs survive; even
-    # if it were deleted the world regenerates identically from the pinned world_seed.
-    # modules/veloren-server.nix and docs/veloren.md are unchanged.
   ];
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
@@ -104,10 +93,6 @@
     address = "10.0.0.10";
     prefixLength = 24;
   }];
-  #networking.interfaces.enp0s31f6.ipv4.addresses = [{
-    #address = "10.0.0.10";
-    #prefixLength = 24;
-  #}];
   networking.defaultGateway = "10.0.0.1";
   networking.nameservers = [ "10.0.0.1" ];
   networking.firewall.enable = true;
@@ -136,10 +121,6 @@
   # change, as docs/minecraft.md has said all along.
   networking.firewall.allowedTCPPorts = [
     # Nothing. Every service port lives in an interface-scoped list below.
-    #
-    # Removed 2026-08-06: 6789, 7878, 8096, 8989 (sabnzbd/radarr/jellyfin/sonarr) --
-    # modules/usenet.nix has not been imported by any host for a long time, so these
-    # were open to the whole LAN for services that do not run.
   ];
   networking.firewall.allowedUDPPorts = [
     51821   # wgfam -- family devices
@@ -195,11 +176,6 @@
     rsync
     go
 
-    # Veloren client (veloren-voxygen). Same derivation as the server in
-    # modules/veloren-server.nix, which is the point: Veloren refuses cross-version
-    # connections, so client and server must come from one flake pin. Airshipper is
-    # not a substitute — it self-updates to upstream's weekly nightlies.
-    veloren
   ];
 
   # Set your time zone.
@@ -282,13 +258,7 @@
     80 443
     25565
 
-    # Veloren game port (modules/veloren-server.nix). Closed alongside the disabled
-    # import above; re-open with it, here rather than on br0 -- that server also runs
-    # with auth_server_address: None and verifies no identity, so it belongs behind the
-    # tunnel for exactly the reason 25565 does.
-    # 14004
   ];
-  # networking.firewall.interfaces."wgfam".allowedUDPPorts = [ 14006 ]; # Veloren query
 
   # Auto-start the RustDesk host with the (autologin) graphical session, so the box
   # accepts connections after boot without launching it by hand. Runs as a user
