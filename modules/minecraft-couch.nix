@@ -74,25 +74,34 @@
       # `--probe` dumps raw events to check a new pad.
       couchMenu = pkgs.writers.writePython3Bin "minecraft-couch-menu"
         {
-          libraries = [ pkgs.python3Packages.evdev ];
+          # Propagates evdev, so this one entry covers both.
+          libraries = [ pkgs.minecraft-menu ];
           # E501: UI strings read better than they wrap.
           flakeIgnore = [ "E501" ];
         }
         ''
           """Couch Minecraft pre-launcher: pads, players, then play."""
           import argparse
-          import glob
-          import json
           import os
           import re
-          import select
           import subprocess
           import sys
-          import termios
           import time
-          import tty
 
           from evdev import InputDevice, categorize, ecodes
+
+          # The widgets moved to packages/minecraft-menu so the per-machine launcher
+          # can use the same ones. Everything below is couch-only.
+          from minecraft_menu import (
+              Input,
+              draw,
+              load_json,
+              menu,
+              message,
+              pads,
+              save_json,
+              type_text,
+          )
 
           SEED = [${lib.concatMapStringsSep ", " (n: "\"${n}\"") seedPlayers}]
           ROSTER = "${rosterFile}"
@@ -100,246 +109,32 @@
           BLUETOOTHCTL = "${pkgs.bluez}/bin/bluetoothctl"
           NAME_RE = re.compile("${nameRe}")
 
-          # D-pad button codes are excluded from "confirm" so a D-pad press can
-          # never double as a selection. See the comment above the derivation.
-          DPAD_BTNS = {ecodes.BTN_DPAD_UP, ecodes.BTN_DPAD_DOWN,
-                       ecodes.BTN_DPAD_LEFT, ecodes.BTN_DPAD_RIGHT}
-          DEADZONE = 16000
-
-          KEYS_LOWER = ["abcdefghij", "klmnopqrst", "uvwxyz0123", "456789_"]
-          SHIFT, BACKSPACE, ACCEPT = "SHIFT", "BACKSPACE", "OK"
-
 
           # -------------------------------------------------------------- roster
 
           def load_roster():
               """Read the roster, seeding it from Nix on first run."""
-              if not os.path.exists(ROSTER):
-                  os.makedirs(os.path.dirname(ROSTER), exist_ok=True)
+              data = load_json(ROSTER, None)
+              if data is None:
                   save_roster(SEED)
                   return list(SEED)
-              with open(ROSTER) as fh:
-                  return list(json.load(fh).get("players", []))
+              return list(data.get("players", []))
 
 
           def save_roster(players):
-              tmp = ROSTER + ".tmp"
-              with open(tmp, "w") as fh:
-                  json.dump({"players": players}, fh, indent=2)
-                  fh.write("\n")
-              os.replace(tmp, ROSTER)
-
-
-          # ---------------------------------------------------------------- pads
-
-          def pads():
-              """Resolved event nodes for every joystick, de-duplicated.
-
-              The udev rule tags one symlink per joystick node; resolving and
-              de-duplicating guards against a pad that exposes several nodes
-              (motion sensors, force feedback) being counted more than once.
-              """
-              seen = set()
-              for link in sorted(glob.glob("/dev/input/couchpad-*")):
-                  seen.add(os.path.realpath(link))
-              return sorted(seen)
-
-
-          # --------------------------------------------------------------- input
-
-          class Input:
-              """Merged keyboard + gamepad event source.
-
-              Yields ("move", dx, dy), ("confirm",), ("text", ch),
-              ("backspace",) or ("escape",). Both device classes drive every
-              screen, which is what lets the menu be reached with no pad paired.
-              """
-
-              def __init__(self):
-                  self.devices = []
-                  for node in pads():
-                      try:
-                          self.devices.append(InputDevice(node))
-                      except OSError:
-                          pass
-                  self.latched = {}
-                  self.fd = sys.stdin.fileno()
-                  self.saved = termios.tcgetattr(self.fd)
-                  tty.setraw(self.fd)
-
-              def close(self):
-                  termios.tcsetattr(self.fd, termios.TCSADRAIN, self.saved)
-                  for dev in self.devices:
-                      dev.close()
-                  self.devices = []
-
-              def _from_pad(self, dev):
-                  out = []
-                  for event in dev.read():
-                      if event.type == ecodes.EV_ABS:
-                          horiz = event.code in (ecodes.ABS_HAT0X, ecodes.ABS_X)
-                          vert = event.code in (ecodes.ABS_HAT0Y, ecodes.ABS_Y)
-                          if not (horiz or vert):
-                              continue
-                          hat = event.code in (ecodes.ABS_HAT0X, ecodes.ABS_HAT0Y)
-                          # A hat is already discrete; an analogue axis streams,
-                          # so latch on the way out and re-arm at centre.
-                          key = (dev.path, event.code)
-                          if hat:
-                              step = event.value
-                          elif abs(event.value) > DEADZONE:
-                              if self.latched.get(key):
-                                  continue
-                              self.latched[key] = True
-                              step = 1 if event.value > 0 else -1
-                          else:
-                              self.latched[key] = False
-                              continue
-                          if not step:
-                              continue
-                          step = 1 if step > 0 else -1
-                          out.append(("move", step, 0) if horiz else ("move", 0, step))
-                      elif event.type == ecodes.EV_KEY and event.value == 1:
-                          if event.code == ecodes.BTN_DPAD_UP:
-                              out.append(("move", 0, -1))
-                          elif event.code == ecodes.BTN_DPAD_DOWN:
-                              out.append(("move", 0, 1))
-                          elif event.code == ecodes.BTN_DPAD_LEFT:
-                              out.append(("move", -1, 0))
-                          elif event.code == ecodes.BTN_DPAD_RIGHT:
-                              out.append(("move", 1, 0))
-                          elif event.code not in DPAD_BTNS:
-                              out.append(("confirm", dev.path))
-                  return out
-
-              def _from_keyboard(self):
-                  ch = os.read(self.fd, 1).decode("utf-8", "replace")
-                  if ch == "\x1b":
-                      rest = ""
-                      while select.select([self.fd], [], [], 0.02)[0]:
-                          rest += os.read(self.fd, 1).decode("utf-8", "replace")
-                      arrows = {"[A": ("move", 0, -1), "[B": ("move", 0, 1),
-                                "[C": ("move", 1, 0), "[D": ("move", -1, 0)}
-                      if rest in arrows:
-                          return [arrows[rest]]
-                      return [("escape",)]
-                  if ch in ("\r", "\n"):
-                      return [("confirm", None)]
-                  if ch in ("\x7f", "\b"):
-                      return [("backspace",)]
-                  if ch == "\x03":
-                      raise KeyboardInterrupt
-                  if ch.isprintable():
-                      return [("text", ch)]
-                  return []
-
-              def next(self):
-                  """Block for the next action."""
-                  while True:
-                      fds = [self.fd] + [d.fileno() for d in self.devices]
-                      ready, _, _ = select.select(fds, [], [])
-                      for dev in self.devices:
-                          if dev.fileno() in ready:
-                              actions = self._from_pad(dev)
-                              if actions:
-                                  return actions[0]
-                      if self.fd in ready:
-                          actions = self._from_keyboard()
-                          if actions:
-                              return actions[0]
-
-
-          # ------------------------------------------------------------ rendering
-
-          def draw(title, lines, footer=""):
-              out = ["\x1b[2J\x1b[H", "", "  " + title, ""]
-              out += lines
-              out += ["", "  " + footer if footer else ""]
-              sys.stdout.write("\r\n".join(out))
-              sys.stdout.flush()
-
-
-          def menu(inp, title, options, footer="D-pad or arrows to move, any button or Enter to pick"):
-              """Vertical picker. Returns the chosen index, or None on escape."""
-              cursor = 0
-              while True:
-                  lines = []
-                  for i, opt in enumerate(options):
-                      lines.append(("  >  " if i == cursor else "     ") + opt)
-                  draw(title, lines, footer)
-                  action = inp.next()
-                  if action[0] == "move":
-                      _, _, dy = action
-                      if dy:
-                          cursor = (cursor + dy) % len(options)
-                  elif action[0] == "confirm":
-                      return cursor
-                  elif action[0] == "escape":
-                      return None
-
-
-          def message(inp, title, body):
-              draw(title, ["     " + line for line in body], "any button or Enter to continue")
-              while True:
-                  if inp.next()[0] in ("confirm", "escape"):
-                      return
+              save_json(ROSTER, {"players": players})
 
 
           # ------------------------------------------------------------- text entry
 
           def type_name(inp, roster):
               """On-screen keyboard; the hardware keyboard types into it too."""
-              text, shift, row, col = "", False, 0, 0
-              while True:
-                  rows = []
-                  for r, chars in enumerate(KEYS_LOWER):
-                      cells = []
-                      for c, ch in enumerate(chars):
-                          glyph = ch.upper() if shift else ch
-                          cells.append("[%s]" % glyph if (r, c) == (row, col) else " %s " % glyph)
-                      rows.append("     " + "".join(cells))
-                  extras = [SHIFT, BACKSPACE, ACCEPT]
-                  cells = []
-                  for c, label in enumerate(extras):
-                      cells.append("[%s]" % label if (row, col) == (len(KEYS_LOWER), c) else " %s " % label)
-                  rows.append("     " + "".join(cells))
-                  draw("New player name:  %s_" % text,
-                       rows,
-                       "3-16 letters, digits or _   |   or just type on the keyboard")
-
-                  action = inp.next()
-                  kind = action[0]
-                  if kind == "escape":
-                      return None
-                  if kind == "text":
-                      text += action[1]
-                      continue
-                  if kind == "backspace":
-                      text = text[:-1]
-                      continue
-                  if kind == "move":
-                      _, dx, dy = action
-                      row = (row + dy) % (len(KEYS_LOWER) + 1)
-                      width = len(extras) if row == len(KEYS_LOWER) else len(KEYS_LOWER[row])
-                      col = (col + dx) % width
-                      col = min(col, width - 1)
-                      continue
-                  if kind == "confirm":
-                      if row == len(KEYS_LOWER):
-                          label = extras[col]
-                          if label == SHIFT:
-                              shift = not shift
-                          elif label == BACKSPACE:
-                              text = text[:-1]
-                          else:
-                              err = validate(text, roster)
-                              if err:
-                                  message(inp, "Not a usable name", [err])
-                              else:
-                                  return text
-                      else:
-                          ch = KEYS_LOWER[row][col]
-                          text += ch.upper() if shift else ch
+              return type_text(
+                  inp,
+                  "New player name:",
+                  footer="3-16 letters, digits or _   |   or just type on the keyboard",
+                  validate=lambda text: validate(text, roster),
+              )
 
 
           def validate(name, roster):
