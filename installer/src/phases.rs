@@ -9,6 +9,7 @@ use std::io::{self, BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
+#[derive(Clone)]
 pub struct Ctx {
     /// The checkout being installed from.
     pub repo: PathBuf,

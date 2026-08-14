@@ -21,8 +21,36 @@ use ratatui::widgets::{Block, Borders, Clear, List, ListItem, Paragraph, Wrap};
 use ratatui::{Frame, Terminal};
 
 use std::io::{self, Stdout};
+use std::sync::mpsc::{self, Receiver};
+use std::time::{Duration, Instant};
 
 type Term = Terminal<CrosstermBackend<Stdout>>;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PState {
+    Pending,
+    Running,
+    Done,
+    Failed,
+}
+
+/// Sent from the worker thread that runs the phases.
+enum Msg {
+    Start(usize),
+    Line(String),
+    Ok(usize),
+    Err(usize, String),
+    Finished,
+}
+
+/// Live state of an install in flight.
+pub struct Run {
+    rx: Receiver<Msg>,
+    current: Option<usize>,
+    phase_started: Instant,
+    started: Instant,
+    failed: bool,
+}
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Role {
@@ -63,7 +91,9 @@ pub struct App {
     pub row: usize,
     pub log: Vec<String>,
     pub phase_done: Vec<bool>,
-    pub running: bool,
+    pub phase_state: Vec<PState>,
+    pub run: Option<Run>,
+    pub tick: usize,
     pub status: String,
     quit: bool,
 }
@@ -76,10 +106,16 @@ impl App {
             row: 0,
             log: Vec::new(),
             phase_done: vec![false; phases::ALL.len()],
-            running: false,
+            phase_state: vec![PState::Pending; phases::ALL.len()],
+            run: None,
+            tick: 0,
             status: "press v to check everything, Enter to edit a row".into(),
             quit: false,
         }
+    }
+
+    pub fn is_running(&self) -> bool {
+        self.run.is_some()
     }
 
     fn selected(&self) -> CheckId {
@@ -120,12 +156,96 @@ fn event_loop(term: &mut Term, app: &mut App) -> io::Result<()> {
         if app.quit {
             return Ok(());
         }
+
+        // While phases run the loop must not block on a keypress: the worker's output is
+        // what needs drawing, and nixos-install alone can take twenty minutes.
+        if app.is_running() {
+            app.tick = app.tick.wrapping_add(1);
+            pump(app);
+            if event::poll(Duration::from_millis(120))? {
+                let _ = event::read()?;
+            }
+            continue;
+        }
+
         let Event::Key(key) = event::read()? else {
             continue;
         };
         if key.kind == KeyEventKind::Press {
             handle_key(app, key.code);
         }
+    }
+}
+
+/// Drain whatever the worker has produced since the last frame.
+fn pump(app: &mut App) {
+    let mut finished = false;
+    if let Some(run) = app.run.as_mut() {
+        for msg in run.rx.try_iter() {
+            match msg {
+                Msg::Start(i) => {
+                    run.current = Some(i);
+                    run.phase_started = Instant::now();
+                    app.phase_state[i] = PState::Running;
+                    app.log.push(format!(
+                        "== {}: {}",
+                        phases::ALL[i].name(),
+                        phases::ALL[i].describe()
+                    ));
+                }
+                Msg::Line(l) => app.log.push(l),
+                Msg::Ok(i) => {
+                    app.phase_state[i] = PState::Done;
+                    app.phase_done[i] = true;
+                    run.current = None;
+                }
+                Msg::Err(i, e) => {
+                    app.phase_state[i] = PState::Failed;
+                    run.failed = true;
+                    run.current = None;
+                    app.log
+                        .push(format!("   {} FAILED: {e}", phases::ALL[i].name()));
+                }
+                Msg::Finished => finished = true,
+            }
+        }
+        app.status = match run.current {
+            Some(i) => format!("{} — {}", phases::ALL[i].name(), elapsed(run.phase_started)),
+            None if !finished => "…".into(),
+            _ => app.status.clone(),
+        };
+    }
+
+    if finished {
+        let failed = app.run.as_ref().is_some_and(|r| r.failed);
+        let total = app
+            .run
+            .as_ref()
+            .map(|r| elapsed(r.started))
+            .unwrap_or_default();
+        app.run = None;
+        if failed {
+            app.status = "failed — see the log".into();
+        } else {
+            app.status = format!("installed in {total}");
+            app.log.push(String::new());
+            app.log.push(format!(
+                "Commit disk-config/{h}.nix and hardware/{h}.nix, then push: every host",
+                h = app.board.host()
+            ));
+            app.log.push(
+                "rebuilds from github:seandheath/nixos nightly and would revert them.".into(),
+            );
+        }
+    }
+}
+
+fn elapsed(since: Instant) -> String {
+    let s = since.elapsed().as_secs();
+    if s < 60 {
+        format!("{s}s")
+    } else {
+        format!("{}m{:02}s", s / 60, s % 60)
     }
 }
 
@@ -248,7 +368,8 @@ fn self_destructive(app: &App) -> bool {
         .any(|(p, done)| p.is_destructive() && !*done)
 }
 
-/// Runs every pending phase with no further interaction.
+/// Hand every pending phase to a worker thread. The event loop then draws its output as
+/// it arrives instead of freezing until the whole install finishes.
 fn execute_pending(app: &mut App) {
     let ctx = match app.board.ctx() {
         Ok(c) => c,
@@ -257,44 +378,43 @@ fn execute_pending(app: &mut App) {
             return;
         }
     };
-    app.running = true;
-
-    for (i, phase) in phases::ALL.iter().enumerate() {
-        if app.phase_done[i] {
-            continue;
-        }
-        app.status = format!("running {}", phase.name());
-        app.log
-            .push(format!("== {}: {}", phase.name(), phase.describe()));
-
-        let mut lines = Vec::new();
-        let result = phase.run(&ctx, &mut |l| lines.push(l.to_string()));
-        app.log.extend(lines);
-
-        match result {
-            Ok(()) => {
-                app.phase_done[i] = true;
-                app.log.push(format!("   {} done", phase.name()));
-            }
-            Err(e) => {
-                app.log.push(format!("   {} FAILED: {e}", phase.name()));
-                app.modal = Modal::Error(format!("{} failed:\n{e}", phase.name()));
-                app.status = format!("{} failed", phase.name());
-                app.running = false;
-                return;
-            }
-        }
+    let pending: Vec<usize> = (0..phases::ALL.len())
+        .filter(|i| !app.phase_done[*i])
+        .collect();
+    for i in &pending {
+        app.phase_state[*i] = PState::Pending;
     }
 
-    app.running = false;
-    app.status = "installed".into();
-    app.log.push(String::new());
-    app.log.push(format!(
-        "Commit disk-config/{h}.nix and hardware/{h}.nix, then push: every host",
-        h = app.board.host()
-    ));
-    app.log
-        .push("rebuilds from github:seandheath/nixos nightly and would revert them.".into());
+    let (tx, rx) = mpsc::channel();
+    std::thread::spawn(move || {
+        for i in pending {
+            let phase = phases::ALL[i];
+            let _ = tx.send(Msg::Start(i));
+            let line_tx = tx.clone();
+            let mut send = move |l: &str| {
+                let _ = line_tx.send(Msg::Line(format!("   {l}")));
+            };
+            match phase.run(&ctx, &mut send) {
+                Ok(()) => {
+                    let _ = tx.send(Msg::Ok(i));
+                }
+                Err(e) => {
+                    let _ = tx.send(Msg::Err(i, e.to_string()));
+                    break;
+                }
+            }
+        }
+        let _ = tx.send(Msg::Finished);
+    });
+
+    app.run = Some(Run {
+        rx,
+        current: None,
+        phase_started: Instant::now(),
+        started: Instant::now(),
+        failed: false,
+    });
+    app.status = "starting…".into();
 }
 
 // --- modals ----------------------------------------------------------------------------
@@ -515,17 +635,31 @@ pub fn role_of(app: &App, disk: &Disk) -> Option<Role> {
 // --- drawing ---------------------------------------------------------------------------
 
 fn draw(f: &mut Frame, app: &App) {
+    // While installing, the checklist matters less than the log.
+    let (board_h, run_h) = if app.is_running() {
+        (Constraint::Length(6), Constraint::Min(12))
+    } else {
+        (Constraint::Min(8), Constraint::Length(8))
+    };
     let rows = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(3),
-            Constraint::Min(8),
-            Constraint::Length(8),
-            Constraint::Length(3),
-        ])
+        .constraints([Constraint::Length(3), board_h, run_h, Constraint::Length(3)])
         .split(f.area());
 
     let ready = app.board.ready();
+    let (badge, colour) = match app.run.as_ref() {
+        Some(r) => (
+            format!(
+                "INSTALLING {}/{}  {}",
+                app.phase_done.iter().filter(|d| **d).count(),
+                phases::ALL.len(),
+                elapsed(r.started)
+            ),
+            Color::Cyan,
+        ),
+        None if ready => ("READY".into(), Color::Green),
+        None => ("incomplete".into(), Color::Yellow),
+    };
     f.render_widget(
         Paragraph::new(Line::from(vec![
             Span::styled(
@@ -533,10 +667,7 @@ fn draw(f: &mut Frame, app: &App) {
                 Style::default().add_modifier(Modifier::BOLD),
             ),
             Span::raw(format!("   {}   ", app.board.host())),
-            Span::styled(
-                if ready { "READY" } else { "incomplete" },
-                Style::default().fg(if ready { Color::Green } else { Color::Yellow }),
-            ),
+            Span::styled(badge, Style::default().fg(colour)),
             Span::raw(format!("   {}", app.status)),
         ]))
         .block(Block::default().borders(Borders::ALL)),
@@ -551,11 +682,13 @@ fn draw(f: &mut Frame, app: &App) {
     draw_detail(f, cols[1], app);
     draw_phases(f, rows[2], app);
 
+    let help = if app.is_running() {
+        "installing — nixos-install takes a while; the log below is live"
+    } else {
+        "j/k move   Enter edit   c check row   v check all   m mount existing   r install   q quit"
+    };
     f.render_widget(
-        Paragraph::new(
-            "j/k move   Enter edit   c check row   v check all   m mount existing   r install   q quit",
-        )
-        .block(Block::default().borders(Borders::ALL)),
+        Paragraph::new(help).block(Block::default().borders(Borders::ALL)),
         rows[3],
     );
 
@@ -657,24 +790,40 @@ fn draw_phases(f: &mut Frame, area: Rect, app: &App) {
         .constraints([Constraint::Percentage(40), Constraint::Percentage(60)])
         .split(area);
 
+    const SPIN: [&str; 4] = ["|", "/", "-", "\\"];
     let items: Vec<ListItem> = phases::ALL
         .iter()
-        .zip(&app.phase_done)
-        .map(|(p, done)| {
-            let style = if *done {
-                Style::default().fg(Color::Green)
-            } else if p.is_destructive() {
-                Style::default().fg(Color::Red)
-            } else {
-                Style::default()
+        .enumerate()
+        .map(|(i, p)| {
+            let state = app.phase_state[i];
+            let done = app.phase_done[i];
+            let (mark, style) = match state {
+                PState::Running => (
+                    SPIN[(app.tick / 2) % SPIN.len()].to_string(),
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                PState::Failed => ("✘".into(), Style::default().fg(Color::Red)),
+                _ if done => ("✔".into(), Style::default().fg(Color::Green)),
+                _ if p.is_destructive() => (" ".into(), Style::default().fg(Color::Red)),
+                _ => (" ".into(), Style::default()),
             };
-            ListItem::new(format!("[{}] {}", if *done { "x" } else { " " }, p.name())).style(style)
+            let timing = match (state, app.run.as_ref()) {
+                (PState::Running, Some(r)) => format!("  {}", elapsed(r.phase_started)),
+                _ => String::new(),
+            };
+            ListItem::new(format!("{mark} {}{timing}", p.name())).style(style)
         })
         .collect();
-    let title = if app.phase_done.first() == Some(&false) {
-        " phases -- if ALREADY INSTALLED press m to mount first "
+
+    let finished = app.phase_done.iter().filter(|d| **d).count();
+    let title = if app.is_running() {
+        format!(" phases  {finished}/{} ", phases::ALL.len())
+    } else if app.phase_done.first() == Some(&false) {
+        " phases -- if ALREADY INSTALLED press m to mount first ".into()
     } else {
-        " phases "
+        " phases ".into()
     };
     f.render_widget(
         List::new(items).block(Block::default().borders(Borders::ALL).title(title)),
@@ -979,6 +1128,77 @@ mod tests {
         assert!(
             a.board.luks_passphrase.is_empty(),
             "a stale passphrase must not survive turning encryption off"
+        );
+    }
+
+    fn running_app() -> (App, mpsc::Sender<Msg>) {
+        let (tx, rx) = mpsc::channel();
+        let mut a = app();
+        a.run = Some(Run {
+            rx,
+            current: None,
+            phase_started: Instant::now(),
+            started: Instant::now(),
+            failed: false,
+        });
+        (a, tx)
+    }
+
+    /// The run used to block the event loop, so the screen froze from ERASE until the
+    /// whole install finished -- twenty silent minutes through nixos-install.
+    #[test]
+    fn progress_streams_in_rather_than_arriving_at_the_end() {
+        let (mut a, tx) = running_app();
+        tx.send(Msg::Start(0)).unwrap();
+        tx.send(Msg::Line("   formatting /dev/…".into())).unwrap();
+        pump(&mut a);
+
+        assert_eq!(a.phase_state[0], PState::Running);
+        assert!(
+            a.log.iter().any(|l| l.contains("formatting")),
+            "output must appear while the phase is still running"
+        );
+        assert!(a.is_running());
+
+        tx.send(Msg::Ok(0)).unwrap();
+        pump(&mut a);
+        assert_eq!(a.phase_state[0], PState::Done);
+        assert!(a.phase_done[0]);
+
+        tx.send(Msg::Finished).unwrap();
+        pump(&mut a);
+        assert!(!a.is_running());
+        assert!(a.status.contains("installed"));
+    }
+
+    #[test]
+    fn a_failed_phase_is_marked_and_reported() {
+        let (mut a, tx) = running_app();
+        tx.send(Msg::Start(1)).unwrap();
+        tx.send(Msg::Err(1, "disko exploded".into())).unwrap();
+        tx.send(Msg::Finished).unwrap();
+        pump(&mut a);
+
+        assert_eq!(a.phase_state[1], PState::Failed);
+        assert!(a.log.iter().any(|l| l.contains("disko exploded")));
+        assert!(a.status.contains("failed"));
+        assert!(!a.is_running());
+    }
+
+    #[test]
+    fn the_header_shows_progress_while_installing() {
+        let (mut a, tx) = running_app();
+        tx.send(Msg::Start(0)).unwrap();
+        pump(&mut a);
+        let out = render(&a);
+        assert!(
+            out.contains("INSTALLING"),
+            "no progress indicator in the header"
+        );
+        assert!(out.contains("partition"));
+        assert!(
+            out.contains("the log below is live"),
+            "the footer should say the run is in progress"
         );
     }
 
