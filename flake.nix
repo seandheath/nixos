@@ -28,6 +28,13 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
+    # Declarative disk layout. One description of a disk drives both the partitioning and
+    # the fileSystems config, so install.sh cannot format one shape and describe another.
+    disko = {
+      url = "github:nix-community/disko";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     cclaude = {
       url = "github:seandheath/cclaude";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -44,13 +51,17 @@
     pi-flake.url = "github:ChauDucToan/pi-flake";
   };
 
-  outputs = { self, nixpkgs, nixos-hardware, home-manager, sops-nix, impermanence, ... }@inputs:
+  outputs = { self, nixpkgs, nixos-hardware, home-manager, sops-nix, impermanence, disko, ... }@inputs:
     let
       system = "x86_64-linux";
 
       commonModules = [
         home-manager.nixosModules.home-manager
         sops-nix.nixosModules.sops
+        disko.nixosModules.disko
+        # Inert until a host sets fleet.disk.enable, so the hosts still carried by a
+        # hand-written hardware/<host>.nix are untouched by adding it here.
+        ./modules/disk-layout.nix
         ./modules/nix-settings.nix
         ./modules/sops.nix
         ./modules/accounts.nix
