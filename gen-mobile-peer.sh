@@ -11,9 +11,9 @@
 # one authority for these names. hydrogen briefly ran a second dnsmasq for the same zone,
 # which is how split-horizon DNS starts giving two different answers to one question.
 #
-# So the phone asks 10.42.0.3 for a name, is told the app lives at 10.41.0.1, and reaches
-# it over the hydrogen peer. Two peers, each doing its own job, and neither box's outage
-# implies the other's.
+# So the phone asks the router at its tunnel address for a name, is told where the app
+# lives, and reaches it over the hydrogen peer. Two peers, each doing its own job, and
+# neither box's outage implies the other's.
 #
 # THE SECOND DNS SERVER IS NOT OPTIONAL. With only the tunnel resolver listed, a phone
 # whose hydrogen peer is down has no DNS at all -- not degraded, gone -- and presents as
@@ -43,22 +43,25 @@
 #
 set -euo pipefail
 
-# --- Fixed facts about the two hubs (modules/family/peers.nix) --------------------
-HYDROGEN_FAM_KEY="ALwEaWzOtlZ7NspsMoFy9l9aTOG1bXdvXgmzf3xVc2Y="
-HYDROGEN_ADM_KEY="wxLQ7mv3IGFVecZnrtZ0LrqtEbHr5j/nh0yYHq4SXjs="
-ROUTER_MGMT_KEY="/4/zGHCJN/J2IrGEprkcPk+35Mij+kzY2UxNK+8Y5Qs="
-
-FAM_PORT=51821
-ADM_PORT=51822
-MGMT_PORT=51823
-
-# hub. resolves to hydrogen's LAN address inside the house and to the WAN address
-# outside it (the router's split-horizon record). vpn. always resolves to the WAN
-# address, which is right for the router peer: at home that packet still reaches the
-# router, because 51823 is open on brLan.
-HYDROGEN_HOST="hub.luckyobserver.com"
-ROUTER_HOST="vpn.luckyobserver.com"
-ROUTER_TUNNEL_ADDR="10.42.0.1"
+# --- Hub facts, read from modules/family/peers.nix ---------------------------------
+# Derived, not transcribed. This block used to be a hand-copied duplicate, and it drifted:
+# it sent every phone to hub.luckyobserver.com, a name peers.nix records as deliberately
+# abandoned in favour of vpn.
+eval "$(nix eval --json --file modules/family/peers.nix 2>/dev/null | ${PYTHON:-python3} -c '
+import json, sys, shlex
+d = json.load(sys.stdin)
+def emit(k, v): print(f"{k}={shlex.quote(str(v))}")
+emit("HYDROGEN_FAM_KEY", d["hubs"]["fam"]["publicKey"])
+emit("HYDROGEN_ADM_KEY", d["hubs"]["adm"]["publicKey"])
+emit("ROUTER_MGMT_KEY",  d["routerMgmt"]["publicKey"])
+emit("FAM_PORT",         d["hubs"]["fam"]["port"])
+emit("ADM_PORT",         d["hubs"]["adm"]["port"])
+emit("MGMT_PORT",        d["routerMgmt"]["port"])
+emit("HYDROGEN_HOST",    d["endpointHost"])
+emit("ROUTER_HOST",      d["endpointHost"])
+emit("ROUTER_TUNNEL_ADDR", d["routerMgmt"]["address"])
+')"
+[[ -n ${HYDROGEN_FAM_KEY:-} ]] || { echo "error: could not read modules/family/peers.nix" >&2; exit 1; }
 
 die() { echo "error: $*" >&2; exit 1; }
 

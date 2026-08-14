@@ -28,19 +28,22 @@
 #
 set -euo pipefail
 
-# The existing age recipient, sole reader of secrets/secrets.yaml. Taken from that
-# file's own sops metadata; if you ever rotate it, change it here too.
-MAIN_RECIPIENT="age1276ku650f9gsmv3slnduus8styr0m6ued8dpza2qau446sp9l4qsq5dden"
+# The existing age recipient, sole reader of secrets/secrets.yaml. Read from .sops.yaml so
+# a rotation there is picked up here.
+MAIN_RECIPIENT="$(sed -n 's/^  - &main \(age1[0-9a-z]*\)$/\1/p' .sops.yaml)"
+[[ -n "$MAIN_RECIPIENT" ]] || { echo "error: no '&main' recipient in .sops.yaml" >&2; exit 1; }
 
 # WireGuard keypairs, all keyed `wg-priv-<name>` to match the existing wg-priv-sulfur /
 # wg-priv-fleet convention. The split is only which FILE they land in: HUB_PEERS go to
 # secrets/secrets.yaml (main key), FAMILY_PEERS to secrets/family.yaml (main + family),
 # so a kid's laptop can read its own key and nothing else.
 #
-# FAMILY_PEERS are hostnames -- the kids' Minecraft handles, lowercased. Keep them in
-# step with `family` in modules/family/peers.nix.
+# FAMILY_PEERS are hostnames -- the kids' Minecraft handles, lowercased -- read from
+# modules/family/peers.nix rather than transcribed.
 HUB_PEERS=(wgfam-hub wgadm-hub sulfur-adm)
-FAMILY_PEERS=(gentlemenpupil vizualwanderer phantomspecialst maddreamer)
+read -r -a FAMILY_PEERS <<< "$(nix eval --json --file modules/family/peers.nix 2>/dev/null \
+    | python3 -c 'import json,sys; print(" ".join(sorted(json.load(sys.stdin)["family"])))')"
+[[ ${#FAMILY_PEERS[@]} -gt 0 ]] || { echo "error: could not read modules/family/peers.nix" >&2; exit 1; }
 
 # Accounts needing a hashed password, keyed `<name>-password-hash` (matching
 # nextcloud-adminpass / paperless-adminpass).
@@ -132,36 +135,13 @@ echo "Choose a passphrase for secrets/family-age-key.enc (needed at every instal
 age -p -a -o "$WORK/family-age-key.enc" "$WORK/family-age.key"
 
 # --- 4. .sops.yaml ---------------------------------------------------------------
-# Staged in $WORK and passed to sops with --config, so the repository is untouched until
-# every artefact exists. Rules are evaluated top-down, first match wins.
-cat > "$WORK/.sops.yaml" <<EOF
-# sops creation rules. Which key can read which file is the whole point:
-# secrets/secrets.yaml holds credentials for hydrogen's services (Nextcloud admin, Borg
-# repo key, fleet VPN SSH key) and stays readable only by the main key. The family
-# laptops carry the FAMILY key instead, so a kid's machine -- which lives outside the
-# house and is not disk-encrypted -- can decrypt its own WireGuard key and password and
-# nothing else.
-#
-# Rotate a recipient here and re-run \`sops updatekeys <file>\` on every file it matches.
-keys:
-  - &main ${MAIN_RECIPIENT}
-  - &family ${FAMILY_RECIPIENT}
-
-creation_rules:
-  # Family devices: readable by the family key AND by main, so hydrogen and sulfur can
-  # still administer them.
-  - path_regex: secrets/family\.yaml\$
-    key_groups:
-      - age:
-          - *main
-          - *family
-
-  # Everything else: main only.
-  - path_regex: secrets/[^/]+\.yaml\$
-    key_groups:
-      - age:
-          - *main
-EOF
+# Derived from the committed .sops.yaml with the freshly generated family recipient
+# substituted in, so the rule structure lives in exactly one place. Staged in $WORK and
+# passed to sops with --config, so the repository is untouched until every artefact exists.
+sed "s|^  - &family age1[0-9a-z]*$|  - \&family ${FAMILY_RECIPIENT}|" \
+    .sops.yaml > "$WORK/.sops.yaml"
+grep -q "&family ${FAMILY_RECIPIENT}" "$WORK/.sops.yaml" \
+    || die "could not substitute the family recipient into .sops.yaml"
 
 # --- 5. Passwords ----------------------------------------------------------------
 # read -rs keeps them off the screen; printf is a shell builtin, so the plaintext is

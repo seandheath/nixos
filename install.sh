@@ -2,6 +2,25 @@
 
 set -euo pipefail
 
+# The kids' laptops, read from modules/family/peers.nix rather than transcribed. Tries the
+# working directory first, then the copy already placed on the target -- --resume can run
+# from outside the repo. Hard-fails rather than answering "not a family host", which would
+# silently pick the wrong password handling.
+family_hosts() {
+    local peers f
+    for f in ./modules/family/peers.nix /mnt/home/sheath/nixos/modules/family/peers.nix; do
+        [[ -f "$f" ]] || continue
+        peers=$(nix eval --json --file "$f" 2>/dev/null \
+            | python3 -c 'import json,sys; print(" ".join(sorted(json.load(sys.stdin)["family"])))') || continue
+        [[ -n "$peers" ]] || continue
+        echo "$peers"
+        return 0
+    done
+    echo "error: could not read the family host list from modules/family/peers.nix" >&2
+    exit 1
+}
+
+
 # --- Resume Functionality ---
 RESUME_FILE="/tmp/nixos-install-resume"
 
@@ -95,9 +114,8 @@ if [[ "${1:-}" == "--resume" ]]; then
 
     # Family laptops set both passwords declaratively from sops (see
     # modules/family/profile.nix), so there is no `passwd` in the system profile to run.
-    # Same list as the main path below; kept in step with modules/family/peers.nix.
     resume_is_family=false
-    for _fh in gentlemenpupil vizualwanderer phantomspecialst maddreamer; do
+    for _fh in $(family_hosts); do
         [[ "$hostname" == "$_fh" ]] && resume_is_family=true && break
     done
 
@@ -342,11 +360,11 @@ fi
 echo "Selected host: $hostname"
 
 # --- Family host handling ---
-# The four kids' laptops differ from every other host in three ways that this script
-# has to know about: which age key they get, which disk layout they support, and how
-# their passwords are set. Keep this list in step with `family` in
-# modules/family/peers.nix -- every peer there is one of these four.
-FAMILY_HOSTS=(gentlemenpupil vizualwanderer phantomspecialst maddreamer)
+# The four kids' laptops differ from every other host in three ways this script has to
+# know about: which age key they get, which disk layout they support, and how their
+# passwords are set.
+read -r -a FAMILY_HOSTS <<< "$(family_hosts)"
+[[ ${#FAMILY_HOSTS[@]} -gt 0 ]] || { echo "error: could not read family hosts from modules/family/peers.nix" >&2; exit 1; }
 IS_FAMILY_HOST=false
 for _fh in "${FAMILY_HOSTS[@]}"; do
     if [[ "$hostname" == "$_fh" ]]; then
