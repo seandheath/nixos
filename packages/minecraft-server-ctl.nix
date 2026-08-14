@@ -193,6 +193,33 @@ pkgs.writeShellApplication {
       echo "removed (world kept at $root/$name)"
     }
 
+    running_servers() {
+      for c in $(podman ps --filter 'name=^mc-' --format '{{.Names}}'); do
+        echo "''${c#mc-}"
+      done
+    }
+
+    # Bracket a backup. Minecraft writes region files continuously, so an archive taken
+    # live can catch a half-written chunk -- the same reason modules/backup.nix flushes the
+    # shared world through its console FIFO. Never fails: a world that cannot be reached is
+    # worse left running than it is worth aborting a backup for.
+    cmd_freeze() {
+      local n
+      for n in $(running_servers); do
+        rcon "$n" save-off >/dev/null 2>&1 || true
+        rcon "$n" save-all flush >/dev/null 2>&1 || true
+      done
+      echo frozen
+    }
+
+    cmd_thaw() {
+      local n
+      for n in $(running_servers); do
+        rcon "$n" save-on >/dev/null 2>&1 || true
+      done
+      echo thawed
+    }
+
     usage() {
       cat <<'USAGE'
     usage: minecraft-server-ctl SUBCOMMAND [ARGS]
@@ -205,6 +232,8 @@ pkgs.writeShellApplication {
       status NAME              state and port, or "absent"
       logs NAME [LINES]        recent output
       remove NAME              remove the container, keep the world
+      freeze                   suspend autosave on every running server, before a backup
+      thaw                     resume autosave everywhere
     USAGE
     }
 
@@ -219,6 +248,8 @@ pkgs.writeShellApplication {
       status) cmd_status "''${1:-}" ;;
       logs)   cmd_logs "''${1:-}" "''${2:-40}" ;;
       remove) cmd_remove "''${1:-}" ;;
+      freeze) cmd_freeze ;;
+      thaw)   cmd_thaw ;;
       ""|-h|--help) usage ;;
       *) usage; die "unknown subcommand: $sub" ;;
     esac

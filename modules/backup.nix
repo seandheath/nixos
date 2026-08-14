@@ -24,6 +24,11 @@ let
     "/var/lib/calibre-web"
     "/var/lib/syncthing"       # synced folders + config.xml (device keys/IDs) + index DB
     "/var/lib/minecraft"       # the world (see minecraftFlush below) + server.properties
+
+    # The on-demand worlds, one directory per server. The parent covers servers created
+    # after this line was written; without it a world made from the launcher is silently
+    # unprotected. Not flushed like the shared world below -- see the note there.
+    "/var/lib/minecraft-servers"
     # The postgresql subdirectory, NOT /var/backup -- widening it to the parent sweeps the
     # rootfs repo into every job, so each backup would archive a copy of the backups.
     "/var/backup/postgresql"
@@ -57,12 +62,26 @@ let
     ${pkgs.coreutils}/bin/timeout 5 ${pkgs.bash}/bin/bash -c \
       ${lib.escapeShellArg "echo ${cmd} > /run/minecraft-server.stdin"} || true
   '';
+  # The on-demand worlds have no console FIFO; they are reached by RCON through their own
+  # containers, as mcctl, whose rootless podman needs its runtime directory named. Both
+  # halves end in `|| true`: a world that cannot be reached is not worth failing a backup
+  # over, and freeze is only an optimisation over Minecraft's own autosave.
+  mcServers = verb: ''
+    ${pkgs.coreutils}/bin/timeout 30 ${pkgs.sudo}/bin/sudo -u mcctl \
+      XDG_RUNTIME_DIR=/run/user/${toString config.users.users.mcctl.uid} \
+      ${lib.getExe pkgs.minecraft-server-ctl} ${verb} >/dev/null 2>&1 || true
+  '';
+
   minecraftFlush = ''
     ${mcConsole "save-off"}
     ${mcConsole "save-all flush"}
+    ${lib.optionalString (config.fleet.minecraftServers.enable or false) (mcServers "freeze")}
     ${pkgs.coreutils}/bin/sleep 5
   '';
-  minecraftResume = pkgs.writeShellScript "minecraft-save-on" (mcConsole "save-on");
+  minecraftResume = pkgs.writeShellScript "minecraft-save-on" (
+    mcConsole "save-on"
+    + lib.optionalString (config.fleet.minecraftServers.enable or false) (mcServers "thaw")
+  );
 
 
   # Named for the disk, not for "local" -- both this and rootRepo are on the machine.

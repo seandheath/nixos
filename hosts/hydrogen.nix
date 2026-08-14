@@ -19,6 +19,7 @@
     ../modules/fleet-vpn.nix
     ../modules/family/vpn-hub.nix
     ../modules/minecraft-server.nix
+    ../modules/minecraft-servers.nix      # extra worlds on demand, in rootless podman
     ../modules/minecraft-couch.nix
     ../modules/minecraft-client.nix
   ];
@@ -38,6 +39,14 @@
     # The restore copy: client and server closures mirrored into a local binary cache and
     # picked up by the nightly borg run. Survives Mojang or Modrinth dropping a version.
     archiveDir = "/var/lib/minecraft-archive";
+  };
+
+  # On-demand worlds alongside the shared one. authorizedKeys is empty until each laptop
+  # has its own control key in secrets/family.yaml; sheath drives it directly over wgadm
+  # in the meantime.
+  fleet.minecraftServers = {
+    enable = true;
+    authorizedKeys = [ ];
   };
 
   # Static br0. Plain false, not mkDefault, to beat the generated hardware file.
@@ -92,8 +101,21 @@
     22000 21027     # Syncthing sync + discovery
   ];
 
-  # Note what is absent: 22, RustDesk, Syncthing.
-  networking.firewall.interfaces."wgfam".allowedTCPPorts = [ 80 443 25565 ];
+  # Note what is absent: RustDesk, Syncthing.
+  #
+  # 22 is here so the kids' launchers can reach the on-demand server control channel, which
+  # is SSH behind a forced command (modules/minecraft-servers.nix). Consequence, per the
+  # guest note in modules/family/peers.nix: a guest key on wgfam can now reach sshd too.
+  # Key-only auth is what stops them, not reachability. If guests become common, the
+  # remedy that file suggests is a third hub carrying only the control port.
+  networking.firewall.interfaces."wgfam".allowedTCPPorts = [ 22 80 443 25565 ];
+
+  # The on-demand worlds. A range rather than per-server entries: firewall ports are
+  # declarative and per-interface, so a container the launcher creates at runtime on a
+  # fresh port would otherwise be unreachable until the next rebuild. 25565 stays the
+  # shared world.
+  networking.firewall.interfaces."wgfam".allowedTCPPortRanges = [ { from = 25566; to = 25575; } ];
+  networking.firewall.interfaces."wgadm".allowedTCPPortRanges = [ { from = 25566; to = 25575; } ];
 
   services.openssh = {
     enable = true;
