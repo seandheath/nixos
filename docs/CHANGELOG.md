@@ -19,6 +19,57 @@ Also the decision log. Rationale that would otherwise bloat a code comment lives
   finding: scripted networking is detaching its own slave, and `br0-netdev`'s
   `X-ReloadIfChanged` is the next suspect.
 
+## 2026-08-14 (later)
+
+- **Disk layout is declarative: `modules/disk-layout.nix` renders `fleet.disk.*` into
+  `disko.devices`.** The old installer partitioned imperatively and then described the same
+  disk a second time in a shell heredoc. Two descriptions, maintained by hand, had already
+  drifted: generated `/boot` used `fmask=0022` where every committed host uses `0077`, and
+  generated `/` was `subvol=@root` where `hardware/sulfur.nix` is a tmpfs. One description
+  now drives both, so they cannot disagree.
+- **The `by-id` path is format-time only.** disko mounts by
+  `/dev/disk/by-partlabel/disk-<disk>-<part>`, so a committed layout is machine-independent
+  and `disko --mode mount` needs no disk id. That is what makes resuming after a live-ISO
+  reboot possible at all, and it is why `hardware/_placeholder.nix`'s label-matching hack is
+  no longer load-bearing.
+- **disko does not set `neededForBoot`.** It emits only `device`, `fsType` and `options`. The
+  module adds it for `/nix`, `/home`, `/persist` and `/var/log`; without it sops-install-secrets
+  fails during initrd activation. Highest-risk omission in the migration, and silent.
+- **The age key went to the wrong place for sulfur.** The old installer chose the destination
+  from the *disk layout* -- impermanence meant `/persist/secrets/age-keys.txt`. Only
+  `modules/impermanence-server.nix` (hydrogen) actually moves `sops.age.keyFile` there;
+  sulfur imports `modules/impermanence.nix`, which does not, so its key landed where nothing
+  reads it. Evaluated, not assumed: sulfur wants `/home/sheath/.config/sops/age/keys.txt`.
+  The installer now asks the host's own configuration, which also picks the family key from
+  `sops.defaultSopsFile` rather than a hardcoded host list, and drops the
+  `/persist/secrets/sheath-password` file nothing ever read.
+- **Family laptops may now use LUKS, btrfs and `/persist`.** The "family must be mode 1"
+  restriction existed only because the age-key path was inferred from the layout. With it
+  derived, encryption and impermanence became independent choices.
+- **A TUI installer in Rust replaces the shell one** (`installer/`, `nix run .#installer`).
+  Every option is chosen and reviewed before anything executes; the layout is saved to
+  `disk-config/<host>.nix`, which is the single source of truth and the file that has to be
+  committed anyway. Phase completion is derived by inspecting the target rather than trusting
+  a scratch file, so a fresh run, a resume and a deliberate re-install take the same path.
+  State lives on `@persist` because `/tmp` dies with the ISO and a tmpfs root evaporates on
+  reboot. The repo's first Rust package; `nix run` resolves it via `meta.mainProgram`, and
+  `checks` names it explicitly because that attrset is otherwise hosts-only.
+- **The run screen offers `m` before `r`.** After an ISO reboot nothing is mounted, so every
+  phase reads as pending -- and the destructive one is first in the list. Without an explicit
+  "mount the existing target" step, a resume would have re-partitioned an installed machine.
+- **hydrogen stays unencrypted.** `modules/auto-update.nix` reboots the fleet unattended; an
+  encrypted headless server would come back up waiting at a passphrase prompt nobody is
+  watching. Encryption is per-host, not fleet-wide.
+- `install.sh` is kept until the TUI has completed a real install. Deleting the only working
+  installer before its replacement is proven would leave no way to install a machine.
+
+<!-- TODO: verify a two-disk encrypted layout boots from ONE passphrase. Both volumes
+     format from one shared key file, so the headers hold identical passphrases -- confirmed
+     by reading the generated diskoScript. Whether systemd's password cache then opens the
+     second without a second prompt needs a real boot. Worst case is two prompts, never a
+     failed boot. Automating this against disko's own VM harness was abandoned: it hardcodes
+     checkScripts = true, which its two-askPassword script then fails on. -->
+
 ## 2026-08-14
 
 - **`install.sh` could not install a family laptop, and found out after `mkfs`.** The host
