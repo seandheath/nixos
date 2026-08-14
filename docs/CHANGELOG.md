@@ -44,6 +44,12 @@ Also the decision log. Rationale that would otherwise bloat a code comment lives
   filesystems. `--dry-run` now reports the profile as valid without writing or building.
 - The ERASE confirmation stays. Validation proves the configuration is right, not that it is
   aimed at the correct machine.
+- **The installer carries its own tools.** The minimal ISO has no `age` and no `mkpasswd`,
+  so the environment check failed on the real thing. The package now wraps the binary with
+  `--suffix PATH` over age, mkpasswd, util-linux, openssh, git and coreutils: the ISO's
+  copies still win where they exist, and these fill the gaps. `nix`, `nixos-install`,
+  `nixos-generate-config` and `nixos-enter` are deliberately left out -- those must come
+  from the running installer environment, not from this checkout's nixpkgs.
 
 ## 2026-08-14 (later)
 
