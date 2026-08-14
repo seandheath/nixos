@@ -140,6 +140,21 @@ fn parse_facts(out: &str) -> io::Result<Facts> {
     })
 }
 
+/// Build the host's partitioning script. This is disko itself accepting the layout, so it
+/// is the strongest check available without touching a disk.
+pub fn build_disko_script(repo: &str, host: &str) -> io::Result<String> {
+    let mut c = nix();
+    c.args([
+        "build",
+        "--no-link",
+        "--print-out-paths",
+        &format!("{repo}#nixosConfigurations.{host}.config.system.build.diskoScript"),
+    ]);
+    Ok(run(c, "building the partitioning script")?
+        .trim()
+        .to_string())
+}
+
 /// The locked disko revision, so the CLI matches the module the layout was built against.
 pub fn disko_bin(repo: &str) -> io::Result<String> {
     let mut c = nix();

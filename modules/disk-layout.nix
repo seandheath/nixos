@@ -61,9 +61,11 @@ in
       description = "by-id path of the disk carrying the ESP and root.";
     };
 
+    # Off by default: an un-chosen default that encrypts costs a wipe to discover, and
+    # every committed layout states the value explicitly either way.
     system.encrypt = lib.mkOption {
       type = lib.types.bool;
-      default = true;
+      default = false;
       description = "Wrap the root partition in LUKS2.";
     };
 
@@ -81,7 +83,7 @@ in
 
     home.encrypt = lib.mkOption {
       type = lib.types.bool;
-      default = true;
+      default = false;
       description = "Wrap the separate /home disk in LUKS2.";
     };
 

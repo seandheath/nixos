@@ -184,7 +184,7 @@ impl Profile {
 }
 
 /// A disko size: digits followed by a unit, e.g. `32G`.
-fn is_size(s: &str) -> bool {
+pub fn is_size(s: &str) -> bool {
     let Some(unit) = s.chars().last() else {
         return false;
     };

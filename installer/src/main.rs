@@ -1,13 +1,13 @@
 //! TUI installer for this NixOS fleet.
 
+mod checks;
 mod disks;
 mod nix;
 mod phases;
 mod profile;
 mod ui;
 
-use phases::{Ctx, Phase};
-use std::path::{Path, PathBuf};
+use checks::Board;
 use std::process::ExitCode;
 
 pub const BY_ID: &str = "/dev/disk/by-id";
@@ -19,20 +19,18 @@ struct Args {
     host: Option<String>,
     dry_run: bool,
     list_hosts: bool,
-    run: bool,
 }
 
 fn usage() {
     eprintln!(
-        "usage: installer [--repo PATH] [--host HOST] [--dry-run|--run] [--list-hosts]
+        "usage: installer [--repo PATH] [--host HOST] [--dry-run] [--list-hosts]
 
   --repo PATH   the configuration flake (default: the current directory)
-  --host HOST   skip the host picker
-  --dry-run     report what would happen and touch nothing
-  --run         execute the pending phases without the TUI
+  --host HOST   preselect the host
+  --dry-run     run every check, print the result, and change nothing
   --list-hosts  print every host in the flake
 
-Run with no arguments for the TUI."
+Run with no arguments for the dashboard."
     );
 }
 
@@ -42,7 +40,6 @@ fn parse_args() -> Result<Args, String> {
         host: None,
         dry_run: false,
         list_hosts: false,
-        run: false,
     };
     let mut it = std::env::args().skip(1);
     while let Some(arg) = it.next() {
@@ -50,7 +47,6 @@ fn parse_args() -> Result<Args, String> {
             "--repo" => a.repo = it.next().ok_or("--repo needs a path")?,
             "--host" => a.host = Some(it.next().ok_or("--host needs a name")?),
             "--dry-run" => a.dry_run = true,
-            "--run" => a.run = true,
             "--list-hosts" => a.list_hosts = true,
             "-h" | "--help" => {
                 usage();
@@ -71,98 +67,78 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-
-    if let Err(e) = run(&args) {
-        eprintln!("error: {e}");
-        return ExitCode::FAILURE;
+    match run(&args) {
+        Ok(code) => code,
+        Err(e) => {
+            eprintln!("error: {e}");
+            ExitCode::FAILURE
+        }
     }
-    ExitCode::SUCCESS
 }
 
-fn run(args: &Args) -> Result<(), String> {
+fn run(args: &Args) -> Result<ExitCode, String> {
     if args.list_hosts {
         for h in nix::hosts(&args.repo).map_err(|e| e.to_string())? {
             println!("{h}");
         }
-        return Ok(());
+        return Ok(ExitCode::SUCCESS);
     }
 
-    if args.dry_run {
-        let host = args
-            .host
-            .clone()
-            .ok_or("--dry-run needs --host until the TUI can pick one")?;
-        return dry_run(&args.repo, &host);
-    }
-
-    if args.run {
-        let host = args
-            .host
-            .clone()
-            .ok_or("--run needs --host until the TUI can pick one")?;
-        return execute(&args.repo, &host);
-    }
-
-    if !is_root() {
-        return Err("the installer must run as root".into());
-    }
     let hosts = nix::hosts(&args.repo).map_err(|e| e.to_string())?;
     if hosts.is_empty() {
         return Err("the flake defines no hosts".into());
     }
-    ui::run(&args.repo, hosts).map_err(|e| e.to_string())
-}
+    let mut board = Board::new(&args.repo, hosts);
+    if let Some(h) = &args.host {
+        board.host_idx = board
+            .hosts
+            .iter()
+            .position(|x| x == h)
+            .ok_or_else(|| format!("no such host: {h}"))?;
+    }
 
-/// Build the phase context. `disko` is only resolved when something may actually run,
-/// because building it is slow and the inspection predicates do not need it.
-fn context(repo: &str, host: &str, facts: nix::Facts, with_disko: bool) -> Result<Ctx, String> {
-    let disko = if with_disko {
-        nix::disko_bin(repo).map_err(|e| e.to_string())?
-    } else {
-        String::new()
-    };
-    Ok(Ctx {
-        repo: PathBuf::from(repo),
-        target: PathBuf::from(TARGET),
-        host: host.to_string(),
-        facts,
-        disko,
-        scratch: PathBuf::from(SCRATCH),
-    })
-}
-
-fn phase_status(ctx: &Ctx) -> Vec<(Phase, bool)> {
-    phases::ALL.iter().map(|p| (*p, p.is_done(ctx))).collect()
-}
-
-fn execute(repo: &str, host: &str) -> Result<(), String> {
+    if args.dry_run {
+        return Ok(dry_run(board));
+    }
     if !is_root() {
         return Err("the installer must run as root".into());
     }
-    let facts = nix::facts(repo, host).map_err(|e| e.to_string())?;
-    let ctx = context(repo, host, facts, true)?;
-
-    for (phase, done) in phase_status(&ctx) {
-        if done {
-            println!("== {} (already done)", phase.name());
-            continue;
-        }
-        if phase.is_destructive() {
-            return Err(format!(
-                "{} is pending and is destructive; run it from the TUI, which confirms first",
-                phase.name()
-            ));
-        }
-        println!("== {}: {}", phase.name(), phase.describe());
-        phase
-            .run(&ctx, &mut |line| println!("   {line}"))
-            .map_err(|e| e.to_string())?;
-    }
-    Ok(())
+    ui::run(board).map_err(|e| e.to_string())?;
+    Ok(ExitCode::SUCCESS)
 }
 
-fn is_root() -> bool {
-    // SAFETY: geteuid is always safe; it takes no arguments and cannot fail.
+/// Every check, reported, with nothing changed. Useful over SSH, where there is no
+/// terminal for the dashboard.
+fn dry_run(mut board: Board) -> ExitCode {
+    board.allow_writes = false;
+    println!("host: {}\n", board.host());
+    board.load_host();
+    board.check_all();
+
+    for id in checks::ALL {
+        let st = board.status(id);
+        println!("{} {:<14} {}", st.glyph(), id.label(), st.summary());
+    }
+
+    let unmet: Vec<&str> = checks::ALL
+        .iter()
+        .filter(|id| !board.status(**id).satisfied())
+        .map(|id| id.label())
+        .collect();
+
+    println!("\nNo file was written and no disk was touched.");
+    if unmet.is_empty() {
+        ExitCode::SUCCESS
+    } else {
+        // Passphrases cannot be entered without the dashboard, so those rows fail here
+        // by construction rather than indicating a problem.
+        println!("unmet: {}", unmet.join(", "));
+        ExitCode::FAILURE
+    }
+}
+
+pub fn is_root() -> bool {
+    // SAFETY: geteuid takes no arguments and cannot fail.
     unsafe { libc_geteuid() == 0 }
 }
 
@@ -172,83 +148,24 @@ extern "C" {
     fn libc_geteuid() -> u32;
 }
 
-/// Report the target's state without touching it.
-fn dry_run(repo: &str, host: &str) -> Result<(), String> {
-    let fd = nix::fleet_disk(repo, host).map_err(|e| e.to_string())?;
-    let configured = fd.enable;
-    let p = profile::Profile::from_fleet_disk(host, fd);
-    let facts = nix::facts(repo, host).map_err(|e| e.to_string())?;
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use checks::Status;
 
-    println!("host:          {host}");
-    println!(
-        "layout:        {}",
-        if configured {
-            "committed in disk-config/"
-        } else {
-            "none yet (module defaults shown)"
-        }
-    );
-    println!(
-        "age key:       {} <- {}",
-        facts.age_key_file,
-        facts.age_key_source()
-    );
-    println!("root password: {}", facts.root_password);
-    println!(
-        "passwords:     {}",
-        if facts.mutable_users {
-            "set with passwd after install"
-        } else {
-            "declarative; nothing to run"
-        }
-    );
-    println!("persists /etc/ssh: {}", facts.persist_ssh);
-
-    println!("\ndisks visible now:");
-    match disks::list(Path::new(BY_ID)) {
-        Ok(ds) if ds.is_empty() => println!("  (none)"),
-        Ok(ds) => {
-            for d in ds {
-                println!(
-                    "  {}  {}",
-                    d.label(),
-                    d.by_id.as_deref().unwrap_or("** no stable by-id link **")
-                );
-            }
-        }
-        Err(e) => println!("  (could not enumerate: {e})"),
+    #[test]
+    fn dry_run_reports_unmet_rows_rather_than_claiming_success() {
+        // A board that was never loaded has pending rows, so the summary must not be "ready".
+        let board = Board::new("/definitely/not/a/repo", vec!["nohost".into()]);
+        let unmet: Vec<&str> = checks::ALL
+            .iter()
+            .filter(|id| !board.status(**id).satisfied())
+            .map(|id| id.label())
+            .collect();
+        assert!(!unmet.is_empty());
+        assert!(matches!(
+            board.status(checks::CheckId::Layout),
+            Status::Pending
+        ));
     }
-
-    println!("\nrendered disk-config/{host}.nix:\n");
-    print!("{}", p.to_nix());
-
-    match p.validate() {
-        Ok(()) => println!("\nprofile is installable."),
-        Err(errs) => {
-            println!("\nnot installable yet:");
-            for e in errs {
-                println!("  - {e}");
-            }
-        }
-    }
-
-    // Status comes from inspecting the target, so this reads correctly on a fresh run, a
-    // resume and a re-install alike.
-    let ctx = context(repo, host, facts, false)?;
-    println!("\nphases:");
-    for (phase, done) in phase_status(&ctx) {
-        println!(
-            "  [{}] {:<10} {}{}",
-            if done { "x" } else { " " },
-            phase.name(),
-            phase.describe(),
-            if phase.is_destructive() {
-                "  <-- confirmation required"
-            } else {
-                ""
-            }
-        );
-    }
-    println!("\nnothing above was executed.");
-    Ok(())
 }

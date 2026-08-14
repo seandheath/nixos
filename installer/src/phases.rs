@@ -20,6 +20,12 @@ pub struct Ctx {
     pub disko: String,
     /// tmpfs working area; holds the LUKS key file during formatting.
     pub scratch: PathBuf,
+
+    // Collected up front so the run needs no interaction once it starts. Empty when the
+    // host does not need them: no encryption, or rootPassword is not "persist".
+    pub luks_passphrase: String,
+    pub age_passphrase: String,
+    pub root_password: String,
 }
 
 impl Ctx {
@@ -106,13 +112,6 @@ impl Phase {
             Phase::Install => "nixos-install",
             Phase::Finalize => "fix ownership and report",
         }
-    }
-
-    /// True for phases that drive an interactive passphrase prompt on /dev/tty and so
-    /// cannot have their output captured: the committed age key is scrypt-encrypted and
-    /// `age -d` reads its passphrase from the terminal, never from stdin.
-    pub fn needs_tty(self) -> bool {
-        matches!(self, Phase::Secrets | Phase::Finalize)
     }
 
     pub fn is_destructive(self) -> bool {
@@ -208,18 +207,11 @@ fn stream(mut cmd: Command, what: &str, log: &mut dyn FnMut(&str)) -> io::Result
     }
 }
 
-/// Run a command with the terminal handed straight to it, for interactive prompts.
-fn passthrough(mut cmd: Command, what: &str) -> io::Result<()> {
-    let status = cmd.status()?;
-    if status.success() {
-        Ok(())
-    } else {
-        Err(io::Error::other(format!("{what} failed ({status})")))
-    }
-}
-
 /// The one irreversible step. The caller is responsible for having confirmed it.
 fn partition(ctx: &Ctx, log: &mut dyn FnMut(&str)) -> io::Result<()> {
+    if !ctx.luks_passphrase.is_empty() {
+        write_luks_key(ctx)?;
+    }
     log("partitioning with disko");
     let mut c = Command::new(&ctx.disko);
     c.args([
@@ -229,7 +221,10 @@ fn partition(ctx: &Ctx, log: &mut dyn FnMut(&str)) -> io::Result<()> {
         "--flake",
     ])
     .arg(format!("{}#{}", ctx.repo.display(), ctx.host));
-    stream(c, "disko", log)
+    let result = stream(c, "disko", log);
+    // The headers hold the passphrase now; nothing later reads the file.
+    let _ = std::fs::remove_file(ctx.luks_key());
+    result
 }
 
 /// Re-mount an already-installed target. Needs no by-id path: disko opens LUKS and
@@ -302,15 +297,7 @@ fn secrets(ctx: &Ctx, log: &mut dyn FnMut(&str)) -> io::Result<()> {
         dest.display()
     ));
 
-    // Interactive: the committed key is scrypt-encrypted and age prompts on /dev/tty.
-    let mut c = Command::new("sh");
-    c.arg("-c").arg(format!(
-        "{} -d {} > {}",
-        age_tool(),
-        shell_quote(&src.to_string_lossy()),
-        shell_quote(&dest.to_string_lossy())
-    ));
-    if let Err(e) = passthrough(c, "age decrypt") {
+    if let Err(e) = age_decrypt(&src, &dest, &ctx.age_passphrase) {
         let _ = std::fs::remove_file(&dest);
         return Err(e);
     }
@@ -346,13 +333,15 @@ fn secrets(ctx: &Ctx, log: &mut dyn FnMut(&str)) -> io::Result<()> {
         if path.exists() {
             log("root password already set");
         } else {
-            log("set root's password (read from /persist/secrets/root-password at boot)");
-            let mut c = Command::new("sh");
-            c.arg("-c").arg(format!(
-                "mkpasswd -m sha-512 > {}",
-                shell_quote(&path.to_string_lossy())
-            ));
-            passthrough(c, "mkpasswd")?;
+            log("hashing root's password (read from /persist/secrets/root-password at boot)");
+            // --stdin keeps this non-interactive; the password never reaches argv.
+            let hash = pipe_to(
+                Command::new("mkpasswd"),
+                ["-m", "sha-512", "--stdin"],
+                &ctx.root_password,
+                "mkpasswd",
+            )?;
+            std::fs::write(&path, hash.trim_end().to_owned() + "\n")?;
             set_mode(&path, 0o600)?;
         }
     }
@@ -384,24 +373,85 @@ fn finalize(ctx: &Ctx, log: &mut dyn FnMut(&str)) -> io::Result<()> {
     Ok(())
 }
 
-fn age_tool() -> &'static str {
-    if which("age") {
-        "age"
-    } else if which("rage") {
-        "rage"
-    } else {
-        "nix --extra-experimental-features 'nix-command flakes' run nixpkgs#age --"
-    }
-}
-
-fn which(bin: &str) -> bool {
+pub fn which(bin: &str) -> bool {
     std::env::var_os("PATH")
         .map(|paths| std::env::split_paths(&paths).any(|d| d.join(bin).is_file()))
         .unwrap_or(false)
 }
 
+fn age_tool() -> &'static str {
+    if which("rage") && !which("age") {
+        "rage"
+    } else {
+        "age"
+    }
+}
+
 fn shell_quote(s: &str) -> String {
     format!("'{}'", s.replace('\'', r"'\''"))
+}
+
+/// Run a command with its stdin fed from a string, returning stdout.
+fn pipe_to<I, S>(mut cmd: Command, args: I, stdin: &str, what: &str) -> io::Result<String>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<std::ffi::OsStr>,
+{
+    use std::io::Write;
+    cmd.args(args)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    let mut child = cmd.spawn()?;
+    child
+        .stdin
+        .take()
+        .expect("piped")
+        .write_all(stdin.as_bytes())?;
+    let out = child.wait_with_output()?;
+    if !out.status.success() {
+        return Err(io::Error::other(format!(
+            "{what} failed: {}",
+            String::from_utf8_lossy(&out.stderr).trim()
+        )));
+    }
+    Ok(String::from_utf8_lossy(&out.stdout).into_owned())
+}
+
+/// The command run inside the pty. The passphrase is deliberately not a parameter: it
+/// arrives on stdin, so it never reaches argv and cannot be read out of `ps`.
+fn age_command(src: &Path, dest: &Path) -> String {
+    format!(
+        "{} -d -o {} {}",
+        age_tool(),
+        shell_quote(&dest.to_string_lossy()),
+        shell_quote(&src.to_string_lossy())
+    )
+}
+
+/// Decrypt a scrypt-encrypted age file without a terminal.
+///
+/// `age -d` refuses a piped passphrase -- "standard input is not a terminal, and /dev/tty
+/// is not available" -- so `script` supplies a pty and the passphrase arrives on its
+/// stdin. It is never an argument, so it does not appear in `ps`. `script -e` propagates
+/// age's exit status, and a wrong passphrase leaves no output file behind.
+pub fn age_decrypt(src: &Path, dest: &Path, passphrase: &str) -> io::Result<()> {
+    let inner = age_command(src, dest);
+    let out = pipe_to(
+        Command::new("script"),
+        ["-qec", inner.as_str(), "/dev/null"],
+        &format!("{passphrase}\n"),
+        "age decrypt",
+    );
+    match out {
+        // A wrong passphrase fails the inner command, which -e surfaces; the missing
+        // output file is the backstop.
+        Ok(_) if dest.is_file() => Ok(()),
+        Ok(_) => Err(io::Error::other(
+            "age produced no output; the passphrase is probably wrong",
+        )),
+        Err(e) => Err(e),
+    }
 }
 
 fn set_mode(p: &Path, mode: u32) -> io::Result<()> {
@@ -409,13 +459,14 @@ fn set_mode(p: &Path, mode: u32) -> io::Result<()> {
     std::fs::set_permissions(p, std::fs::Permissions::from_mode(mode))
 }
 
-/// Write the shared LUKS passphrase. Every encrypted volume on the host formats from
-/// this one file, so a single passphrase opens them all and systemd prompts once.
-pub fn write_luks_key(ctx: &Ctx, passphrase: &str) -> io::Result<()> {
+/// Write the shared LUKS passphrase where disko's passwordFile option expects it. Every
+/// encrypted volume on the host formats from this one file, so a single passphrase opens
+/// them all and systemd prompts once.
+pub fn write_luks_key(ctx: &Ctx) -> io::Result<()> {
     std::fs::create_dir_all(&ctx.scratch)?;
     set_mode(&ctx.scratch, 0o700)?;
     let key = ctx.luks_key();
-    std::fs::write(&key, passphrase)?;
+    std::fs::write(&key, &ctx.luks_passphrase)?;
     set_mode(&key, 0o600)
 }
 
@@ -437,6 +488,9 @@ mod tests {
             },
             disko: "/nonexistent/disko".into(),
             scratch: root.join("scratch"),
+            luks_passphrase: String::new(),
+            age_passphrase: String::new(),
+            root_password: String::new(),
         }
     }
 
@@ -534,6 +588,68 @@ mod tests {
     fn only_partition_is_destructive() {
         let destructive: Vec<_> = ALL.iter().filter(|p| p.is_destructive()).collect();
         assert_eq!(destructive, vec![&Phase::Partition]);
+    }
+
+    #[test]
+    fn the_age_command_never_carries_the_passphrase() {
+        let cmd = age_command(
+            Path::new("/repo/secrets/age-key.enc"),
+            Path::new("/mnt/persist/secrets/age-keys.txt"),
+        );
+        // Exactly: tool, -d, -o, dest, src. Anything else risks a secret in argv.
+        assert!(cmd.contains(" -d -o "));
+        assert!(cmd.ends_with("'/repo/secrets/age-key.enc'"));
+        assert!(
+            !cmd.contains("passphrase") && !cmd.contains("--password"),
+            "the passphrase must arrive on stdin, never in the command line: {cmd}"
+        );
+    }
+
+    /// The mechanism the whole non-interactive run rests on: age refuses a piped
+    /// passphrase, so `script` supplies a pty. Skipped where age is absent, e.g. the nix
+    /// build sandbox.
+    #[test]
+    fn age_round_trips_through_the_pty() {
+        if !which("age") || !which("script") {
+            eprintln!("skipping: age or script is not on PATH");
+            return;
+        }
+        let d = tmpdir("age");
+        let plain = d.join("plain.txt");
+        let enc = d.join("key.age");
+        let out = d.join("out.txt");
+        std::fs::write(&plain, "AGE-SECRET-KEY-1ROUNDTRIP").unwrap();
+
+        // Encrypting needs the same pty trick, which is itself the proof it works.
+        let encrypt = format!(
+            "age -p -o {} {}",
+            shell_quote(&enc.to_string_lossy()),
+            shell_quote(&plain.to_string_lossy())
+        );
+        pipe_to(
+            Command::new("script"),
+            ["-qec", encrypt.as_str(), "/dev/null"],
+            "hunter2\nhunter2\n",
+            "age encrypt",
+        )
+        .expect("encrypt");
+        assert!(enc.is_file(), "fixture was not encrypted");
+
+        age_decrypt(&enc, &out, "hunter2").expect("correct passphrase decrypts");
+        assert_eq!(
+            std::fs::read_to_string(&out).unwrap(),
+            "AGE-SECRET-KEY-1ROUNDTRIP"
+        );
+
+        // A wrong passphrase must fail loudly and leave nothing behind.
+        let bad = d.join("bad.txt");
+        assert!(age_decrypt(&enc, &bad, "wrong").is_err());
+        assert!(
+            !bad.exists(),
+            "a failed decrypt must not leave a partial key"
+        );
+
+        std::fs::remove_dir_all(&d).unwrap();
     }
 
     #[test]

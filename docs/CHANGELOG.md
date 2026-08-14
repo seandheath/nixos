@@ -19,6 +19,32 @@ Also the decision log. Rationale that would otherwise bloat a code comment lives
   finding: scripted networking is detaching its own slave, and `br0-netdev`'s
   `X-ReloadIfChanged` is the next suspect.
 
+## 2026-08-14 (installer dashboard)
+
+- **The installer is one screen, and every row is checked before anything runs.** The
+  five-screen wizard hid its own holes: the options screen had no forward key at all, and
+  nothing told you a choice was wrong until the phase depending on it failed minutes later.
+  Each row now has a validator that answers "does this work", not "is it set" -- the layout
+  row builds `diskoScript`, so disko itself accepts the layout before a disk is touched, and
+  the age row really decrypts the key. `r` is refused until every row is satisfied.
+- **Encryption defaults to off.** `fleet.disk.system.encrypt` defaulted to `true`, so *not*
+  selecting LUKS still produced a passphrase prompt during the first real install -- an
+  opt-out default dressed up as an opt-in list. An un-chosen default that costs a wipe to
+  discover is a bad default whichever way it points. Committed layouts state the value
+  explicitly, so no host changed behaviour.
+- **`age -d` cannot be fed a passphrase on stdin** -- *"standard input is not a terminal,
+  and /dev/tty is not available"*. `script(1)` supplies a pty, the passphrase arrives on its
+  stdin so it never reaches argv, and `script -e` propagates age's exit status; a wrong
+  passphrase writes no output file. That removed the last interactive step, so the run is
+  now unattended from `ERASE` to a booted system, and the same call validates the passphrase
+  while the board is still being filled in. `script` is util-linux, so it is on every ISO.
+- **A dry run cannot write the layout.** The layout check writes `disk-config/<host>.nix` to
+  validate it; run against an already-installed machine that file would set
+  `fleet.disk.enable = true` and the next local rebuild would try to replace its live
+  filesystems. `--dry-run` now reports the profile as valid without writing or building.
+- The ERASE confirmation stays. Validation proves the configuration is right, not that it is
+  aimed at the correct machine.
+
 ## 2026-08-14 (later)
 
 - **Disk layout is declarative: `modules/disk-layout.nix` renders `fleet.disk.*` into

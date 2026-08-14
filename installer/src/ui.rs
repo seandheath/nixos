@@ -1,13 +1,12 @@
-//! The installer TUI.
+//! The installer dashboard.
 //!
-//! Every option is chosen and reviewed before anything executes. Phases then run on this
-//! thread, redrawing on each log line: the interactive ones have to hand the terminal to
-//! a child process, and coordinating that with a worker thread buys nothing here.
+//! One screen: every requirement, what was chosen for it, and whether it works. The run is
+//! gated on all of them, and once it starts nothing else is asked -- every secret was
+//! collected while the board was being filled in.
 
+use crate::checks::{self, Board, CheckId, Status};
 use crate::disks::Disk;
-use crate::nix::Facts;
-use crate::phases::{self, Ctx, Phase};
-use crate::profile::{Profile, RootMode};
+use crate::phases;
 
 use crossterm::event::{self, Event, KeyCode, KeyEventKind};
 use crossterm::terminal::{
@@ -22,130 +21,83 @@ use ratatui::widgets::{Block, Borders, Clear, List, ListItem, Paragraph, Wrap};
 use ratatui::{Frame, Terminal};
 
 use std::io::{self, Stdout};
-use std::path::{Path, PathBuf};
 
 type Term = Terminal<CrosstermBackend<Stdout>>;
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-enum Screen {
-    Host,
-    Disks,
-    Options,
-    Review,
-    Run,
-}
-
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum Role {
+pub enum Role {
     System,
     Home,
     Data,
 }
 
-#[derive(PartialEq, Eq)]
-enum Modal {
+/// A row editor, or a gate. Everything the operator types lives here.
+pub enum Modal {
     None,
-    /// Typing ERASE, the last gate before the one destructive phase.
-    Erase(String),
-    /// The shared LUKS passphrase; every encrypted volume formats from it.
-    Passphrase {
+    Hosts(usize),
+    Disks(usize),
+    Toggle,
+    Text {
+        value: String,
+        what: CheckId,
+    },
+    Secret {
         first: String,
         second: String,
         confirming: bool,
+        what: CheckId,
     },
+    Erase(String),
     Error(String),
 }
 
+impl Modal {
+    fn is_open(&self) -> bool {
+        !matches!(self, Modal::None)
+    }
+}
+
 pub struct App {
-    repo: String,
-    screen: Screen,
-    modal: Modal,
-
-    hosts: Vec<String>,
-    host_idx: usize,
-
-    facts: Option<Facts>,
-    profile: Option<Profile>,
-
-    disks: Vec<Disk>,
-    disk_idx: usize,
-
-    opt_idx: usize,
-    editing: Option<String>,
-
-    phase_done: Vec<bool>,
-    log: Vec<String>,
-    status: String,
+    pub board: Board,
+    pub modal: Modal,
+    pub row: usize,
+    pub log: Vec<String>,
+    pub phase_done: Vec<bool>,
+    pub running: bool,
+    pub status: String,
     quit: bool,
 }
 
-const OPTIONS: [&str; 6] = [
-    "encrypt with LUKS",
-    "root mode",
-    "tmpfs size",
-    "swap size",
-    "ESP size",
-    "/data filesystem type",
-];
-
 impl App {
-    pub fn new(repo: &str, hosts: Vec<String>) -> Self {
+    pub fn new(board: Board) -> Self {
         App {
-            repo: repo.to_string(),
-            screen: Screen::Host,
+            board,
             modal: Modal::None,
-            hosts,
-            host_idx: 0,
-            facts: None,
-            profile: None,
-            disks: Vec::new(),
-            disk_idx: 0,
-            opt_idx: 0,
-            editing: None,
-            phase_done: vec![false; phases::ALL.len()],
+            row: 0,
             log: Vec::new(),
-            status: String::new(),
+            phase_done: vec![false; phases::ALL.len()],
+            running: false,
+            status: "press v to check everything, Enter to edit a row".into(),
             quit: false,
         }
     }
 
-    fn host(&self) -> &str {
-        &self.hosts[self.host_idx]
+    fn selected(&self) -> CheckId {
+        checks::ALL[self.row.min(checks::ALL.len() - 1)]
     }
 
-    fn ctx(&self, with_disko: bool) -> Result<Ctx, String> {
-        let facts = self.facts.clone().ok_or("host facts not loaded")?;
-        let disko = if with_disko {
-            crate::nix::disko_bin(&self.repo).map_err(|e| e.to_string())?
-        } else {
-            String::new()
-        };
-        Ok(Ctx {
-            repo: PathBuf::from(&self.repo),
-            target: PathBuf::from(crate::TARGET),
-            host: self.host().to_string(),
-            facts,
-            disko,
-            scratch: PathBuf::from(crate::SCRATCH),
-        })
-    }
-
-    fn refresh_phase_status(&mut self) {
-        if let Ok(ctx) = self.ctx(false) {
+    fn refresh_phases(&mut self) {
+        if let Ok(ctx) = self.board.ctx() {
             self.phase_done = phases::ALL.iter().map(|p| p.is_done(&ctx)).collect();
         }
     }
-
-    fn layout_path(&self) -> PathBuf {
-        Path::new(&self.repo).join(format!("disk-config/{}.nix", self.host()))
-    }
 }
 
-pub fn run(repo: &str, hosts: Vec<String>) -> io::Result<()> {
+pub fn run(board: Board) -> io::Result<()> {
     let mut term = setup()?;
-    let mut app = App::new(repo, hosts);
+    let mut app = App::new(board);
     let res = event_loop(&mut term, &mut app);
-    teardown(&mut term)?;
+    let _ = teardown(&mut term);
     res
 }
 
@@ -171,295 +123,97 @@ fn event_loop(term: &mut Term, app: &mut App) -> io::Result<()> {
         let Event::Key(key) = event::read()? else {
             continue;
         };
-        if key.kind != KeyEventKind::Press {
-            continue;
+        if key.kind == KeyEventKind::Press {
+            handle_key(app, key.code);
         }
-        handle_key(term, app, key.code);
     }
 }
 
-fn handle_key(term: &mut Term, app: &mut App, code: KeyCode) {
-    if app.modal != Modal::None {
-        return modal_key(term, app, code);
-    }
-    if app.editing.is_some() {
-        return edit_key(app, code);
+/// No terminal handle here: nothing suspends the TUI any more, because every phase runs
+/// without asking a question.
+pub fn handle_key(app: &mut App, code: KeyCode) {
+    if app.modal.is_open() {
+        return modal_key(app, code);
     }
     match code {
         KeyCode::Char('q') => app.quit = true,
-        KeyCode::Esc => back(app),
-        _ => match app.screen {
-            Screen::Host => host_key(app, code),
-            Screen::Disks => disks_key(app, code),
-            Screen::Options => options_key(app, code),
-            Screen::Review => review_key(app, code),
-            Screen::Run => run_key(term, app, code),
-        },
-    }
-}
-
-fn back(app: &mut App) {
-    app.screen = match app.screen {
-        Screen::Host => Screen::Host,
-        Screen::Disks => Screen::Host,
-        Screen::Options => Screen::Disks,
-        Screen::Review => Screen::Options,
-        Screen::Run => Screen::Review,
-    };
-}
-
-// --- host ------------------------------------------------------------------------------
-
-fn host_key(app: &mut App, code: KeyCode) {
-    match code {
-        KeyCode::Up | KeyCode::Char('k') => app.host_idx = app.host_idx.saturating_sub(1),
-        KeyCode::Down | KeyCode::Char('j') => {
-            app.host_idx = (app.host_idx + 1).min(app.hosts.len().saturating_sub(1))
+        KeyCode::Up | KeyCode::Char('k') => app.row = app.row.saturating_sub(1),
+        KeyCode::Down | KeyCode::Char('j') => app.row = (app.row + 1).min(checks::ALL.len() - 1),
+        KeyCode::Enter => open_editor(app),
+        KeyCode::Char('c') => {
+            let id = app.selected();
+            app.status = format!("checking {}...", id.label());
+            app.board.check(id);
         }
-        KeyCode::Enter => load_host(app),
-        _ => {}
-    }
-}
-
-/// Reads the host's own configuration. Slow -- a full module-system evaluation -- so the
-/// status line says so before it blocks.
-fn load_host(app: &mut App) {
-    app.status = format!("evaluating {}...", app.host());
-
-    let fd = match crate::nix::fleet_disk(&app.repo, app.host()) {
-        Ok(v) => v,
-        Err(e) => return app.modal = Modal::Error(e.to_string()),
-    };
-    let facts = match crate::nix::facts(&app.repo, app.host()) {
-        Ok(v) => v,
-        Err(e) => return app.modal = Modal::Error(e.to_string()),
-    };
-
-    let mut profile = Profile::from_fleet_disk(app.host(), fd);
-    app.disks = crate::disks::list(Path::new(crate::BY_ID)).unwrap_or_default();
-
-    // An existing layout may name a disk that is not in this machine; keep it, but do not
-    // pretend it was seen.
-    if profile.system_device == crate::profile::UNSET_DEVICE {
-        if let Some(d) = app.disks.iter().find_map(|d| d.by_id.clone()) {
-            profile.system_device = d;
-        }
-    }
-
-    app.facts = Some(facts);
-    app.profile = Some(profile);
-    app.status.clear();
-    app.refresh_phase_status();
-    app.screen = Screen::Disks;
-}
-
-// --- disks -----------------------------------------------------------------------------
-
-fn disks_key(app: &mut App, code: KeyCode) {
-    match code {
-        KeyCode::Up | KeyCode::Char('k') => app.disk_idx = app.disk_idx.saturating_sub(1),
-        KeyCode::Down | KeyCode::Char('j') => {
-            app.disk_idx = (app.disk_idx + 1).min(app.disks.len().saturating_sub(1))
-        }
-        KeyCode::Char('s') => assign(app, Some(Role::System)),
-        KeyCode::Char('h') => assign(app, Some(Role::Home)),
-        KeyCode::Char('d') => assign(app, Some(Role::Data)),
-        KeyCode::Char('x') => assign(app, None),
-        KeyCode::Enter => app.screen = Screen::Options,
-        _ => {}
-    }
-}
-
-fn assign(app: &mut App, role: Option<Role>) {
-    let Some(disk) = app.disks.get(app.disk_idx).cloned() else {
-        return;
-    };
-    let Some(p) = app.profile.as_mut() else {
-        return;
-    };
-
-    let Some(by_id) = disk.by_id.clone() else {
-        app.modal = Modal::Error(format!(
-            "{} has no /dev/disk/by-id link. Kernel names reorder across boots, so it \
-             cannot be written into a layout.",
-            disk.name
-        ));
-        return;
-    };
-
-    // A disk holds one role: clear it from the others first.
-    if p.system_device == by_id {
-        p.system_device = crate::profile::UNSET_DEVICE.to_string();
-    }
-    if p.home_device.as_deref() == Some(by_id.as_str()) {
-        p.home_device = None;
-    }
-    if p.data_device.as_deref() == Some(by_id.as_str()) {
-        p.data_device = None;
-    }
-
-    match role {
-        Some(Role::System) => p.system_device = by_id,
-        Some(Role::Home) => p.home_device = Some(by_id),
-        // Preserved, never formatted: mounted by-uuid so a multi-device btrfs assembles
-        // its whole array. by-id here names the member the operator pointed at.
-        Some(Role::Data) => p.data_device = Some(by_id),
-        None => {}
-    }
-}
-
-fn role_of(p: &Profile, disk: &Disk) -> Option<Role> {
-    let by_id = disk.by_id.as_deref()?;
-    if p.system_device == by_id {
-        Some(Role::System)
-    } else if p.home_device.as_deref() == Some(by_id) {
-        Some(Role::Home)
-    } else if p.data_device.as_deref() == Some(by_id) {
-        Some(Role::Data)
-    } else {
-        None
-    }
-}
-
-// --- options ---------------------------------------------------------------------------
-
-fn options_key(app: &mut App, code: KeyCode) {
-    match code {
-        KeyCode::Up | KeyCode::Char('k') => app.opt_idx = app.opt_idx.saturating_sub(1),
-        KeyCode::Down | KeyCode::Char('j') => {
-            app.opt_idx = (app.opt_idx + 1).min(OPTIONS.len() - 1)
-        }
-        // Space changes the field, Enter moves on. Sharing Enter for both left this
-        // screen with no way forward.
-        KeyCode::Char(' ') => toggle_or_edit(app),
-        KeyCode::Enter => app.screen = Screen::Review,
-        _ => {}
-    }
-}
-
-fn toggle_or_edit(app: &mut App) {
-    let idx = app.opt_idx;
-    let Some(p) = app.profile.as_mut() else {
-        return;
-    };
-    match idx {
-        0 => {
-            p.system_encrypt = !p.system_encrypt;
-            // One passphrase opens every volume, so the two flags move together.
-            p.home_encrypt = p.system_encrypt;
-        }
-        1 => {
-            p.root_mode = match p.root_mode {
-                RootMode::Subvol => RootMode::Tmpfs,
-                RootMode::Tmpfs => RootMode::Subvol,
-            }
-        }
-        2 => app.editing = Some(p.tmpfs_size.clone()),
-        3 => app.editing = Some(p.swap_size.clone().unwrap_or_default()),
-        4 => app.editing = Some(p.esp_size.clone()),
-        5 => app.editing = Some(p.data_fs_type.clone()),
-        _ => {}
-    }
-}
-
-fn edit_key(app: &mut App, code: KeyCode) {
-    let Some(buf) = app.editing.as_mut() else {
-        return;
-    };
-    match code {
-        KeyCode::Char(c) => buf.push(c),
-        KeyCode::Backspace => {
-            buf.pop();
-        }
-        KeyCode::Esc => app.editing = None,
-        KeyCode::Enter => {
-            let value = buf.clone();
-            app.editing = None;
-            let idx = app.opt_idx;
-            if let Some(p) = app.profile.as_mut() {
-                match idx {
-                    2 => p.tmpfs_size = value,
-                    3 => p.swap_size = (!value.is_empty()).then_some(value),
-                    4 => p.esp_size = value,
-                    5 => p.data_fs_type = value,
-                    _ => {}
-                }
-            }
-        }
-        _ => {}
-    }
-}
-
-// --- review ----------------------------------------------------------------------------
-
-fn review_key(app: &mut App, code: KeyCode) {
-    match code {
-        KeyCode::Char('w') => write_layout(app),
-        KeyCode::Enter => {
-            write_layout(app);
-            if app.modal == Modal::None {
-                app.refresh_phase_status();
-                app.screen = Screen::Run;
-            }
-        }
-        _ => {}
-    }
-}
-
-fn write_layout(app: &mut App) {
-    let Some(p) = app.profile.as_ref() else {
-        return;
-    };
-    if let Err(errs) = p.validate() {
-        app.modal = Modal::Error(errs.join("\n"));
-        return;
-    }
-    let path = app.layout_path();
-    if let Some(d) = path.parent() {
-        if let Err(e) = std::fs::create_dir_all(d) {
-            app.modal = Modal::Error(e.to_string());
-            return;
-        }
-    }
-    if let Err(e) = std::fs::write(&path, p.to_nix()) {
-        app.modal = Modal::Error(e.to_string());
-        return;
-    }
-    // Untracked files are invisible to flake evaluation, and disko reads the flake.
-    if let Ok(ctx) = app.ctx(false) {
-        let rel = format!("disk-config/{}.nix", app.host());
-        let _ = phases::git_add(&ctx, &rel, &mut |_| {});
-    }
-    app.status = format!("wrote {}", path.display());
-}
-
-// --- run -------------------------------------------------------------------------------
-
-fn run_key(term: &mut Term, app: &mut App, code: KeyCode) {
-    match code {
-        KeyCode::Char('r') => start_run(term, app),
-        KeyCode::Char('R') => {
-            app.refresh_phase_status();
-            app.status = "re-checked the target".into();
+        KeyCode::Char('v') => {
+            app.status = "checking everything...".into();
+            app.board.check_all();
+            app.status = if app.board.ready() {
+                "all checks pass -- press r to install".into()
+            } else {
+                "some checks failed".into()
+            };
         }
         KeyCode::Char('m') => remount(app),
+        KeyCode::Char('r') => start_run(app),
         _ => {}
     }
 }
 
-/// Re-attach an already-installed machine. After an ISO reboot nothing is mounted, so
-/// every phase reads as pending -- including the destructive one. Mounting first is what
-/// turns a resume back into a resume instead of a re-partition.
+/// Enter opens the editor a row needs; rows with nothing to edit just re-check.
+fn open_editor(app: &mut App) {
+    match app.selected() {
+        CheckId::Host => app.modal = Modal::Hosts(app.board.host_idx),
+        CheckId::SystemDisk | CheckId::HomeDisk | CheckId::DataDisk => app.modal = Modal::Disks(0),
+        CheckId::Encryption => app.modal = Modal::Toggle,
+        CheckId::RootPassword => {
+            app.modal = Modal::Secret {
+                first: String::new(),
+                second: String::new(),
+                confirming: false,
+                what: CheckId::RootPassword,
+            }
+        }
+        CheckId::AgeKey => {
+            app.modal = Modal::Secret {
+                first: String::new(),
+                second: String::new(),
+                confirming: false,
+                what: CheckId::AgeKey,
+            }
+        }
+        CheckId::Sizes => {
+            let v = app
+                .board
+                .profile
+                .as_ref()
+                .and_then(|p| p.swap_size.clone())
+                .unwrap_or_default();
+            app.modal = Modal::Text {
+                value: v,
+                what: CheckId::Sizes,
+            }
+        }
+        id => {
+            app.status = format!("checking {}...", id.label());
+            app.board.check(id);
+        }
+    }
+}
+
 fn remount(app: &mut App) {
-    let ctx = match app.ctx(true) {
+    let ctx = match app.board.ctx() {
         Ok(c) => c,
-        Err(e) => return app.modal = Modal::Error(e),
+        Err(e) => {
+            app.modal = Modal::Error(e);
+            return;
+        }
     };
     let mut lines = Vec::new();
     match phases::remount(&ctx, &mut |l| lines.push(l.to_string())) {
         Ok(()) => {
             app.log.extend(lines);
-            app.refresh_phase_status();
+            app.refresh_phases();
             app.status = "mounted the existing target".into();
         }
         Err(e) => {
@@ -469,67 +223,53 @@ fn remount(app: &mut App) {
     }
 }
 
-fn start_run(term: &mut Term, app: &mut App) {
-    let pending: Vec<Phase> = phases::ALL
-        .iter()
-        .zip(&app.phase_done)
-        .filter(|(_, done)| !**done)
-        .map(|(p, _)| *p)
-        .collect();
-
-    if pending.is_empty() {
-        app.status = "nothing to do".into();
+fn start_run(app: &mut App) {
+    if !app.board.ready() {
+        let unmet: Vec<&str> = checks::ALL
+            .iter()
+            .filter(|id| !app.board.status(**id).satisfied())
+            .map(|id| id.label())
+            .collect();
+        app.modal = Modal::Error(format!("not ready:\n  {}", unmet.join("\n  ")));
         return;
     }
-
-    // Collect the destructive confirmation and the passphrase before anything runs.
-    if pending.iter().any(|p| p.is_destructive()) {
-        if app.profile.as_ref().is_some_and(|p| p.system_encrypt) {
-            app.modal = Modal::Passphrase {
-                first: String::new(),
-                second: String::new(),
-                confirming: false,
-            };
-        } else {
-            app.modal = Modal::Erase(String::new());
-        }
-        return;
+    app.refresh_phases();
+    if self_destructive(app) {
+        app.modal = Modal::Erase(String::new());
+    } else {
+        execute_pending(app);
     }
-    execute_pending(term, app);
 }
 
-fn execute_pending(term: &mut Term, app: &mut App) {
-    let ctx = match app.ctx(true) {
+fn self_destructive(app: &App) -> bool {
+    phases::ALL
+        .iter()
+        .zip(&app.phase_done)
+        .any(|(p, done)| p.is_destructive() && !*done)
+}
+
+/// Runs every pending phase with no further interaction.
+fn execute_pending(app: &mut App) {
+    let ctx = match app.board.ctx() {
         Ok(c) => c,
         Err(e) => {
             app.modal = Modal::Error(e);
             return;
         }
     };
+    app.running = true;
 
     for (i, phase) in phases::ALL.iter().enumerate() {
         if app.phase_done[i] {
             continue;
         }
         app.status = format!("running {}", phase.name());
-        app.log.push(format!("== {}", phase.name()));
+        app.log
+            .push(format!("== {}: {}", phase.name(), phase.describe()));
 
-        let result = if phase.needs_tty() {
-            // age prompts for the key's passphrase on /dev/tty and mkpasswd reads the
-            // root password there, so the TUI stands aside rather than capturing them.
-            let _ = teardown(term);
-            println!("\n== {}: {}\n", phase.name(), phase.describe());
-            let r = phase.run(&ctx, &mut |line| println!("   {line}"));
-            if let Ok(t) = setup() {
-                *term = t;
-            }
-            r
-        } else {
-            let mut lines: Vec<String> = Vec::new();
-            let r = phase.run(&ctx, &mut |line| lines.push(line.to_string()));
-            app.log.extend(lines);
-            r
-        };
+        let mut lines = Vec::new();
+        let result = phase.run(&ctx, &mut |l| lines.push(l.to_string()));
+        app.log.extend(lines);
 
         match result {
             Ok(()) => {
@@ -540,52 +280,115 @@ fn execute_pending(term: &mut Term, app: &mut App) {
                 app.log.push(format!("   {} FAILED: {e}", phase.name()));
                 app.modal = Modal::Error(format!("{} failed:\n{e}", phase.name()));
                 app.status = format!("{} failed", phase.name());
+                app.running = false;
                 return;
             }
         }
-        let _ = term.draw(|f| draw(f, app));
     }
 
-    app.status = "all phases complete".into();
+    app.running = false;
+    app.status = "installed".into();
     app.log.push(String::new());
     app.log.push(format!(
-        "Commit disk-config/{}.nix and hardware/{}.nix -- every host rebuilds from",
-        app.host(),
-        app.host()
+        "Commit disk-config/{h}.nix and hardware/{h}.nix, then push: every host",
+        h = app.board.host()
     ));
     app.log
-        .push("github:seandheath/nixos nightly, and an uncommitted layout is reverted.".into());
+        .push("rebuilds from github:seandheath/nixos nightly and would revert them.".into());
 }
 
 // --- modals ----------------------------------------------------------------------------
 
-fn modal_key(term: &mut Term, app: &mut App, code: KeyCode) {
+fn modal_key(app: &mut App, code: KeyCode) {
     match &mut app.modal {
+        Modal::None => {}
         Modal::Error(_) => {
             if matches!(code, KeyCode::Enter | KeyCode::Esc) {
                 app.modal = Modal::None;
             }
         }
-        Modal::Erase(buf) => match code {
-            KeyCode::Char(c) => buf.push(c),
-            KeyCode::Backspace => {
-                buf.pop();
+        Modal::Hosts(idx) => match code {
+            KeyCode::Up | KeyCode::Char('k') => *idx = idx.saturating_sub(1),
+            KeyCode::Down | KeyCode::Char('j') => {
+                *idx = (*idx + 1).min(app.board.hosts.len().saturating_sub(1))
             }
             KeyCode::Esc => app.modal = Modal::None,
             KeyCode::Enter => {
-                if buf == "ERASE" {
-                    app.modal = Modal::None;
-                    execute_pending(term, app);
+                let chosen = *idx;
+                app.modal = Modal::None;
+                app.board.host_idx = chosen;
+                app.status = format!("evaluating {}...", app.board.host());
+                app.board.load_host();
+            }
+            _ => {}
+        },
+        Modal::Disks(idx) => match code {
+            KeyCode::Up | KeyCode::Char('k') => *idx = idx.saturating_sub(1),
+            KeyCode::Down | KeyCode::Char('j') => {
+                *idx = (*idx + 1).min(app.board.disks.len().saturating_sub(1))
+            }
+            KeyCode::Esc => app.modal = Modal::None,
+            KeyCode::Char('s') => assign_at(app, Some(Role::System)),
+            KeyCode::Char('h') => assign_at(app, Some(Role::Home)),
+            KeyCode::Char('d') => assign_at(app, Some(Role::Data)),
+            KeyCode::Char('x') => assign_at(app, None),
+            KeyCode::Enter => {
+                app.modal = Modal::None;
+                app.board.check_cheap();
+            }
+            _ => {}
+        },
+        Modal::Toggle => match code {
+            KeyCode::Esc => app.modal = Modal::None,
+            KeyCode::Char('y') | KeyCode::Char('n') | KeyCode::Char(' ') | KeyCode::Enter => {
+                let on = match code {
+                    KeyCode::Char('y') => true,
+                    KeyCode::Char('n') => false,
+                    _ => !app.board.profile.as_ref().is_some_and(|p| p.system_encrypt),
+                };
+                if let Some(p) = app.board.profile.as_mut() {
+                    p.system_encrypt = on;
+                    // One passphrase opens every volume, so the flags move together.
+                    p.home_encrypt = on;
+                }
+                app.board.invalidate(CheckId::Encryption);
+                if on {
+                    app.modal = Modal::Secret {
+                        first: String::new(),
+                        second: String::new(),
+                        confirming: false,
+                        what: CheckId::Encryption,
+                    };
                 } else {
-                    app.modal = Modal::Error("not confirmed".into());
+                    app.board.luks_passphrase.clear();
+                    app.modal = Modal::None;
+                    app.board.check_cheap();
                 }
             }
             _ => {}
         },
-        Modal::Passphrase {
+        Modal::Text { value, what } => match code {
+            KeyCode::Char(c) => value.push(c),
+            KeyCode::Backspace => {
+                value.pop();
+            }
+            KeyCode::Esc => app.modal = Modal::None,
+            KeyCode::Enter => {
+                let (v, id) = (value.clone(), *what);
+                app.modal = Modal::None;
+                if let Some(p) = app.board.profile.as_mut() {
+                    p.swap_size = (!v.trim().is_empty()).then(|| v.trim().to_string());
+                }
+                app.board.invalidate(id);
+                app.board.check_cheap();
+            }
+            _ => {}
+        },
+        Modal::Secret {
             first,
             second,
             confirming,
+            what,
         } => match code {
             KeyCode::Char(c) => {
                 if *confirming {
@@ -608,273 +411,283 @@ fn modal_key(term: &mut Term, app: &mut App, code: KeyCode) {
                         return;
                     }
                     *confirming = true;
-                } else if first == second {
-                    let pass = first.clone();
-                    app.modal = Modal::None;
-                    if let Ok(ctx) = app.ctx(false) {
-                        if let Err(e) = phases::write_luks_key(&ctx, &pass) {
-                            app.modal = Modal::Error(e.to_string());
-                            return;
-                        }
-                    }
-                    app.modal = Modal::Erase(String::new());
-                } else {
-                    app.modal = Modal::Error("passphrases did not match".into());
+                    return;
+                }
+                if first != second {
+                    app.modal = Modal::Error("they did not match".into());
+                    return;
+                }
+                let (secret, id) = (first.clone(), *what);
+                app.modal = Modal::None;
+                match id {
+                    CheckId::Encryption => app.board.luks_passphrase = secret,
+                    CheckId::AgeKey => app.board.age_passphrase = secret,
+                    CheckId::RootPassword => app.board.root_password = secret,
+                    _ => {}
+                }
+                app.board.invalidate(id);
+                app.board.check_cheap();
+                // The age passphrase is only meaningful if it decrypts, so prove it now.
+                if id == CheckId::AgeKey {
+                    app.status = "checking the age key...".into();
+                    app.board.check(CheckId::AgeKey);
                 }
             }
             _ => {}
         },
-        Modal::None => {}
+        Modal::Erase(buf) => match code {
+            KeyCode::Char(c) => buf.push(c),
+            KeyCode::Backspace => {
+                buf.pop();
+            }
+            KeyCode::Esc => app.modal = Modal::None,
+            KeyCode::Enter => {
+                if buf == "ERASE" {
+                    app.modal = Modal::None;
+                    execute_pending(app);
+                } else {
+                    app.modal = Modal::Error("not confirmed".into());
+                }
+            }
+            _ => {}
+        },
+    }
+}
+
+fn assign_at(app: &mut App, role: Option<Role>) {
+    let idx = match &app.modal {
+        Modal::Disks(i) => *i,
+        _ => return,
+    };
+    assign(app, idx, role);
+}
+
+/// A disk holds one role; assigning it clears whatever it had before.
+pub fn assign(app: &mut App, idx: usize, role: Option<Role>) {
+    let Some(disk) = app.board.disks.get(idx).cloned() else {
+        return;
+    };
+    let Some(by_id) = disk.by_id.clone() else {
+        app.modal = Modal::Error(format!(
+            "{} has no /dev/disk/by-id link. Kernel names reorder across boots, so it \
+             cannot be written into a layout.",
+            disk.name
+        ));
+        return;
+    };
+    let Some(p) = app.board.profile.as_mut() else {
+        return;
+    };
+
+    if p.system_device == by_id {
+        p.system_device = crate::profile::UNSET_DEVICE.to_string();
+    }
+    if p.home_device.as_deref() == Some(by_id.as_str()) {
+        p.home_device = None;
+    }
+    if p.data_device.as_deref() == Some(by_id.as_str()) {
+        p.data_device = None;
+    }
+    match role {
+        Some(Role::System) => p.system_device = by_id,
+        Some(Role::Home) => p.home_device = Some(by_id),
+        // Preserved, never formatted.
+        Some(Role::Data) => p.data_device = Some(by_id),
+        None => {}
+    }
+    app.board.invalidate(CheckId::SystemDisk);
+}
+
+pub fn role_of(app: &App, disk: &Disk) -> Option<Role> {
+    let p = app.board.profile.as_ref()?;
+    let by_id = disk.by_id.as_deref()?;
+    if p.system_device == by_id {
+        Some(Role::System)
+    } else if p.home_device.as_deref() == Some(by_id) {
+        Some(Role::Home)
+    } else if p.data_device.as_deref() == Some(by_id) {
+        Some(Role::Data)
+    } else {
+        None
     }
 }
 
 // --- drawing ---------------------------------------------------------------------------
 
 fn draw(f: &mut Frame, app: &App) {
-    let chunks = Layout::default()
+    let rows = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(3),
-            Constraint::Min(5),
+            Constraint::Min(8),
+            Constraint::Length(8),
             Constraint::Length(3),
         ])
         .split(f.area());
 
-    let host = if app.facts.is_some() {
-        app.host().to_string()
-    } else {
-        "-".into()
-    };
-    let title = Paragraph::new(Line::from(vec![
-        Span::styled(
-            "NixOS installer",
-            Style::default().add_modifier(Modifier::BOLD),
-        ),
-        Span::raw(format!("   host: {host}   ")),
-        Span::styled(&app.status, Style::default().fg(Color::Yellow)),
-    ]))
-    .block(Block::default().borders(Borders::ALL));
-    f.render_widget(title, chunks[0]);
-
-    match app.screen {
-        Screen::Host => draw_hosts(f, chunks[1], app),
-        Screen::Disks => draw_disks(f, chunks[1], app),
-        Screen::Options => draw_options(f, chunks[1], app),
-        Screen::Review => draw_review(f, chunks[1], app),
-        Screen::Run => draw_run(f, chunks[1], app),
-    }
-
-    let help = match app.screen {
-        Screen::Host => "j/k move   Enter select   q quit",
-        Screen::Disks => {
-            "j/k move   s system   h /home   d /data   x clear   Enter next   Esc back"
-        }
-        Screen::Options => "j/k move   Space change   Enter continue   Esc back",
-        Screen::Review => "w write layout   Enter write and continue   Esc back",
-        Screen::Run => "r run pending   m mount existing   R re-check   Esc back   q quit",
-    };
+    let ready = app.board.ready();
     f.render_widget(
-        Paragraph::new(help).block(Block::default().borders(Borders::ALL)),
-        chunks[2],
+        Paragraph::new(Line::from(vec![
+            Span::styled(
+                "NixOS installer",
+                Style::default().add_modifier(Modifier::BOLD),
+            ),
+            Span::raw(format!("   {}   ", app.board.host())),
+            Span::styled(
+                if ready { "READY" } else { "incomplete" },
+                Style::default().fg(if ready { Color::Green } else { Color::Yellow }),
+            ),
+            Span::raw(format!("   {}", app.status)),
+        ]))
+        .block(Block::default().borders(Borders::ALL)),
+        rows[0],
+    );
+
+    let cols = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(58), Constraint::Percentage(42)])
+        .split(rows[1]);
+    draw_board(f, cols[0], app);
+    draw_detail(f, cols[1], app);
+    draw_phases(f, rows[2], app);
+
+    f.render_widget(
+        Paragraph::new(
+            "j/k move   Enter edit   c check row   v check all   m mount existing   r install   q quit",
+        )
+        .block(Block::default().borders(Borders::ALL)),
+        rows[3],
     );
 
     draw_modal(f, app);
 }
 
-fn draw_hosts(f: &mut Frame, area: Rect, app: &App) {
-    let items: Vec<ListItem> = app
-        .hosts
+fn draw_board(f: &mut Frame, area: Rect, app: &App) {
+    let items: Vec<ListItem> = checks::ALL
         .iter()
         .enumerate()
-        .map(|(i, h)| {
-            let style = if i == app.host_idx {
-                Style::default().add_modifier(Modifier::REVERSED)
-            } else {
-                Style::default()
+        .map(|(i, id)| {
+            let st = app.board.status(*id);
+            let colour = match st {
+                Status::Ok(_) => Color::Green,
+                Status::Failed(_) => Color::Red,
+                Status::NotApplicable(_) => Color::DarkGray,
+                Status::Pending => Color::Yellow,
             };
-            ListItem::new(h.clone()).style(style)
-        })
-        .collect();
-    f.render_widget(
-        List::new(items).block(Block::default().borders(Borders::ALL).title(" host ")),
-        area,
-    );
-}
-
-fn draw_disks(f: &mut Frame, area: Rect, app: &App) {
-    let Some(p) = app.profile.as_ref() else {
-        return;
-    };
-    let items: Vec<ListItem> = app
-        .disks
-        .iter()
-        .enumerate()
-        .map(|(i, d)| {
-            let role = match role_of(p, d) {
-                Some(Role::System) => "system",
-                Some(Role::Home) => "/home ",
-                Some(Role::Data) => "/data ",
-                None => "      ",
-            };
-            let stable = if d.by_id.is_some() {
-                ""
-            } else {
-                "  (no by-id link)"
-            };
-            let style = if i == app.disk_idx {
-                Style::default().add_modifier(Modifier::REVERSED)
-            } else {
-                Style::default()
-            };
-            ListItem::new(format!("[{role}] {}{stable}", d.label())).style(style)
-        })
-        .collect();
-    f.render_widget(
-        List::new(items).block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title(" disks -- /data is preserved, never formatted "),
-        ),
-        area,
-    );
-}
-
-fn draw_options(f: &mut Frame, area: Rect, app: &App) {
-    let Some(p) = app.profile.as_ref() else {
-        return;
-    };
-    let values = [
-        if p.system_encrypt {
-            "yes".into()
-        } else {
-            "no".into()
-        },
-        p.root_mode.as_nix().to_string(),
-        p.tmpfs_size.clone(),
-        p.swap_size.clone().unwrap_or_else(|| "none".into()),
-        p.esp_size.clone(),
-        p.data_fs_type.clone(),
-    ];
-    let items: Vec<ListItem> = OPTIONS
-        .iter()
-        .zip(values.iter())
-        .enumerate()
-        .map(|(i, (name, value))| {
-            let shown = if i == app.opt_idx {
-                app.editing.as_deref().unwrap_or(value)
-            } else {
-                value
-            };
-            let style = if i == app.opt_idx {
-                Style::default().add_modifier(Modifier::REVERSED)
-            } else {
-                Style::default()
-            };
-            ListItem::new(format!("{name:<24} {shown}")).style(style)
-        })
-        .collect();
-    f.render_widget(
-        List::new(items).block(Block::default().borders(Borders::ALL).title(" options ")),
-        area,
-    );
-}
-
-fn draw_review(f: &mut Frame, area: Rect, app: &App) {
-    let cols = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(55), Constraint::Percentage(45)])
-        .split(area);
-
-    let nix = app.profile.as_ref().map(|p| p.to_nix()).unwrap_or_default();
-    f.render_widget(
-        Paragraph::new(nix).wrap(Wrap { trim: false }).block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title(" disk-config "),
-        ),
-        cols[0],
-    );
-
-    let mut lines = Vec::new();
-    if let Some(fa) = app.facts.as_ref() {
-        lines.push(Line::from(format!("age key   {}", fa.age_key_file)));
-        lines.push(Line::from(format!("  from    {}", fa.age_key_source())));
-        lines.push(Line::from(format!("root pw   {}", fa.root_password)));
-        lines.push(Line::from(format!(
-            "passwords {}",
-            if fa.mutable_users {
-                "passwd after install"
-            } else {
-                "declarative"
+            let mut style = Style::default().fg(colour);
+            if i == app.row {
+                style = style.add_modifier(Modifier::REVERSED);
             }
-        )));
-        lines.push(Line::from(format!(
-            "/etc/ssh  persisted: {}",
-            fa.persist_ssh
-        )));
+            ListItem::new(format!(
+                "{} {:<14} {}",
+                st.glyph(),
+                id.label(),
+                truncate(st.summary(), area.width.saturating_sub(20) as usize)
+            ))
+            .style(style)
+        })
+        .collect();
+    f.render_widget(
+        List::new(items).block(Block::default().borders(Borders::ALL).title(" checklist ")),
+        area,
+    );
+}
+
+/// The selected row in full: the rendered layout, the disk table, or the whole error.
+fn draw_detail(f: &mut Frame, area: Rect, app: &App) {
+    let id = app.selected();
+    let mut lines: Vec<Line> = Vec::new();
+
+    if let Status::Failed(e) = app.board.status(id) {
+        for l in e.lines() {
+            lines.push(Line::from(Span::styled(
+                l.to_string(),
+                Style::default().fg(Color::Red),
+            )));
+        }
+        lines.push(Line::from(""));
     }
-    lines.push(Line::from(""));
-    match app.profile.as_ref().map(|p| p.validate()) {
-        Some(Ok(())) => lines.push(Line::from(Span::styled(
-            "installable",
-            Style::default().fg(Color::Green),
-        ))),
-        Some(Err(errs)) => {
-            for e in errs {
-                lines.push(Line::from(Span::styled(
-                    format!("- {e}"),
-                    Style::default().fg(Color::Red),
+
+    match id {
+        CheckId::Layout => {
+            if let Some(p) = app.board.profile.as_ref() {
+                for l in p.to_nix().lines() {
+                    lines.push(Line::from(l.to_string()));
+                }
+            }
+        }
+        CheckId::SystemDisk | CheckId::HomeDisk | CheckId::DataDisk => {
+            for d in &app.board.disks {
+                let role = match role_of(app, d) {
+                    Some(Role::System) => "system",
+                    Some(Role::Home) => "/home ",
+                    Some(Role::Data) => "/data ",
+                    None => "      ",
+                };
+                lines.push(Line::from(format!("[{role}] {}", d.label())));
+            }
+        }
+        CheckId::Host => {
+            if let Some(fa) = app.board.facts.as_ref() {
+                lines.push(Line::from(format!("age key   {}", fa.age_key_file)));
+                lines.push(Line::from(format!("  from    {}", fa.age_key_source())));
+                lines.push(Line::from(format!("root pw   {}", fa.root_password)));
+                lines.push(Line::from(format!(
+                    "/etc/ssh  persisted: {}",
+                    fa.persist_ssh
                 )));
             }
         }
-        None => {}
+        _ => {}
     }
+
     f.render_widget(
-        Paragraph::new(lines)
-            .wrap(Wrap { trim: false })
-            .block(Block::default().borders(Borders::ALL).title(" this host ")),
-        cols[1],
+        Paragraph::new(lines).wrap(Wrap { trim: false }).block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(format!(" {} ", id.label())),
+        ),
+        area,
     );
 }
 
-fn draw_run(f: &mut Frame, area: Rect, app: &App) {
-    let rows = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([Constraint::Length(8), Constraint::Min(3)])
+fn draw_phases(f: &mut Frame, area: Rect, app: &App) {
+    let cols = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(40), Constraint::Percentage(60)])
         .split(area);
 
     let items: Vec<ListItem> = phases::ALL
         .iter()
         .zip(&app.phase_done)
         .map(|(p, done)| {
-            let mark = if *done { "x" } else { " " };
-            let style = if p.is_destructive() && !*done {
-                Style::default().fg(Color::Red)
-            } else if *done {
+            let style = if *done {
                 Style::default().fg(Color::Green)
+            } else if p.is_destructive() {
+                Style::default().fg(Color::Red)
             } else {
                 Style::default()
             };
-            ListItem::new(format!("[{mark}] {:<10} {}", p.name(), p.describe())).style(style)
+            ListItem::new(format!("[{}] {}", if *done { "x" } else { " " }, p.name())).style(style)
         })
         .collect();
     let title = if app.phase_done.first() == Some(&false) {
-        " phases -- if this machine is ALREADY INSTALLED, press m to mount it first "
+        " phases -- if ALREADY INSTALLED press m to mount first "
     } else {
         " phases "
     };
     f.render_widget(
         List::new(items).block(Block::default().borders(Borders::ALL).title(title)),
-        rows[0],
+        cols[0],
     );
 
-    let height = rows[1].height.saturating_sub(2) as usize;
+    let height = cols[1].height.saturating_sub(2) as usize;
     let start = app.log.len().saturating_sub(height);
     f.render_widget(
         Paragraph::new(app.log[start..].join("\n"))
             .wrap(Wrap { trim: false })
             .block(Block::default().borders(Borders::ALL).title(" log ")),
-        rows[1],
+        cols[1],
     );
 }
 
@@ -882,24 +695,78 @@ fn draw_modal(f: &mut Frame, app: &App) {
     let (title, body, colour) = match &app.modal {
         Modal::None => return,
         Modal::Error(e) => (" error ", e.clone(), Color::Red),
-        Modal::Erase(buf) => (
-            " destructive ",
-            format!(
-                "Every disk assigned a role above will be erased.\n\
-                 /data, if set, is preserved.\n\n\
-                 Type ERASE to continue: {buf}"
-            ),
-            Color::Red,
+        Modal::Hosts(idx) => (
+            " host ",
+            app.board
+                .hosts
+                .iter()
+                .enumerate()
+                .map(|(i, h)| format!("{} {h}", if i == *idx { ">" } else { " " }))
+                .collect::<Vec<_>>()
+                .join("\n"),
+            Color::Cyan,
         ),
-        Modal::Passphrase {
+        Modal::Disks(idx) => (
+            " disks -- s system, h /home, d /data, x clear, Enter done ",
+            app.board
+                .disks
+                .iter()
+                .enumerate()
+                .map(|(i, d)| {
+                    let role = match role_of(app, d) {
+                        Some(Role::System) => "system",
+                        Some(Role::Home) => "/home ",
+                        Some(Role::Data) => "/data ",
+                        None => "      ",
+                    };
+                    format!(
+                        "{} [{role}] {}{}",
+                        if i == *idx { ">" } else { " " },
+                        d.label(),
+                        if d.by_id.is_some() {
+                            ""
+                        } else {
+                            "  (no by-id link)"
+                        }
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join("\n"),
+            Color::Cyan,
+        ),
+        Modal::Toggle => (
+            " encryption ",
+            "Encrypt this host with LUKS2?\n\n  y  yes, and set a passphrase\n  n  no\n\n\
+             Off by default: nothing is encrypted unless you say so."
+                .into(),
+            Color::Cyan,
+        ),
+        Modal::Text { value, .. } => (
+            " swap size ",
+            format!("Btrfs swapfile size, e.g. 32G. Empty for none.\n\n> {value}"),
+            Color::Cyan,
+        ),
+        Modal::Secret {
             first,
             second,
             confirming,
+            what,
         } => (
-            " LUKS passphrase ",
+            match what {
+                CheckId::Encryption => " LUKS passphrase ",
+                CheckId::AgeKey => " age key passphrase ",
+                _ => " root password ",
+            },
             format!(
-                "One passphrase opens every encrypted volume on this host.\n\n{}: {}",
-                if *confirming { "Again" } else { "Passphrase" },
+                "{}\n\n{}: {}",
+                match what {
+                    CheckId::Encryption =>
+                        "One passphrase opens every encrypted volume on this host.",
+                    CheckId::AgeKey =>
+                        "The passphrase for the committed age key. Checked immediately.",
+                    _ => "Hashed with mkpasswd and written to /persist/secrets.",
+                },
+                if *confirming { "Again" } else { "Enter" },
                 "*".repeat(if *confirming {
                     second.len()
                 } else {
@@ -908,9 +775,18 @@ fn draw_modal(f: &mut Frame, app: &App) {
             ),
             Color::Yellow,
         ),
+        Modal::Erase(buf) => (
+            " destructive ",
+            format!(
+                "{}\n\nEverything on these disks will be erased.\n\
+                 Type ERASE to continue: {buf}",
+                disks_to_wipe(app)
+            ),
+            Color::Red,
+        ),
     };
 
-    let area = centered(60, 40, f.area());
+    let area = centered(64, 50, f.area());
     f.render_widget(Clear, area);
     f.render_widget(
         Paragraph::new(body).wrap(Wrap { trim: false }).block(
@@ -921,6 +797,35 @@ fn draw_modal(f: &mut Frame, app: &App) {
         ),
         area,
     );
+}
+
+fn disks_to_wipe(app: &App) -> String {
+    let Some(p) = app.board.profile.as_ref() else {
+        return String::new();
+    };
+    let mut out = vec![format!("  system: {}", p.system_device)];
+    if let Some(h) = &p.home_device {
+        out.push(format!("  /home:  {h}"));
+    }
+    if let Some(d) = &p.data_device {
+        out.push(format!("  /data:  {d}   PRESERVED, not formatted"));
+    }
+    out.join("\n")
+}
+
+fn truncate(s: &str, max: usize) -> String {
+    let one_line = s.replace('\n', " ");
+    if one_line.chars().count() <= max || max == 0 {
+        one_line
+    } else {
+        format!(
+            "{}…",
+            one_line
+                .chars()
+                .take(max.saturating_sub(1))
+                .collect::<String>()
+        )
+    }
 }
 
 fn centered(pct_x: u16, pct_y: u16, area: Rect) -> Rect {
@@ -945,11 +850,12 @@ fn centered(pct_x: u16, pct_y: u16, area: Rect) -> Rect {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::nix::Facts;
+    use crate::profile::{Profile, RootMode};
     use ratatui::backend::TestBackend;
 
-    /// Every cell's symbol, row after row. Enough for `contains` assertions.
     fn render(app: &App) -> String {
-        let mut t = Terminal::new(TestBackend::new(100, 30)).unwrap();
+        let mut t = Terminal::new(TestBackend::new(110, 34)).unwrap();
         t.draw(|f| draw(f, app)).unwrap();
         t.backend()
             .buffer()
@@ -959,199 +865,156 @@ mod tests {
             .collect()
     }
 
-    fn app_with_profile() -> App {
-        let mut app = App::new("/repo", vec!["sulfur".into(), "hydrogen".into()]);
-        app.facts = Some(Facts {
+    fn app() -> App {
+        let mut board = Board::new("/repo", vec!["gentlemenpupil".into(), "sulfur".into()]);
+        board.facts = Some(Facts {
             age_key_file: "/home/sheath/.config/sops/age/keys.txt".into(),
-            sops_file: "secrets.yaml".into(),
-            root_password: "persist".into(),
+            sops_file: "family.yaml".into(),
+            root_password: "none".into(),
             mutable_users: false,
-            persist_ssh: true,
+            persist_ssh: false,
         });
-        app.profile = Some(Profile {
-            host: "sulfur".into(),
-            system_device: "/dev/disk/by-id/nvme-SAMPLE".into(),
-            system_encrypt: true,
+        board.profile = Some(Profile {
+            host: "gentlemenpupil".into(),
+            system_device: "/dev/disk/by-id/nvme-A".into(),
+            system_encrypt: false,
             esp_size: "1G".into(),
             home_device: None,
-            home_encrypt: true,
-            root_mode: RootMode::Tmpfs,
+            home_encrypt: false,
+            root_mode: RootMode::Subvol,
             tmpfs_size: "6G".into(),
-            swap_size: Some("32G".into()),
+            swap_size: None,
             data_device: None,
             data_fs_type: "btrfs".into(),
         });
-        app
+        board.disks = vec![Disk {
+            name: "nvme0n1".into(),
+            size: "1T".into(),
+            model: "Samsung".into(),
+            serial: "1".into(),
+            by_id: Some("/dev/disk/by-id/nvme-A".into()),
+        }];
+        App::new(board)
     }
 
     #[test]
-    fn host_screen_lists_every_host() {
-        let app = App::new("/repo", vec!["sulfur".into(), "vizualwanderer".into()]);
-        let out = render(&app);
-        assert!(out.contains("NixOS installer"));
-        assert!(out.contains("sulfur"));
-        assert!(out.contains("vizualwanderer"));
+    fn the_board_lists_every_requirement() {
+        let a = app();
+        let out = render(&a);
+        for id in checks::ALL {
+            assert!(out.contains(id.label()), "missing row: {}", id.label());
+        }
     }
 
     #[test]
-    fn review_shows_the_hosts_own_age_key_path() {
-        let mut app = app_with_profile();
-        app.screen = Screen::Review;
-        let out = render(&app);
-        assert!(out.contains("/home/sheath/.config/sops/age/keys.txt"));
-        assert!(out.contains("age-key.enc"));
-        assert!(out.contains("installable"));
-        assert!(out.contains("rootMode"));
+    fn a_failed_row_shows_its_reason_in_the_detail_pane() {
+        let mut a = app();
+        a.board
+            .set(CheckId::Layout, Status::Failed("disko said no".into()));
+        a.row = checks::ALL
+            .iter()
+            .position(|c| *c == CheckId::Layout)
+            .unwrap();
+        assert!(render(&a).contains("disko said no"));
     }
 
     #[test]
-    fn review_reports_why_a_profile_is_not_installable() {
-        let mut app = app_with_profile();
-        app.screen = Screen::Review;
-        app.profile.as_mut().unwrap().system_device = crate::profile::UNSET_DEVICE.into();
-        let out = render(&app);
-        assert!(out.contains("no system disk selected"));
+    fn the_header_only_says_ready_when_every_row_is_satisfied() {
+        let mut a = app();
+        assert!(render(&a).contains("incomplete"));
+        for id in checks::ALL {
+            a.board.set(id, Status::Ok("fine".into()));
+        }
+        assert!(render(&a).contains("READY"));
     }
 
     #[test]
-    fn run_screen_warns_before_repartitioning_an_installed_machine() {
-        let mut app = app_with_profile();
-        app.screen = Screen::Run;
-        app.phase_done = vec![false; phases::ALL.len()];
-        let out = render(&app);
+    fn r_is_refused_while_anything_is_unmet() {
+        let mut a = app();
+        a.board.set(CheckId::Layout, Status::Failed("nope".into()));
+        start_run(&mut a);
+        match &a.modal {
+            Modal::Error(e) => assert!(e.contains("layout")),
+            _ => panic!("expected a refusal listing the unmet rows"),
+        }
+    }
+
+    #[test]
+    fn a_ready_board_asks_for_erase_before_partitioning() {
+        let mut a = app();
+        for id in checks::ALL {
+            a.board.set(id, Status::Ok("fine".into()));
+        }
+        a.phase_done = vec![false; phases::ALL.len()];
+        start_run(&mut a);
         assert!(
-            out.contains("ALREADY INSTALLED"),
-            "an unmounted target must not silently look like a fresh disk"
+            matches!(a.modal, Modal::Erase(_)),
+            "the destructive phase must still be confirmed"
         );
-        assert!(out.contains("m mount existing"));
-
-        // Once mounted, the hint goes away.
-        app.phase_done[0] = true;
-        assert!(!render(&app).contains("ALREADY INSTALLED"));
+        assert!(render(&a).contains("Type ERASE"));
     }
 
     #[test]
-    fn erase_modal_is_shown_before_anything_destructive() {
-        let mut app = app_with_profile();
-        app.screen = Screen::Run;
-        app.modal = Modal::Erase("ER".into());
-        let out = render(&app);
-        assert!(out.contains("erased"));
-        assert!(out.contains("Type ERASE to continue"));
-    }
-
-    #[test]
-    fn passphrase_modal_never_echoes_the_passphrase() {
-        let mut app = app_with_profile();
-        app.screen = Screen::Run;
-        app.modal = Modal::Passphrase {
+    fn secrets_are_never_drawn() {
+        let mut a = app();
+        a.modal = Modal::Secret {
             first: "hunter2".into(),
             second: String::new(),
             confirming: false,
+            what: CheckId::AgeKey,
         };
-        let out = render(&app);
-        assert!(!out.contains("hunter2"), "the passphrase must not be drawn");
+        let out = render(&a);
+        assert!(!out.contains("hunter2"));
         assert!(out.contains("*******"));
     }
 
     #[test]
+    fn turning_encryption_off_clears_the_passphrase() {
+        let mut a = app();
+        a.board.luks_passphrase = "old".into();
+        a.board.profile.as_mut().unwrap().system_encrypt = true;
+        a.modal = Modal::Toggle;
+        modal_key(&mut a, KeyCode::Char('n'));
+        assert!(!a.board.profile.as_ref().unwrap().system_encrypt);
+        assert!(
+            a.board.luks_passphrase.is_empty(),
+            "a stale passphrase must not survive turning encryption off"
+        );
+    }
+
+    #[test]
     fn assigning_a_role_moves_it_off_the_previous_disk() {
-        let mut app = app_with_profile();
-        app.disks = vec![
-            Disk {
-                name: "nvme0n1".into(),
-                size: "1T".into(),
-                model: "A".into(),
-                serial: "1".into(),
-                by_id: Some("/dev/disk/by-id/nvme-A".into()),
-            },
-            Disk {
-                name: "sda".into(),
-                size: "2T".into(),
-                model: "B".into(),
-                serial: "2".into(),
-                by_id: Some("/dev/disk/by-id/ata-B".into()),
-            },
-        ];
-        app.disk_idx = 1;
-        assign(&mut app, Some(Role::Home));
+        let mut a = app();
+        a.board.disks.push(Disk {
+            name: "sda".into(),
+            size: "2T".into(),
+            model: "B".into(),
+            serial: "2".into(),
+            by_id: Some("/dev/disk/by-id/ata-B".into()),
+        });
+        assign(&mut a, 1, Some(Role::Home));
         assert_eq!(
-            app.profile.as_ref().unwrap().home_device.as_deref(),
+            a.board.profile.as_ref().unwrap().home_device.as_deref(),
             Some("/dev/disk/by-id/ata-B")
         );
-
-        // Re-assigning the same disk as system must clear its /home role, not hold both.
-        assign(&mut app, Some(Role::System));
-        let p = app.profile.as_ref().unwrap();
+        assign(&mut a, 1, Some(Role::System));
+        let p = a.board.profile.as_ref().unwrap();
         assert_eq!(p.system_device, "/dev/disk/by-id/ata-B");
         assert_eq!(p.home_device, None);
     }
 
-    /// Every screen must have a way forward. Options once had none: Enter changed the
-    /// field under the cursor and nothing advanced, stranding the operator one screen
-    /// short of installing.
-    #[test]
-    fn every_screen_leads_to_the_next() {
-        let mut app = app_with_profile();
-        app.disks = vec![Disk {
-            name: "nvme0n1".into(),
-            size: "1T".into(),
-            model: "A".into(),
-            serial: "1".into(),
-            by_id: Some("/dev/disk/by-id/nvme-A".into()),
-        }];
-
-        app.screen = Screen::Disks;
-        disks_key(&mut app, KeyCode::Enter);
-        assert_eq!(app.screen, Screen::Options, "disks must reach options");
-
-        options_key(&mut app, KeyCode::Enter);
-        assert_eq!(app.screen, Screen::Review, "options must reach review");
-
-        // Space still changes a field rather than navigating.
-        app.screen = Screen::Options;
-        app.opt_idx = 0;
-        let before = app.profile.as_ref().unwrap().system_encrypt;
-        options_key(&mut app, KeyCode::Char(' '));
-        assert_eq!(app.screen, Screen::Options);
-        assert_ne!(app.profile.as_ref().unwrap().system_encrypt, before);
-    }
-
-    #[test]
-    fn a_single_disk_layout_keeps_home_on_the_system_disk() {
-        let mut app = app_with_profile();
-        app.disks = vec![Disk {
-            name: "nvme0n1".into(),
-            size: "1T".into(),
-            model: "A".into(),
-            serial: "1".into(),
-            by_id: Some("/dev/disk/by-id/nvme-A".into()),
-        }];
-        app.disk_idx = 0;
-        assign(&mut app, Some(Role::System));
-
-        let p = app.profile.as_ref().unwrap();
-        assert_eq!(
-            p.home_device, None,
-            "no second disk means /home is a subvolume"
-        );
-        assert!(p.validate().is_ok());
-        assert!(!p.to_nix().contains("home.device"));
-    }
-
     #[test]
     fn a_disk_with_no_stable_link_is_refused() {
-        let mut app = app_with_profile();
-        app.disks = vec![Disk {
+        let mut a = app();
+        a.board.disks = vec![Disk {
             name: "vda".into(),
             size: "1T".into(),
             model: String::new(),
             serial: String::new(),
             by_id: None,
         }];
-        app.disk_idx = 0;
-        assign(&mut app, Some(Role::System));
-        match &app.modal {
+        assign(&mut a, 0, Some(Role::System));
+        match &a.modal {
             Modal::Error(e) => assert!(e.contains("by-id")),
             _ => panic!("expected a refusal: kernel names reorder across boots"),
         }
