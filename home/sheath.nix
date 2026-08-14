@@ -1,6 +1,13 @@
 { config, pkgs, inputs, lib, osConfig, ... }:
 let
   vllm = import ../modules/vllm-endpoint.nix;
+
+  # Role, derived from the NixOS config. sheath's account exists on all six hosts, but only
+  # sulfur is a machine he sits at -- hydrogen is a headless-ish server and the kids'
+  # laptops carry this account purely for remote administration. Without this they each
+  # built VSCodium, treesitter with every grammar, and a dock script hardcoded to three
+  # specific monitor serials.
+  workstation = osConfig.networking.hostName == "sulfur";
   # Pi coding agent (pi.dev) and its sops-templated Open WebUI config are
   # workstation-only. hydrogen (server) has no user-level age key at
   # ~/.config/sops/age/keys.txt, so the home sops activation for the openwebui
@@ -10,24 +17,23 @@ let
   #
   # The family laptops are excluded for a different reason: they carry the FAMILY age
   # key, which by design cannot decrypt secrets/secrets.yaml (see .sops.yaml), so the
-  # openwebui-* secrets below would fail activation there — and Pi has no business on a
-  # child's machine either way. `or false` because modules/family/profile.nix is the
-  # module that declares family.enable, and the other hosts never import it.
-  enablePi = osConfig.networking.hostName != "hydrogen"
-    && !(osConfig.family.enable or false);
+  # openwebui-* secrets below would fail activation there.
+  enablePi = workstation;
 in
 {
   imports = [
     ./bash.nix
-    ./ptyxis.nix
     ./git.nix
-    ./go.nix
     ./neovim.nix
-    ./vscode.nix
-    ./monitors.nix
     inputs.sops-nix.homeManagerModules.sops
     inputs.nix-index-database.homeModules.nix-index
+  ] ++ lib.optionals workstation [
+    ./ptyxis.nix
+    ./vscode.nix
+    ./monitors.nix
   ];
+
+  programs.go.enable = true;
 
   # nix-index: `nix-locate <file>` finds which package provides a binary/file,
   # and hooks bash's command-not-found to suggest the package. comma (`,`)

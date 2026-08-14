@@ -1,5 +1,10 @@
-{ config, pkgs, ... }:
+{ config, pkgs, lib, osConfig, ... }:
 
+# Full editor on sulfur; on the server and the kids' laptops sheath's account is for
+# administration, so it gets nix/bash/python tooling and the matching grammars only.
+let
+  workstation = osConfig.networking.hostName == "sulfur";
+in
 {
   programs.neovim = {
     enable = true;
@@ -452,7 +457,9 @@
       telescope-fzf-native-nvim
 
       # ── Treesitter ──
-      nvim-treesitter.withAllGrammars
+      (if workstation
+       then nvim-treesitter.withAllGrammars
+       else nvim-treesitter.withPlugins (g: [ g.nix g.bash g.python g.lua g.markdown g.json g.yaml ]))
 
       # ── LSP ──
       nvim-lspconfig
@@ -484,23 +491,19 @@
 
     # LSP servers and tools available on PATH
     extraPackages = with pkgs; [
-      # LSP servers
+      nil                      # Nix LSP
+      bash-language-server
+      nixfmt
+      ripgrep                  # telescope live_grep
+      fd                       # telescope find_files
+    ] ++ lib.optionals workstation [
       rust-analyzer
       pyright
-      nil                      # Nix LSP
       lua-language-server
-      clang-tools              # clangd for C/C++
-      bash-language-server   # was nodePackages.bash-language-server; that set was removed in 26.05
-
-      # Formatters
-      nixfmt                   # was nixfmt-rfc-style; that alias now just points here
+      clang-tools              # clangd
       stylua
       black
       rustfmt
-
-      # Tools
-      ripgrep                  # for telescope live_grep
-      fd                       # for telescope find_files
     ];
   };
 }
