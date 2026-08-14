@@ -17,6 +17,7 @@ in
     ../modules/wivrn.nix
     ../modules/fleet-vpn.nix
     ../modules/minecraft-client.nix       # the offline client (game + mods pinned), shared with hydrogen
+    ../modules/minecraft-launcher.nix     # pick a player and a server; spins servers up on demand
     ../modules/family/wg-endpoint.nix     # keeps wgadm pointed at the LAN or the WAN
   ];
 
@@ -26,6 +27,9 @@ in
     playerName = "LuckyObserver";
     server = "mc.luckyobserver.com:25565";
   };
+
+  # The plain client icon still quick-plays into the family world; this one asks first.
+  services.minecraftLauncher.enable = true;
 
   fleet.bootGenerations = 20;
   # Not sops: the age key lives under /home, which is exactly what has not mounted when
