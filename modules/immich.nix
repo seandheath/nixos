@@ -24,16 +24,5 @@
   systemd.services.immich-server.unitConfig.RequiresMountsFor = "/data";
   systemd.services.immich-machine-learning.unitConfig.RequiresMountsFor = "/data";
 
-  services.nginx.virtualHosts."immich.luckyobserver.com" = {
-    useACMEHost = "luckyobserver.com";
-    forceSSL = true;
-    locations."/" = {
-      proxyPass = "http://127.0.0.1:2283";
-      proxyWebsockets = true;
-      extraConfig = ''
-        client_max_body_size 50G;
-        proxy_read_timeout 600s;
-      '';
-    };
-  };
+  fleet.vhosts.immich = { port = 2283; maxBody = "50G"; readTimeout = "600s"; };
 }

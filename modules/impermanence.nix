@@ -56,13 +56,6 @@
   # Required for impermanence to work with users
   programs.fuse.userAllowOther = true;
 
-  # Set passwords declaratively since /etc/shadow is wiped
-  users.mutableUsers = false;
-
-  # User password files (must exist in /persist/secrets/)
-  users.users.sheath.hashedPasswordFile = "/persist/secrets/sheath-password";
-  users.users.root.hashedPasswordFile = "/persist/secrets/root-password";
-
   # Btrfs maintenance
   services.btrfs.autoScrub = {
     enable = true;

@@ -44,6 +44,9 @@ in
   # The option itself lives in the single boot.extraModprobeConfig block below.
 
   fleet.bootGenerations = 20;
+  # Not sops: the age key lives under /home, which is exactly what has not mounted when
+  # root recovery is needed.
+  fleet.accounts.rootPassword = "persist";
 
   # Kernel deliberately NOT pinned: follow whatever nixpkgs makes the default. The old
   # `linuxPackages_6_18` pin existed because nvidia-open 595 lagged behind mainline, and
@@ -368,31 +371,6 @@ in
   };
 
 
-  # --------------------------------------------------------------------------
-  # sheath's login password, from sops rather than /persist/secrets/sheath-password.
-  #
-  # modules/impermanence.nix already sets users.mutableUsers = false and points this at a
-  # plaintext hash that install.sh writes once, by hand, per machine -- so the password on
-  # this laptop, hydrogen and the four kids' laptops could drift apart with nothing to
-  # notice. One sops entry is now the source for all six.
-  #
-  # It lives in secrets/family.yaml, which needs saying: that file is encrypted to the
-  # main key AND the family key (see .sops.yaml), so this host reads it with the main key
-  # it already has. sopsFile is explicit because this host's defaultSopsFile is
-  # secrets/secrets.yaml.
-  #
-  # root is deliberately left on /persist/secrets/root-password. It is the recovery path
-  # for a machine whose /home -- and therefore whose age key -- did not mount, and that is
-  # exactly when a sops-backed password would be unavailable.
-  #
-  # REVERT: drop these two lines. /persist/secrets/sheath-password is still there and
-  # modules/impermanence.nix picks it back up.
-  sops.secrets."sheath-password-hash" = {
-    sopsFile = ../secrets/family.yaml;
-    neededForUsers = true;
-  };
-  users.users.sheath.hashedPasswordFile =
-    lib.mkForce config.sops.secrets."sheath-password-hash".path;
 
   # --------------------------------------------------------------------------
   # wgadm: the administrative tunnel to hydrogen (modules/family/vpn-hub.nix).

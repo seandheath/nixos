@@ -52,6 +52,8 @@
         home-manager.nixosModules.home-manager
         sops-nix.nixosModules.sops
         ./modules/nix-settings.nix
+        ./modules/sops.nix
+        ./modules/accounts.nix
         ./modules/boot-efi.nix
         ./modules/locale.nix
         ./modules/auto-update.nix

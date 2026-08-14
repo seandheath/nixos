@@ -25,8 +25,6 @@
     };
   };
 
-  services.nginx.virtualHosts."nc.luckyobserver.com" = {
-    useACMEHost = "luckyobserver.com";
-    forceSSL = true;
-  };
+  # The nextcloud module generates the vhost on hostName; this only attaches the cert.
+  fleet.vhosts.nc = { };
 }

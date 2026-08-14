@@ -96,14 +96,12 @@ in
     # the first use of this in the repo; if activation ever fails here, the escape hatch
     # is users.mutableUsers = true plus `passwd`, which is what the other hosts do.
     sops.secrets."${username}-password-hash".neededForUsers = true;
-    sops.secrets."sheath-password-hash".neededForUsers = true;
 
     # ---------------------------------------------------------------------------
     # Accounts
     #
     # Declarative passwords are the point: a child cannot change their own password out
     # from under you, and a reinstall reproduces the same login.
-    users.mutableUsers = false;
 
     users.users.${username} = {
       isNormalUser = true;
@@ -127,35 +125,11 @@ in
     };
     users.groups.${username} = { };
 
-    # sheath comes from flake.nix's commonModules on every host, but with
-    # mutableUsers = false an account with no declared password cannot log in at the
-    # console at all -- and the console is the recovery path when the network is the
-    # thing that is broken. The same hash is used on hydrogen and sulfur; it lives in
-    # secrets/family.yaml because that file is readable by both age keys.
-    #
-    # WORTH RECONSIDERING NOW THAT THE KIDS HAVE WHEEL. The family age key sits at
-    # /home/sheath/.config/sops/age/keys.txt on this machine, and root can read it. A
-    # child with sudo can therefore decrypt secrets/family.yaml, which holds every
-    # sibling's WireGuard key and password hash -- and THIS hash, which is also sheath's
-    # password on hydrogen and sulfur. Offline cracking of one hash is the whole attack.
-    #
-    # The fix is to stop sharing it: give the laptops their own admin hash, so a child
-    # who reads this file learns a password that works on four laptops they already have
-    # root on, and nothing else.
-    users.users.sheath.hashedPasswordFile = config.sops.secrets."sheath-password-hash".path;
 
     # root stays locked deliberately: no hashedPasswordFile, so no console root login.
     # Administration is sheath over SSH plus the sudo rule below.
 
-    # SECURITY: any process running as sheath on these machines gets root without a
-    # prompt. Same trade as modules/core.nix makes on hydrogen, for the same reason --
-    # unattended remote administration. sheath's account here exists only for that.
-    security.sudo.extraRules = [
-      {
-        users = [ "sheath" ];
-        commands = [{ command = "ALL"; options = [ "NOPASSWD" ]; }];
-      }
-    ];
+    fleet.accounts.sudoNoPassword = true;
 
     # ---------------------------------------------------------------------------
     # Remote administration

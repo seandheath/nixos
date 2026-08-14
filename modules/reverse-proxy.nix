@@ -1,34 +1,84 @@
-{ config, ... }:
+# nginx + one wildcard cert for every internal service name.
+{ config, lib, ... }:
+let
+  peers = import ./family/peers.nix;
+  domain = "luckyobserver.com";
+  cfg = config.fleet.vhosts;
+in
 {
-  security.acme = {
-    acceptTerms = true;
-    defaults.email = "se@nheath.com";
+  options.fleet.vhosts = lib.mkOption {
+    default = { };
+    description = ''
+      Internal service vhosts, keyed by subdomain. `port = null` only attaches the wildcard
+      cert to a vhost some other module already defines (nextcloud generates its own).
+    '';
+    type = lib.types.attrsOf (lib.types.submodule {
+      options = {
+        port = lib.mkOption {
+          type = lib.types.nullOr lib.types.port;
+          default = null;
+        };
+        maxBody = lib.mkOption {
+          type = lib.types.str;
+          default = "1G";
+        };
+        readTimeout = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = null;
+        };
+      };
+    });
   };
 
-  # Single wildcard cert for every internal service hostname, issued via the
-  # Cloudflare DNS-01 challenge. Works for WireGuard/LAN-only hosts because
-  # DNS-01 validates with a TXT record Cloudflare creates/removes — no public
-  # A records or inbound 80/443 required.
-  #
-  # Secret `acme-dns-credentials` is an env file containing:
-  #   CF_DNS_API_TOKEN=<token scoped to Zone:DNS:Edit on luckyobserver.com>
-  sops.secrets.acme-dns-credentials = {};
-  security.acme.certs."luckyobserver.com" = {
-    domain = "*.luckyobserver.com";
-    dnsProvider = "cloudflare";
-    environmentFile = config.sops.secrets.acme-dns-credentials.path;
-    group = "nginx";   # let nginx read the issued cert/key
-  };
+  config = {
+    security.acme = {
+      acceptTerms = true;
+      defaults.email = "se@nheath.com";
+    };
 
-  services.nginx = {
-    enable = true;
-    recommendedProxySettings = true;
-    recommendedTlsSettings = true;
-    recommendedGzipSettings = true;
-    recommendedOptimisation = true;
-  };
+    # DNS-01 validates with a TXT record Cloudflare creates and removes, so this works for
+    # hosts with no public A record and no inbound 80/443. Secret is an env file holding
+    # CF_DNS_API_TOKEN, scoped to Zone:DNS:Edit.
+    sops.secrets.acme-dns-credentials = { };
+    security.acme.certs.${domain} = {
+      domain = "*.${domain}";
+      dnsProvider = "cloudflare";
+      environmentFile = config.sops.secrets.acme-dns-credentials.path;
+      group = "nginx";
+    };
 
-  # Per-service virtualHosts are defined in each service module
-  # (nextcloud.nix, immich.nix, calibre.nix, paperless.nix), all attaching to
-  # the wildcard cert above via `useACMEHost = "luckyobserver.com"`.
+    services.nginx = {
+      enable = true;
+      recommendedProxySettings = true;
+      recommendedTlsSettings = true;
+      recommendedGzipSettings = true;
+      recommendedOptimisation = true;
+
+      virtualHosts = lib.mapAttrs' (sub: v: lib.nameValuePair "${sub}.${domain}" ({
+        useACMEHost = domain;
+        forceSSL = true;
+      } // lib.optionalAttrs (v.port != null) {
+        locations."/" = {
+          proxyPass = "http://127.0.0.1:${toString v.port}";
+          proxyWebsockets = true;
+          extraConfig = ''
+            client_max_body_size ${v.maxBody};
+          '' + lib.optionalString (v.readTimeout != null) ''
+            proxy_read_timeout ${v.readTimeout};
+          '';
+        };
+      })) cfg;
+    };
+
+    # The clients resolve these names from peers.serviceNames (networking.hosts on the
+    # NixOS hosts, the router for phones), so a vhost that is not in that list is
+    # unreachable by name and nothing else would say so.
+    assertions = lib.mapAttrsToList (sub: _: {
+      assertion = lib.elem "${sub}.${domain}" peers.serviceNames;
+      message = ''
+        fleet.vhosts."${sub}" has no matching entry in modules/family/peers.nix
+        serviceNames, so clients cannot resolve ${sub}.${domain}.
+      '';
+    }) cfg;
+  };
 }

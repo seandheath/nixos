@@ -324,38 +324,10 @@
     settings.PermitRootLogin = "no";
   };
 
-  # ---------------------------------------------------------------------------
-  # Declarative passwords, from sops.
-  #
-  # mutableUsers = false is what makes the declared hashes authoritative; with the
-  # default (true) NixOS only applies a declared password when it CREATES the account,
-  # so setting hashedPasswordFile alone would change nothing on this running system.
-  #
-  # THE CONSEQUENCE, stated plainly: this also discards the root password that was set
-  # interactively at install time. Declared state becomes the whole state. That is why
-  # root is declared here as well -- without it the systemd emergency shell would have no
-  # way in, and a server that cannot be rescued from its own console is a bad trade for a
-  # tidier password story. (nixpkgs' assertion in config/users-groups.nix would still pass
-  # on sheath's key alone; passing that assertion is not the same as being recoverable.)
-  #
-  # Ordering works because modules/impermanence-server.nix marks /persist neededForBoot,
-  # so the age key at /persist/secrets/age-keys.txt is readable before
-  # sops-install-secrets-for-users runs. Read that comment before changing either.
-  #
-  # sheath's hash comes from secrets/family.yaml -- encrypted to the main key AND the
-  # family key, so hydrogen, sulfur and the four laptops all share one entry. root's stays
-  # in secrets/secrets.yaml: the kids' laptops have no business with it and leave root
-  # locked on purpose.
-  users.mutableUsers = false;
-
-  sops.secrets."sheath-password-hash" = {
-    sopsFile = ../secrets/family.yaml;
-    neededForUsers = true;
-  };
-  sops.secrets."root-password-hash".neededForUsers = true;
-
-  users.users.sheath.hashedPasswordFile = config.sops.secrets."sheath-password-hash".path;
-  users.users.root.hashedPasswordFile = config.sops.secrets."root-password-hash".path;
+  # The console is the recovery path here: br0 carries nothing, so a wgadm failure
+  # leaves no remote way in.
+  fleet.accounts.rootPassword = "sops";
+  fleet.accounts.sudoNoPassword = true;
 
   # PostgreSQL for nextcloud + immich (shared instance). Pinned explicitly rather
   # than tracking the stateVersion default, so future stateVersion bumps don't

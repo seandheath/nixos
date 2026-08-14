@@ -18,15 +18,5 @@
     };
   };
 
-  services.nginx.virtualHosts."calibre.luckyobserver.com" = {
-    useACMEHost = "luckyobserver.com";
-    forceSSL = true;
-    locations."/" = {
-      proxyPass = "http://127.0.0.1:8083";
-      proxyWebsockets = true;
-      extraConfig = ''
-        client_max_body_size 1G;
-      '';
-    };
-  };
+  fleet.vhosts.calibre.port = 8083;
 }
