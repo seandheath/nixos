@@ -26,7 +26,7 @@ use std::path::{Path, PathBuf};
 
 type Term = Terminal<CrosstermBackend<Stdout>>;
 
-#[derive(PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 enum Screen {
     Host,
     Disks,
@@ -329,7 +329,10 @@ fn options_key(app: &mut App, code: KeyCode) {
         KeyCode::Down | KeyCode::Char('j') => {
             app.opt_idx = (app.opt_idx + 1).min(OPTIONS.len() - 1)
         }
-        KeyCode::Char(' ') | KeyCode::Enter => toggle_or_edit(app),
+        // Space changes the field, Enter moves on. Sharing Enter for both left this
+        // screen with no way forward.
+        KeyCode::Char(' ') => toggle_or_edit(app),
+        KeyCode::Enter => app.screen = Screen::Review,
         _ => {}
     }
 }
@@ -356,9 +359,6 @@ fn toggle_or_edit(app: &mut App) {
         4 => app.editing = Some(p.esp_size.clone()),
         5 => app.editing = Some(p.data_fs_type.clone()),
         _ => {}
-    }
-    if app.screen == Screen::Options && app.editing.is_none() {
-        // toggles only
     }
 }
 
@@ -669,7 +669,7 @@ fn draw(f: &mut Frame, app: &App) {
         Screen::Disks => {
             "j/k move   s system   h /home   d /data   x clear   Enter next   Esc back"
         }
-        Screen::Options => "j/k move   Space/Enter change   Esc back",
+        Screen::Options => "j/k move   Space change   Enter continue   Esc back",
         Screen::Review => "w write layout   Enter write and continue   Esc back",
         Screen::Run => "r run pending   m mount existing   R re-check   Esc back   q quit",
     };
@@ -1085,6 +1085,58 @@ mod tests {
         let p = app.profile.as_ref().unwrap();
         assert_eq!(p.system_device, "/dev/disk/by-id/ata-B");
         assert_eq!(p.home_device, None);
+    }
+
+    /// Every screen must have a way forward. Options once had none: Enter changed the
+    /// field under the cursor and nothing advanced, stranding the operator one screen
+    /// short of installing.
+    #[test]
+    fn every_screen_leads_to_the_next() {
+        let mut app = app_with_profile();
+        app.disks = vec![Disk {
+            name: "nvme0n1".into(),
+            size: "1T".into(),
+            model: "A".into(),
+            serial: "1".into(),
+            by_id: Some("/dev/disk/by-id/nvme-A".into()),
+        }];
+
+        app.screen = Screen::Disks;
+        disks_key(&mut app, KeyCode::Enter);
+        assert_eq!(app.screen, Screen::Options, "disks must reach options");
+
+        options_key(&mut app, KeyCode::Enter);
+        assert_eq!(app.screen, Screen::Review, "options must reach review");
+
+        // Space still changes a field rather than navigating.
+        app.screen = Screen::Options;
+        app.opt_idx = 0;
+        let before = app.profile.as_ref().unwrap().system_encrypt;
+        options_key(&mut app, KeyCode::Char(' '));
+        assert_eq!(app.screen, Screen::Options);
+        assert_ne!(app.profile.as_ref().unwrap().system_encrypt, before);
+    }
+
+    #[test]
+    fn a_single_disk_layout_keeps_home_on_the_system_disk() {
+        let mut app = app_with_profile();
+        app.disks = vec![Disk {
+            name: "nvme0n1".into(),
+            size: "1T".into(),
+            model: "A".into(),
+            serial: "1".into(),
+            by_id: Some("/dev/disk/by-id/nvme-A".into()),
+        }];
+        app.disk_idx = 0;
+        assign(&mut app, Some(Role::System));
+
+        let p = app.profile.as_ref().unwrap();
+        assert_eq!(
+            p.home_device, None,
+            "no second disk means /home is a subvolume"
+        );
+        assert!(p.validate().is_ok());
+        assert!(!p.to_nix().contains("home.device"));
     }
 
     #[test]
