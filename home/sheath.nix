@@ -28,7 +28,7 @@ in
     inputs.sops-nix.homeManagerModules.sops
     inputs.nix-index-database.homeModules.nix-index
   ] ++ lib.optionals workstation [
-    ./ptyxis.nix
+    ./ghostty.nix
     ./vscode.nix
     ./monitors.nix
   ];

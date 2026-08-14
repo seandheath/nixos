@@ -64,6 +64,9 @@
         # stayed unreachable for six hours. Defines nothing on a host with no bridges.
         ./modules/bridge-slave-restore.nix
         { nixpkgs.overlays = [ (import ./packages) ]; }
+        # Every host: sulfur's Ghostty sets TERM=xterm-ghostty, which nixpkgs' ncurses does
+        # not carry, and an SSH session inherits it.
+        ({ pkgs, ... }: { environment.systemPackages = [ pkgs.ghostty.terminfo ]; })
         {
           home-manager.useGlobalPkgs = true;
           home-manager.useUserPackages = true;

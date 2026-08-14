@@ -91,12 +91,14 @@ pkgs.dockerTools.buildLayeredImage {
     pkgs.bashInteractive
     pkgs.coreutils
 
-    # ncurses is here for its **terminfo database**, not for tput. A dockerTools image ships
-    # no terminfo at all (cclaude gets one free from debian's ncurses-base), so TERM=
-    # xterm-256color resolves to nothing, both TUIs lose cursor addressing, and they fall
-    # back to clearing and repainting the whole screen every frame — which reads as violent
-    # flicker in ptyxis. See TERMINFO_DIRS in config.Env below; both halves are required.
+    # Both are here for their **terminfo databases**, not for tput. A dockerTools image ships
+    # no terminfo at all (cclaude gets one free from debian's ncurses-base), so the forwarded
+    # TERM resolves to nothing, both TUIs lose cursor addressing, and they fall back to
+    # clearing and repainting the whole screen every frame — violent flicker. ncurses does not
+    # carry xterm-ghostty, which is what the host terminal sends. See TERMINFO_DIRS in
+    # config.Env below; both halves are required.
     pkgs.ncurses
+    pkgs.ghostty.terminfo
     # HTTPS to the vLLM endpoint. Without this every model call fails cert verification.
     pkgs.cacert
     pkgs.dockerTools.usrBinEnv

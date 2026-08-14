@@ -21,6 +21,18 @@ Also the decision log. Rationale that would otherwise bloat a code comment lives
 
 ## 2026-08-14
 
+- **Ptyxis → Ghostty on sulfur (`home/ghostty.nix`).** Ptyxis' home-manager module only
+  installed the package, so font and login-shell had to be GSettings in `modules/dconf.nix`,
+  split away from the module that owned the terminal; `programs.ghostty` writes a real config
+  file, so both `org/gnome/Ptyxis*` blocks are gone. Two non-obvious carry-overs: `font-size`
+  is 14, not 11, because GNOME's 1.25 `text-scaling-factor` is applied by VTE but not by
+  Ghostty; and `command = "direct:bash --login"` replaces `login-shell = true`, which is
+  load-bearing for `home.sessionPath` (it reaches `~/.profile`, not `.bashrc`).
+- **`pkgs.ghostty.terminfo` on every host, and in the RE container image.** Ghostty sends
+  `TERM=xterm-ghostty`; nixpkgs' ncurses ships only a bare `ghostty` entry, so an SSH session
+  to any other host — and any TUI in the container, which inherits the host's `TERM` — would
+  hit the same no-terminfo repaint flicker `packages/re-container.nix` already guards against.
+  8 KB per host, versus pinning `term = xterm-256color` and losing the capability advertising.
 - Bumped `openwebui-model` in `secrets/secrets.yaml` to the endpoint's newer served model.
   `contextWindow`/`maxOutput` in `modules/vllm-endpoint.nix` were left alone -- the endpoint
   was serving no models when the change was made, so its `/models` could not be re-read.
