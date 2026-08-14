@@ -89,8 +89,14 @@
 
       # The kids' laptops. modules/family/profile.nix derives the username, WireGuard peer
       # address, sops key names and Minecraft handle from the hostname via
-      # modules/family/peers.nix, so a host file declares only its hostname and hardware.
-      familyHosts = [ "gentlemenpupil" "vizualwanderer" "phantomspecialst" "maddreamer" ];
+      # modules/family/peers.nix, so a host declares only its hostname and hardware.
+      # Value is the host's hardware-model modules, the seam mkHost has as extraModules.
+      familyHosts = {
+        gentlemenpupil = [ ./modules/oryp10.nix ]; # System76 Oryx Pro 10, ex-osmium
+        vizualwanderer = [ ];
+        phantomspecialst = [ ];
+        maddreamer = [ ];
+      };
 
       hosts = {
         hydrogen = mkHost { hostName = "hydrogen"; };
@@ -102,15 +108,15 @@
             impermanence.nixosModules.impermanence
           ];
         };
-      } // nixpkgs.lib.genAttrs familyHosts (hostName: nixpkgs.lib.nixosSystem {
+      } // nixpkgs.lib.mapAttrs (hostName: extraModules: nixpkgs.lib.nixosSystem {
         inherit system;
         specialArgs = { inherit inputs; };
         modules = [
           ./modules/family/profile.nix
           ./hardware/${hostName}.nix
           { networking.hostName = hostName; }
-        ] ++ commonModules;
-      });
+        ] ++ extraModules ++ commonModules;
+      }) familyHosts;
     in {
       nixosConfigurations = hosts;
 

@@ -10,8 +10,10 @@ family_hosts() {
     local peers f
     for f in ./modules/family/peers.nix /mnt/home/sheath/nixos/modules/family/peers.nix; do
         [[ -f "$f" ]] || continue
-        peers=$(nix eval --json --file "$f" 2>/dev/null \
-            | python3 -c 'import json,sys; print(" ".join(sorted(json.load(sys.stdin)["family"])))') || continue
+        # Joined in Nix, not python3: the installer ISO has neither python3 nor flakes
+        # enabled, and both misses land on the exit 1 below.
+        peers=$(nix --extra-experimental-features nix-command eval --raw --file "$f" \
+            --apply 'p: builtins.concatStringsSep " " (builtins.attrNames p.family)' 2>/dev/null) || continue
         [[ -n "$peers" ]] || continue
         echo "$peers"
         return 0
@@ -193,15 +195,60 @@ done
 
 DEVICE="/dev/${DEVICE_NAME}"
 
+# --- Host Selection ---
+#
+# Ahead of every destructive step, deliberately. This used to run after mkfs, so an
+# unselectable host wiped the disk and then aborted -- silently, because fzf exits 1
+# printing nothing and `set -e` takes the script with it.
+echo
+echo "Available hosts:"
+HOSTS_DIR="./hosts"
+if [[ ! -d "$HOSTS_DIR" ]]; then
+    echo "Error: 'hosts' directory not found. Make sure you are in the root of the nixos-config repo."
+    exit 1
+fi
+
+# The four family laptops are built by genAttrs in flake.nix and have no hosts/ file, so
+# listing that directory alone cannot name them.
+read -r -a FAMILY_HOSTS <<< "$(family_hosts)"
+[[ ${#FAMILY_HOSTS[@]} -gt 0 ]] || { echo "error: could not read family hosts from modules/family/peers.nix" >&2; exit 1; }
+ALL_HOSTS=$( { ls -1 "$HOSTS_DIR" | sed 's/\.nix$//'; printf '%s\n' "${FAMILY_HOSTS[@]}"; } | sort -u )
+
+if command -v fzf &> /dev/null; then
+    hostname=$(printf '%s\n' "$ALL_HOSTS" | fzf --prompt="Select a host to install: ") || true
+else
+    select host in $ALL_HOSTS; do
+        hostname=$host
+        break
+    done
+fi
+
+if [[ -z "${hostname:-}" ]]; then
+    echo "No host selected. Aborting."
+    exit 1
+fi
+
+echo "Selected host: $hostname"
+
+IS_FAMILY_HOST=false
+for _fh in "${FAMILY_HOSTS[@]}"; do
+    if [[ "$hostname" == "$_fh" ]]; then
+        IS_FAMILY_HOST=true
+        break
+    fi
+done
+
 # --- Installation Mode Selection ---
 echo
 echo "Select installation mode:"
 echo "  1) Simple (ext4, no encryption)"
 echo "  2) Impermanence (Btrfs + LUKS encryption)"
 echo "  3) Impermanence (Btrfs, no encryption)"
-echo
-echo "  The family laptops (gentlemenpupil, vizualwanderer, phantomspecialst,"
-echo "  maddreamer) must use option 1 -- they do not import modules/impermanence.nix."
+if [[ "$IS_FAMILY_HOST" == "true" ]]; then
+    echo
+    echo "  ${hostname} is a family laptop and must use option 1 -- it does not import"
+    echo "  modules/impermanence.nix."
+fi
 read -p "Enter choice [1-3]: " INSTALL_MODE
 
 case "$INSTALL_MODE" in
@@ -213,6 +260,38 @@ case "$INSTALL_MODE" in
         exit 1
         ;;
 esac
+
+# --- Family host validation ---
+# The four kids' laptops differ from every other host in three ways this script has to
+# know about: which age key they get, which disk layout they support, and how their
+# passwords are set. Checked here, before anything is destroyed.
+if [[ "$IS_FAMILY_HOST" == "true" ]]; then
+    # modules/family/profile.nix imports modules/sops.nix, whose keyFile is
+    # ${config.users.users.sheath.home}/.config/sops/age/keys.txt -- the SIMPLE layout's
+    # path. It does not import impermanence, so nothing would ever populate
+    # /persist/secrets, and sops would fail on first boot with every secret missing
+    # (which on these hosts includes both login passwords -- an unbootable-to-a-login
+    # machine). Refuse rather than produce that.
+    if [[ "$USE_IMPERMANENCE" == "true" ]]; then
+        echo
+        echo -e "\e[1;31mERROR: ${hostname} is a family laptop and only supports Simple mode (option 1).\e[0m"
+        echo "Family hosts keep the age key at /home/sheath/.config/sops/age/keys.txt and do"
+        echo "not import modules/impermanence.nix. Re-run and choose option 1."
+        exit 1
+    fi
+
+    # The whole point of the family age key is that it lives in the repository,
+    # passphrase-protected, so an install needs nothing but this checkout and the
+    # passphrase. If it is absent, something is wrong -- do not silently fall through
+    # to the "paste a plaintext key" prompt.
+    if [[ ! -f secrets/family-age-key.enc ]]; then
+        echo
+        echo -e "\e[1;31mERROR: secrets/family-age-key.enc is missing.\e[0m"
+        echo "Restore it from git on an existing machine and commit it before"
+        echo "installing a family laptop."
+        exit 1
+    fi
+fi
 
 # --- Final Confirmation ---
 echo
@@ -261,7 +340,9 @@ ROOT_PART="${DEVICE}${PART_PREFIX}2"
 
 # --- Formatting ---
 echo "Formatting boot partition..."
-sudo mkfs.vfat -F 32 -n EFI "${BOOT_PART}"
+# Labels match hardware/_placeholder.nix, so a host whose real hardware config has not
+# been committed yet still boots when it rebuilds from the repo. See CHANGELOG 2026-08-14.
+sudo mkfs.vfat -F 32 -n BOOT "${BOOT_PART}"
 
 if [[ "$USE_IMPERMANENCE" == "true" ]]; then
     if [[ "$ENCRYPT" == "true" ]]; then
@@ -320,7 +401,7 @@ if [[ "$USE_IMPERMANENCE" == "true" ]]; then
 else
     # --- Simple ext4 Setup ---
     echo "Formatting root partition..."
-    sudo mkfs.ext4 -F -L root "${ROOT_PART}"
+    sudo mkfs.ext4 -F -L nixos "${ROOT_PART}"
 
     echo "Mounting filesystems..."
     sudo mount "${ROOT_PART}" /mnt
@@ -334,72 +415,6 @@ sudo nixos-generate-config --root /mnt
 
 echo "Device setup complete. Proceeding with custom installation..."
 echo
-
-# --- Host Selection ---
-echo "Available hosts:"
-HOSTS_DIR="./hosts"
-if [[ ! -d "$HOSTS_DIR" ]]; then
-    echo "Error: 'hosts' directory not found. Make sure you are in the root of the nixos-config repo."
-    exit 1
-fi
-
-if command -v fzf &> /dev/null; then
-    hostname=$(ls -1 "$HOSTS_DIR" | sed 's/\.nix$//' | fzf --prompt="Select a host to install: ")
-else
-    select host in $(ls -1 "$HOSTS_DIR" | sed 's/\.nix$//'); do
-        hostname=$host
-        break
-    done
-fi
-
-if [[ -z "$hostname" ]]; then
-    echo "No host selected. Aborting."
-    exit 1
-fi
-
-echo "Selected host: $hostname"
-
-# --- Family host handling ---
-# The four kids' laptops differ from every other host in three ways this script has to
-# know about: which age key they get, which disk layout they support, and how their
-# passwords are set.
-read -r -a FAMILY_HOSTS <<< "$(family_hosts)"
-[[ ${#FAMILY_HOSTS[@]} -gt 0 ]] || { echo "error: could not read family hosts from modules/family/peers.nix" >&2; exit 1; }
-IS_FAMILY_HOST=false
-for _fh in "${FAMILY_HOSTS[@]}"; do
-    if [[ "$hostname" == "$_fh" ]]; then
-        IS_FAMILY_HOST=true
-        break
-    fi
-done
-
-if [[ "$IS_FAMILY_HOST" == "true" ]]; then
-    # modules/family/profile.nix imports modules/sops.nix, whose keyFile is
-    # ${config.users.users.sheath.home}/.config/sops/age/keys.txt -- the SIMPLE layout's
-    # path. It does not import impermanence, so nothing would ever populate
-    # /persist/secrets, and sops would fail on first boot with every secret missing
-    # (which on these hosts includes both login passwords -- an unbootable-to-a-login
-    # machine). Refuse rather than produce that.
-    if [[ "$USE_IMPERMANENCE" == "true" ]]; then
-        echo
-        echo -e "\e[1;31mERROR: ${hostname} is a family laptop and only supports Simple mode (option 1).\e[0m"
-        echo "Family hosts keep the age key at /home/sheath/.config/sops/age/keys.txt and do"
-        echo "not import modules/impermanence.nix. Re-run and choose option 1."
-        exit 1
-    fi
-
-    # The whole point of the family age key is that it lives in the repository,
-    # passphrase-protected, so an install needs nothing but this checkout and the
-    # passphrase. If it is absent, something is wrong -- do not silently fall through
-    # to the "paste a plaintext key" prompt.
-    if [[ ! -f secrets/family-age-key.enc ]]; then
-        echo
-        echo -e "\e[1;31mERROR: secrets/family-age-key.enc is missing.\e[0m"
-        echo "Restore it from git on an existing machine and commit it before"
-        echo "installing a family laptop."
-        exit 1
-    fi
-fi
 
 # --- Copy Configuration ---
 echo "Copying configuration to /mnt/home/sheath/nixos..."
@@ -679,6 +694,14 @@ echo "stage=install" >> "$RESUME_FILE"
 echo "Running nixos-install..."
 if sudo nixos-install --root /mnt --flake "/mnt/home/sheath/nixos#${hostname}"; then
     echo "stage=passwd" >> "$RESUME_FILE"
+
+    # The checkout and the age key were written as root, and users/sheath.nix sets no
+    # createHome, so NixOS will not chown a home that already exists. Left alone, sheath
+    # cannot read her own age key or use git in ~/nixos. Names are resolved inside the
+    # installed system, where the uid is whatever NixOS assigned.
+    echo "Fixing ownership of /home/sheath..."
+    sudo nixos-enter --root /mnt -c 'chown -R sheath:sheath /home/sheath' || \
+        echo "WARNING: could not chown /home/sheath; fix it after first boot."
 
     if [[ "$IS_FAMILY_HOST" == "true" ]]; then
         # No nixos-enter, and no passwd. modules/family/profile.nix sets

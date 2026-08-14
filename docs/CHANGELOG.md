@@ -21,6 +21,36 @@ Also the decision log. Rationale that would otherwise bloat a code comment lives
 
 ## 2026-08-14
 
+- **`install.sh` could not install a family laptop, and found out after `mkfs`.** The host
+  picker listed `ls ./hosts`, and `a3d1f31` had deleted the four `hosts/<kid>.nix` files that
+  morning when it moved family hosts to `genAttrs` -- it reasoned about preserving the
+  per-host *hardware* overwrite contract and did not notice the *selection* one. Because the
+  picker ran after `sgdisk`/`mkfs`, a family install wiped the disk and then aborted, silently
+  under fzf (`set -e` on fzf's exit 1). Host selection and the family-only validation now run
+  before anything destructive, the list is `hosts/` plus `family_hosts()`, and `family_hosts()`
+  joins in Nix rather than python3 -- the installer ISO has neither python3 nor flakes on, and
+  both misses hit the same hard exit.
+- **Filesystem labels now match `hardware/_placeholder.nix`** (`BOOT`/`nixos`, was `EFI`/`root`),
+  and the placeholder emits a `warnings` entry naming the host. Every machine rebuilds from the
+  repo (`modules/auto-update.nix`, and the `nr`/`nb` aliases), so a host whose real hardware
+  config was never committed switches to the placeholder's dummy filesystems and dies at the
+  next boot -- `nixos-rebuild` does not validate mounts, so the nightly reports success. The
+  labels make that survivable; the warning makes it visible. hydrogen and sulfur were never
+  exposed. The real fix is still to commit each machine's generated config: the other three
+  laptops are outstanding.
+- **`modules/oryp10.nix`**: System76 Oryx Pro 10 support for gentlemenpupil, recovered from
+  `hosts/osmium.nix` at `e560e78^` -- the same physical machine before it was handed down, so
+  the PRIME bus IDs and the fall-off-the-bus workarounds (`pcie_aspm=off`, `nvidiaPersistenced`,
+  `finegrained = false`) are measured, not inferred from the model. Dropped from osmium:
+  `mitigations=off` (this is a child's web-browsing laptop now), `scsi_mod.use_blk_mq=1` (no-op
+  since 5.0), and the docked lid-switch overrides. `open = false` is osmium's proven value and
+  is the one thing here not re-verified against the current 595 driver.
+- **`flake.nix`: family hosts take `extraModules`**, the seam `mkHost` already had and the
+  `genAttrs` branch lacked. `familyHosts` is now hostname → modules.
+- `install.sh` chowns `/home/sheath` after install. The checkout and age key are written as
+  root and `users/sheath.nix` sets no `createHome`, so NixOS never fixed it: sheath could not
+  read her own age key or use git in `~/nixos`. Boot worked, since sops-nix reads it as root,
+  which is why it went unnoticed.
 - **Ptyxis → Ghostty on sulfur (`home/ghostty.nix`).** Ptyxis' home-manager module only
   installed the package, so font and login-shell had to be GSettings in `modules/dconf.nix`,
   split away from the module that owned the terminal; `programs.ghostty` writes a real config
