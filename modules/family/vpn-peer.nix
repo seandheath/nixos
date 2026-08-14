@@ -23,43 +23,28 @@ in
   sops.secrets.${self.secret} = { };
 
   networking.wg-quick.interfaces.${fam.interface} = {
-    # /32, not /24. With a host address and host routes, wg-quick adds exactly the two
-    # routes below and nothing that could shadow the local network -- so unlike
-    # hosts/sulfur.nix's wg0 there is no need for `table = "off"` and a hand-built
-    # high-metric route.
+    # /32, not /24: host address plus host routes means nothing here can shadow the local
+    # network, so no table = "off" and hand-built metric, unlike sulfur's wg0.
     address = [ "${self.address}/32" ];
     privateKeyFile = config.sops.secrets.${self.secret}.path;
 
     peers = [{
       publicKey = fam.publicKey;
 
-      # This is the whole isolation story on the client side. The hub, and one more
-      # address:
-      #
-      # ${adm.address} is sulfur, and it is REQUIRED, not a convenience. WireGuard will
-      # not encapsulate a packet whose destination is absent from allowedIPs, so without
-      # it this machine's sshd accepts sulfur's connection and then cannot reply -- admin
-      # SSH hangs with no error anywhere. It grants no reach of its own: sulfur always
-      # initiates, and hydrogen's FORWARD rules pass only port 22 in that direction.
-      #
-      # Everything else -- the LAN, the router's admin page at 10.0.0.2, the other
-      # family laptops -- is simply not routable from here.
+      # The whole client-side isolation story. sulfur's address is REQUIRED, not a
+      # convenience: WireGuard will not encapsulate a packet whose destination is absent
+      # here, so without it sshd accepts sulfur's connection and cannot reply -- admin SSH
+      # hangs with no error anywhere. It grants no reach of its own. Everything else -- the
+      # LAN, the router, the sibling laptops -- is simply not routable from here.
       allowedIPs = [ "${fam.address}/32" "${adm.address}/32" ];
 
-      # A BOOTSTRAP VALUE, and deliberately an IP literal rather than
-      # ${peers.endpointHost}. modules/family/wg-endpoint.nix owns endpoint selection
-      # from here on and overwrites this within seconds of boot.
-      #
-      # It must not be a hostname: wg-quick resolves the endpoint while CREATING the
-      # interface, and a failed lookup aborts the whole unit -- which then sits failed
-      # and never retries. A laptop behind a captive portal, or one that boots before
-      # DNS is up, would have no tunnel at all until someone restarted it by hand. An
-      # address that is merely *wrong* when away from home is harmless by comparison;
-      # wg-endpoint corrects it on the first run.
+      # A bootstrap value that wg-endpoint.nix overwrites seconds after boot. Deliberately
+      # an IP literal: wg-quick resolves the endpoint while CREATING the interface, so a
+      # failed lookup aborts the unit, which then sits failed and never retries. Being
+      # merely wrong when away is harmless by comparison.
       endpoint = "${peers.lanEndpoint}:${toString fam.port}";
 
-      # Keeps the NAT mapping alive so the hub can reach back, and bounds how long a
-      # re-targeted endpoint takes to produce a handshake.
+      # Keeps the NAT mapping alive so the hub can reach back.
       persistentKeepalive = 25;
     }];
   };
@@ -72,9 +57,7 @@ in
   }];
 
 
-  # Service names resolve to the hub rather than to hydrogen's LAN address, so they work
-  # identically at home and away and never depend on the router's resolver. Same names
-  # as the public ones, so the wildcard cert from modules/reverse-proxy.nix still
-  # matches.
+  # Resolve to the hub, not hydrogen's LAN address, so they work identically at home and
+  # away and never depend on the router's resolver.
   networking.hosts.${fam.address} = peers.serviceNames;
 }

@@ -1,28 +1,14 @@
-# Fleet WireGuard access for sheath (see ~/Downloads/README.md, "Fleet access
-# for sheath"). Admits this device's /32 (172.20.20.6) to a management VPN
-# (hub 172.20.20.1) and reaches a Jellyfin server at 100.64.0.80 over the tunnel
-# (shell + SFTP as user `sheath`, media group r/w).
+# Fleet WireGuard access to a Jellyfin server at 100.64.0.80.
 #
-# The grant is ONE device record — a single key/address. It cannot be live on
-# sulfur and hydrogen at the same time (the hub keys the endpoint by public
-# key; concurrent use flaps the handshake). Both hosts therefore declare the
-# identical tunnel with autoconnect/autostart DISABLED, and it is switched by
-# hand — exactly one host up at a time:
-#   sulfur:    nmcli connection up fleet     / nmcli connection down fleet
-#              (or the GNOME network panel toggle — same thing)
-#   hydrogen:  sudo systemctl start wg-quick-fleet
-#              sudo systemctl stop  wg-quick-fleet
+# The grant is ONE device record, so it cannot be live on sulfur and hydrogen at once --
+# the hub keys the endpoint by public key and concurrent use flaps the handshake. Both
+# declare it with autoconnect/autostart off; switch by hand, one host at a time:
+#   sulfur    nmcli connection up|down fleet, or the GNOME panel toggle
+#   hydrogen  systemctl start|stop wg-quick-fleet
 #
-# TWO IMPLEMENTATIONS OF ONE TUNNEL, and the split is deliberate. sulfur builds
-# it as a NetworkManager profile so it appears in the GNOME panel — a hand-
-# switched tunnel is exactly what a toggle is good for, and NM owning the config
-# makes that toggle safe (see the header in hosts/sulfur.nix). hydrogen keeps
-# wg-quick: it is a server, nobody is switching this from its panel, and there
-# is no reason to move a working tunnel on the machine everything depends on.
-# hydrogen's copy is protected from NM by modules/wg-unmanaged.nix instead.
-#
-# We connect to the server by IP, so no tunnel-provided DNS is configured
-# (keeps hydrogen clear of resolvconf).
+# Two implementations of one tunnel: sulfur uses an NM profile so it appears in the panel,
+# which is what a hand-switched tunnel wants; hydrogen keeps wg-quick because nobody
+# switches a server from its panel. Connects by IP, so no tunnel DNS.
 { config, lib, ... }:
 let
   isHydrogen = config.networking.hostName == "hydrogen";
@@ -61,11 +47,8 @@ in
         {
           publicKey = fleetPeerKey;
           endpoint = fleetEndpoint;
-          # The issued conf ships AllowedIPs empty (routes are left to the client /
-          # the optional FleetConnect renderer). Supply exactly what we need to
-          # reach: the management VPN + hub (172.20.20.0/24) and the Jellyfin host
-          # (100.64.0.80/32). These are narrow and don't overlap the 10.0.0.0/24
-          # home LAN, so no `table = "off"` route-suppression is needed.
+          # The issued conf ships AllowedIPs empty. These are narrow and do not overlap the
+          # home LAN, so no table = "off" route suppression is needed.
           allowedIPs = [ "172.20.20.0/24" "100.64.0.80/32" ];
           persistentKeepalive = 25;
         }
@@ -92,8 +75,6 @@ in
         peer-routes = true;
       };
 
-      # Same narrow allowed-ips as the wg-quick copy above, and for the same reason:
-      # they don't overlap the 10.0.0.0/24 home LAN, so no route suppression is needed.
       "wireguard-peer.${fleetPeerKey}" = {
         allowed-ips = "172.20.20.0/24;100.64.0.80/32;";
         endpoint = fleetEndpoint;
@@ -119,18 +100,14 @@ in
   };
 
 
-  # Pin the Jellyfin server's host key (README step 2) so the first SSH is
-  # verified instead of trust-on-first-use.
+  # Pinned so the first SSH is verified rather than trust-on-first-use.
   programs.ssh.knownHosts.fleet-jellyfin = {
     hostNames = [ "100.64.0.80" ];
     publicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFd0ZwFQwDQsRZFssVJeqIt53gwcMy+9wYT9APllnngV";
   };
 
-  # `ssh jellyfin` -> sheath@100.64.0.80 over the fleet tunnel. Declared at the
-  # system level (/etc/ssh/ssh_config) so hydrogen gets it without a managed
-  # ~/.ssh/config; on sulfur the user's own ~/.ssh/config alias (read first)
-  # takes precedence over this identical block. IdentitiesOnly mirrors the
-  # user's `Host *` setting so only this key is offered.
+  # System-level so hydrogen gets it without a managed ~/.ssh/config; on sulfur the user's
+  # own identical alias is read first and wins.
   programs.ssh.extraConfig = ''
     Host jellyfin
       HostName 100.64.0.80

@@ -1,29 +1,17 @@
-# hydrogen's two WireGuard hubs. Imported only by hosts/hydrogen.nix.
+# hydrogen's two WireGuard hubs, moving the access boundary from network location to key
+# possession. The port lists live in hosts/hydrogen.nix so "which port is open where" reads
+# as one table; this file owns the interfaces and the forwarding policy between them.
 #
-# WHAT CHANGED AND WHY. Until now hydrogen had no WireGuard interface at all: the only
-# hub lived on the router (vpn.luckyobserver.com:51820, 10.40.0.0/24) and forwarded to
-# hydrogen's LAN address, so tunnel traffic ingressed on br0 indistinguishably from LAN
-# traffic. Every service rule was therefore scoped to br0, which made network location
-# the authorisation -- anyone on the home wifi had exactly the access an enrolled peer
-# had. modules/minecraft-server.nix spells out the worst case: that server verifies no
-# identity, so reachability IS authentication, and "reachable" meant "on the wifi".
-#
-# These two hubs move the boundary to key possession. The port lists live in
-# hosts/hydrogen.nix so that "which port is open where" reads as one table; what lives
-# here is the interfaces themselves and the forwarding policy between them.
-#
-# The router hub is deliberately NOT retired. It still reaches the LAN, and 22 is still
-# open on br0, so a broken wgadm config or a failed sops decrypt does not cost you
-# access to the box. It gets no path to the services.
+# The router's own hub is deliberately not retired -- it still reaches the LAN, so a broken
+# wgadm config does not cost access to the box. It gets no path to the services.
 { config, lib, ... }:
 let
   peers = import ./peers.nix;
   fam = peers.hubs.fam;
   adm = peers.hubs.adm;
 
-  # /32 per peer: WireGuard's allowedIPs is a crypto-routing table, not an ACL, but on
-  # the hub side it does double duty -- a peer may only *source* packets from an address
-  # listed against its own key, so a kid's laptop cannot spoof a sibling's address.
+  # /32 per peer: allowedIPs is a crypto-routing table, but on the hub side it also bounds
+  # what a peer may SOURCE, so one laptop cannot spoof a sibling's address.
   mkPeer = p: {
     inherit (p) publicKey;
     allowedIPs = [ "${p.address}/32" ];
@@ -31,12 +19,9 @@ let
 
   sulfurAddr = peers.admin.sulfur.address;
 
-  # Forward policy, in order. Everything about the isolation guarantee is these four
-  # rules; read them top to bottom.
-  #
-  # The peers' own allowedIPs already stop them addressing anything but the hub, but
-  # that is the *client's* configuration and a family laptop is a machine a child has
-  # physical access to. These rules are the half of the boundary that is enforced here.
+  # The isolation guarantee, in order. The peers' own allowedIPs already stop them
+  # addressing anything else, but that is the CLIENT's config on a machine a child has
+  # physical access to. This is the half enforced here.
   forwardRules = [
     # sulfur administers the family laptops over SSH, and nothing else crosses.
     "-i ${adm.interface} -o ${fam.interface} -s ${sulfurAddr} -p tcp --dport 22 -j ACCEPT"
@@ -46,27 +31,17 @@ let
     "-i ${fam.interface} -j DROP"
     # Nothing reaches a family peer unsolicited either, from any direction.
     "-o ${fam.interface} -j DROP"
-    # And nothing on the admin tunnel is forwarded onto the LAN. sulfur reaches the
-    # router as a direct peer of its own, so hydrogen never needs to carry that traffic
-    # -- and FORWARD's policy is ACCEPT, so without this a client that widened its own
-    # allowedIPs would quietly get the whole 10.0.0.0/24.
+    # Nothing on the admin tunnel reaches the LAN: sulfur peers with the router directly.
+    # FORWARD's policy is ACCEPT, so without this a client that widened its own allowedIPs
+    # would quietly get the whole LAN.
     "-i ${adm.interface} -o br0 -j DROP"
   ];
 
-  # A DEDICATED CHAIN, rebuilt as a unit -- not four independent rules appended to
-  # FORWARD.
-  #
-  # The first version did delete-then-append per rule, and on the very first switch
-  # hydrogen came up with `-i wgfam -j DROP` absent while the other three were present.
-  # That is the rule that stops a family peer forwarding onto the LAN, and FORWARD's
-  # policy is ACCEPT, so a partial application is not a degraded boundary -- it is no
-  # boundary. Four statements that must each land, in order, in a chain libvirtd also
-  # edits, is too many places for that to go wrong silently.
-  #
-  # Flushing our own chain and refilling it means the rule set is either entirely
-  # present or entirely absent, the order is guaranteed by construction, and a reload
-  # cannot stack duplicates. The jump is inserted at position 1 so it is evaluated
-  # before anything libvirt puts there.
+  # A dedicated chain rebuilt as a unit, not rules appended to FORWARD: the per-rule
+  # delete-then-append version once came up missing `-i wgfam -j DROP` while the rest
+  # applied, and with FORWARD's ACCEPT policy a partial application is no boundary at all.
+  # Flush-and-refill makes it all-or-nothing, ordered by construction, and safe to reload.
+  # Inserted at position 1 so it beats anything libvirt adds.
   chain = "family-forward";
 
   addRules = ''
@@ -91,12 +66,9 @@ in
       ips = [ "${fam.address}/24" ];
       listenPort = fam.port;
       privateKeyFile = config.sops.secrets.${fam.secret}.path;
-      # Laptops (NixOS-managed), hand-configured household devices, and guests are the
-      # same kind of peer HERE -- one /32, one key, the same isolation. The three
-      # attrsets exist because they differ in ways this file does not act on: whether
-      # there is a Nix config to generate, and whose hands the private key is in.
-      # Anything that ever needs to tell them apart belongs in the FORWARD rules above,
-      # not in this list.
+      # Laptops, household devices and guests are the same kind of peer here -- one /32, one
+      # key, the same isolation. They are separate attrsets because they differ in whose
+      # hands the private key is in, which this file does not act on.
       peers = map mkPeer (
         lib.attrValues peers.family
         ++ lib.attrValues peers.mobile
@@ -112,16 +84,14 @@ in
     };
   };
 
-  # Stated rather than inherited. libvirtd already turns this on as a side effect of
-  # its NAT network, which means the sulfur -> laptop SSH path would work by accident
-  # today and break the day libvirtd is disabled. It is a dependency; say so.
+  # Stated, not inherited: libvirtd turns this on as a side effect, so the sulfur -> laptop
+  # SSH path would work by accident today and break the day libvirtd is disabled.
   boot.kernel.sysctl."net.ipv4.ip_forward" = true;
 
 
   networking.firewall.extraCommands = addRules;
   networking.firewall.extraStopCommands = delRules;
 
-  # NEITHER INTERFACE MAY BE ADDED TO networking.firewall.trustedInterfaces. Doing so
-  # accepts everything arriving on it regardless of the port lists in hosts/hydrogen.nix,
-  # which would hand every family peer the whole box.
+  # NEITHER INTERFACE MAY GO IN networking.firewall.trustedInterfaces -- that accepts
+  # everything regardless of the port lists, handing every family peer the whole box.
 }
