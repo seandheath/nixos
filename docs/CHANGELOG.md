@@ -21,6 +21,11 @@ Also the decision log. Rationale that would otherwise bloat a code comment lives
 
 ## 2026-08-14
 
+- Removed `gen-family-secrets.sh` and `gen-mobile-peer.sh`. Both were one-shot bootstrap
+  tools that had already done their job: the family secrets exist and are edited in place
+  with `sops`, and a phone's keypair is generated on the device. The enrolment settings the
+  QR script encoded now live in `modules/family/peers.nix`, next to the values they use.
+  Recover either from git history if a full re-bootstrap is ever needed.
 - `CLAUDE.md` is now one file, deployed to `~/.claude/CLAUDE.md` by `modules/workstation.nix`
   via `.source`. It previously existed twice: a repo copy and a ~100-line heredoc in
   `workstation.nix`, which had to be kept in step by hand.

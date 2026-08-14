@@ -395,8 +395,8 @@ if [[ "$IS_FAMILY_HOST" == "true" ]]; then
     if [[ ! -f secrets/family-age-key.enc ]]; then
         echo
         echo -e "\e[1;31mERROR: secrets/family-age-key.enc is missing.\e[0m"
-        echo "Generate it with ./gen-family-secrets.sh on an existing machine and commit it"
-        echo "before installing a family laptop."
+        echo "Restore it from git on an existing machine and commit it before"
+        echo "installing a family laptop."
         exit 1
     fi
 fi
@@ -690,8 +690,8 @@ if sudo nixos-install --root /mnt --flake "/mnt/home/sheath/nixos#${hostname}"; 
         echo "Installation finished!"
         echo
         echo "Passwords are declarative on this host: the ${hostname} account and sheath both"
-        echo "read their hash from secrets/family.yaml. Change them by re-running"
-        echo "./gen-family-secrets.sh --rotate and rebuilding, not with passwd."
+        echo "read their hash from secrets/family.yaml. Change them by re-encrypting that"
+        echo "file with sops and rebuilding, not with passwd."
         echo "root has no password by design; administer as sheath (NOPASSWD sudo)."
         echo
         echo "You can now reboot into your new system."

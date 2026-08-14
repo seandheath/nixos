@@ -1,7 +1,6 @@
 # Registry of hydrogen's two WireGuard hubs and every peer on them. Imported by
 # vpn-hub.nix (hydrogen) and vpn-peer.nix (everything else), so an address or public key
-# appears exactly once. Also read by gen-mobile-peer.sh, gen-family-secrets.sh and
-# install.sh via `nix eval --file`.
+# appears exactly once. Also read by install.sh via `nix eval --file`.
 #
 # Two hubs rather than one interface with source-address rules: they carry different
 # authority, and that should be visible in `iptables -S`. wgadm reaches sshd, RustDesk and
@@ -9,7 +8,7 @@
 #
 # Public keys are not secret. The private halves live in sops under `secret`, in the file
 # the host's own sops.defaultSopsFile names -- family.yaml for the laptops, secrets.yaml
-# for hydrogen and sulfur. Regenerate with ./gen-family-secrets.sh.
+# for hydrogen and sulfur; edit them with `sops secrets/<file>.yaml`.
 rec {
   # The same name the router's own hub uses; the three hubs are told apart by port. ddclient
   # already keeps it pointed at the current WAN address, so no extra DNS record exists to
@@ -112,7 +111,18 @@ rec {
   };
 
   # Phones and tablets: same tunnel and isolation as the laptops, but nothing here is
-  # NixOS-managed, so no `secret` and no `minecraftName`. Use ./gen-mobile-peer.sh.
+  # NixOS-managed, so no `secret` and no `minecraftName` -- the device generates its own
+  # keypair and only the public half is pasted here.
+  #
+  # To enrol one: create a tunnel in the WireGuard app (it generates the keypair), set
+  #   Address     10.41.0.<n>/32
+  #   AllowedIPs  <hubs.fam.address>/32, <routerMgmt.address>/32
+  #   DNS         <routerMgmt.address>, 1.1.1.1
+  #   Endpoint    <endpointHost>:<hubs.fam.port>
+  #   PersistentKeepalive 25
+  # then add its public key below and rebuild hydrogen. The second DNS server is not
+  # optional -- with only the tunnel resolver listed, a phone that roams off the tunnel
+  # resolves nothing at all.
   #
   # LEAVE AN ENTRY OUT UNTIL YOU HAVE THE REAL PUBLIC KEY -- `wg setconf` rejects a
   # malformed key and fails the whole interface, taking wgfam down for the laptops too.
