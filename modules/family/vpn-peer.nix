@@ -71,8 +71,6 @@ in
     publicHost = peers.endpointHost;
   }];
 
-  # Replies arrive on the tunnel while the route back may point at the default gateway.
-  networking.firewall.checkReversePath = lib.mkDefault "loose";
 
   # Service names resolve to the hub rather than to hydrogen's LAN address, so they work
   # identically at home and away and never depend on the router's resolver. Same names

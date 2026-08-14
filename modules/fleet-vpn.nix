@@ -118,11 +118,6 @@ in
     }];
   };
 
-  # WireGuard reply traffic returns on the tunnel iface; loosen reverse-path
-  # filtering so it isn't dropped. mkDefault so sulfur's existing plain "loose"
-  # (hosts/sulfur.nix) still wins without a conflict, and hydrogen (which sets
-  # nothing) inherits it.
-  networking.firewall.checkReversePath = lib.mkDefault "loose";
 
   # Pin the Jellyfin server's host key (README step 2) so the first SSH is
   # verified instead of trust-on-first-use.

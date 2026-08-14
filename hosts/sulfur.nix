@@ -43,9 +43,7 @@ in
   #   grep DynamicPowerManagement /proc/driver/nvidia/params   # must be 0
   # The option itself lives in the single boot.extraModprobeConfig block below.
 
-  boot.loader.systemd-boot.enable = true;
-  boot.loader.systemd-boot.configurationLimit = 20;
-  boot.loader.efi.canTouchEfiVariables = true;
+  fleet.bootGenerations = 20;
 
   # Kernel deliberately NOT pinned: follow whatever nixpkgs makes the default. The old
   # `linuxPackages_6_18` pin existed because nvidia-open 595 lagged behind mainline, and
@@ -68,9 +66,6 @@ in
   '';
 
   # Configuration
-  time.timeZone = "America/New_York";
-  i18n.defaultLocale = "en_US.UTF-8";
-  services.xserver.xkb.layout = "us";
 
   # Display
   services.xserver = {
@@ -520,8 +515,6 @@ in
   # the wildcard cert in modules/reverse-proxy.nix still matches.
   networking.hosts.${adm.address} = peers.serviceNames;
 
-  # Required to avoid dropping asymmetric routing replies from WireGuard interface
-  networking.firewall.checkReversePath = "loose";
 
   # Configure Mullvad settings automatically on boot/activation
   systemd.services.mullvad-configure = {

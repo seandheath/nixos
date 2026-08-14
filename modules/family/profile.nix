@@ -80,6 +80,7 @@ in
 
   config = {
     family.enable = true;
+    system.stateVersion = "25.11";
 
     # ---------------------------------------------------------------------------
     # Secrets
@@ -225,7 +226,5 @@ in
     # ---------------------------------------------------------------------------
     # Base system
     networking.networkmanager.enable = true;
-    time.timeZone = "America/New_York";
-    i18n.defaultLocale = "en_US.UTF-8";
   };
 }

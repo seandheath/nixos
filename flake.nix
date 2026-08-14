@@ -52,6 +52,8 @@
         home-manager.nixosModules.home-manager
         sops-nix.nixosModules.sops
         ./modules/nix-settings.nix
+        ./modules/boot-efi.nix
+        ./modules/locale.nix
         ./modules/auto-update.nix
         # Every host: NetworkManager will flush a WireGuard interface it thinks it owns,
         # and the hosts that most need protecting are the ones nobody is watching.
@@ -94,7 +96,15 @@
             impermanence.nixosModules.impermanence
           ];
         };
-      } // nixpkgs.lib.genAttrs familyHosts (hostName: mkHost { inherit hostName; });
+      } // nixpkgs.lib.genAttrs familyHosts (hostName: nixpkgs.lib.nixosSystem {
+        inherit system;
+        specialArgs = { inherit inputs; };
+        modules = [
+          ./modules/family/profile.nix
+          ./hardware/${hostName}.nix
+          { networking.hostName = hostName; }
+        ] ++ commonModules;
+      });
     in {
       nixosConfigurations = hosts;
 

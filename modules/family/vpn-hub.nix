@@ -117,10 +117,6 @@ in
   # today and break the day libvirtd is disabled. It is a dependency; say so.
   boot.kernel.sysctl."net.ipv4.ip_forward" = true;
 
-  # Replies from a peer arrive on the tunnel while the route back may point elsewhere;
-  # strict rp_filter drops them. mkDefault because modules/fleet-vpn.nix sets the same
-  # value and hosts/sulfur.nix sets it outright.
-  networking.firewall.checkReversePath = lib.mkDefault "loose";
 
   networking.firewall.extraCommands = addRules;
   networking.firewall.extraStopCommands = delRules;

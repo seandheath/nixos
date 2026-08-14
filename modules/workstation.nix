@@ -1,6 +1,7 @@
 { config, pkgs, lib, ... }: {
   imports = [
     ./gnome.nix
+    ./nix-ld.nix
     ./sops.nix
     ./dconf.nix
     ./syncthing.nix
@@ -16,26 +17,6 @@
   # Programs
   programs.firefox.enable = true;
 
-  # nix-ld for running dynamically linked executables (AppImages, etc.)
-  programs.nix-ld = {
-    enable = true;
-    libraries = with pkgs; [
-      zstd
-      stdenv.cc.cc.lib
-      zlib
-      glib
-      libGL
-      libx11
-      libxcursor
-      libxrandr
-      libxi
-      libxkbcommon
-      wayland
-      fontconfig
-      freetype
-      dbus
-    ];
-  };
   
   # Services
   # Cynthion udev rules (ships 54-cynthion.rules; TAG+="uaccess" grants the
