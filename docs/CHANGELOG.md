@@ -19,6 +19,46 @@ Also the decision log. Rationale that would otherwise bloat a code comment lives
   finding: scripted networking is detaching its own slave, and `br0-netdev`'s
   `X-ReloadIfChanged` is the next suspect.
 
+## 2026-08-14 (minecraft pre-launcher)
+
+- **A pre-launcher for everything that is not the couch.** sulfur and the kids' laptops baked
+  one player name and one server address in at build time and quick-played straight into
+  them; `docs/minecraft.md` carried "No GUI launcher" as a known limitation. Now: pick a
+  player, pick a world, and the world is started before the game is. The plain **Minecraft**
+  icon still quick-plays into the family server and is the faster route there.
+- **Worlds are rootless podman containers, created on first play.** Built from
+  `packages/fabric-server.nix`, not a `docker.io` pull, so a container world and hydrogen's
+  shared world are the same build with the same mods and datapacks. No `--userns=keep-id`:
+  container root maps to the invoking user, so a plain bind mount needs no `,U` chown.
+- **The version pin was in the wrong place.** It lived in `modules/minecraft-server.nix` as a
+  NixOS-module overlay, so it applied to hosts but not to the flake package set — the first
+  image built against the channel's 26.2, compiled for Java 25, and died on fabric-server's
+  JDK 21 with `UnsupportedClassVersionError`, past every assertion.
+  `packages/minecraft-version.nix` says the version must "not be a property of whichever
+  nixpkgs a host builds from"; the override now sits in `packages/default.nix`, where that
+  is true.
+- **Readiness is RCON, not a TCP connect.** Rootless podman's port forwarder accepts
+  connections on the published port immediately — measured answering in 5 s against a server
+  still unpacking its jar. Only the server itself can say it is up.
+- **The menu widgets moved out of `minecraft-couch.nix`** into `packages/minecraft-menu`,
+  which took that module from 975 lines to 770. Two launchers wanting the same on-screen
+  keyboard is where one copy stops being cheaper than two.
+- **hydrogen's control channel is SSH behind a forced command.** A dedicated `mcctl` user
+  with lingering, whose keys can run only `minecraft-server-ctl` subcommands — a key off a
+  child's laptop is not a shell on the 24/7 box. Consequence, per the guest note in
+  `modules/family/peers.nix`: opening 22 on `wgfam` also exposes sshd to guest keys, and
+  key-only auth is what stops them.
+- Ports are a **range** (25566-25575) rather than per-server entries, because firewall ports
+  are declarative and per-interface: a container created at runtime on a fresh port would be
+  unreachable until the next rebuild. The new worlds join `backupPaths` and are bracketed by
+  RCON `save-off`/`save-on`, the container equivalent of the console-FIFO flush.
+
+<!-- TODO: per-laptop `mcctl-key-<kid>` entries in secrets/family.yaml, mirroring
+     `wg-priv-<kid>`, so each child's launcher can drive hydrogen. Until then
+     fleet.minecraftServers.authorizedKeys is empty and only sheath can, over wgadm.
+     Deliberately per-host rather than one shared key -- the standing "stop sharing
+     sheath-password-hash with the kids' laptops" item is the same mistake. -->
+
 ## 2026-08-14 (installer dashboard)
 
 - **The installer is one screen, and every row is checked before anything runs.** The

@@ -8,6 +8,11 @@
   four clients on the projector, one gamepad each.
 - **`packages/minecraft-client-mods.nix`** — the mod set, shared by the couch clients, sulfur's
   client, and (the `server = true` subset) the server.
+- **`packages/minecraft-launcher.nix`** — the pre-launcher everywhere else: pick a player, pick
+  a world, start it, play. See *Choosing a world*.
+- **`packages/minecraft-server-image.nix`** / **`minecraft-server-ctl.nix`** — on-demand worlds
+  as rootless podman containers, built from the same pinned server as the always-on one.
+- **`packages/minecraft-menu/`** — the menu widgets both pre-launchers draw with.
 
 ## Quick reference
 
@@ -15,6 +20,10 @@
 |---|---|
 | Play on the couch | Click **Minecraft (Couch)** in the GNOME app grid |
 | Play from sulfur | Click **Minecraft**, or run `minecraft-client` |
+| Choose a player and a world | Click **Minecraft (choose a world)**, or run `minecraft-launcher` |
+| Make a new world | In the launcher: *Add a server* → on this machine, or on hydrogen |
+| See the on-demand worlds | `minecraft-server-ctl list` |
+| Stop one | `minecraft-server-ctl stop <name>` |
 | Leave the game | `SUPER`+`SHIFT`+`Q` |
 | Unwedge the projector | `sudo chvt 2`, or `ssh hydrogen 'sudo systemctl stop minecraft-couch'` |
 | Add a player, pair a controller | In the pre-launcher, before **Start playing** |
@@ -111,6 +120,44 @@ seeded once from `seedPlayers` in `modules/minecraft-couch.nix`.
 
 Each player gets a game directory holding only `options.txt`, `config/`, `screenshots/` and a
 `mods` symlink; the game is one shared store path, so a fifth player costs kilobytes.
+
+## Choosing a world
+
+Everything except the couch runs `minecraft-launcher` first: pick who is playing, pick
+which world, and it starts the world before starting the game. The plain **Minecraft**
+icon still quick-plays straight into the family server and is the faster way there.
+
+A world is one of three things:
+
+| Where | What it is | Reachable by |
+|---|---|---|
+| on this machine | a rootless podman container here | only this machine, on 127.0.0.1 |
+| on hydrogen | a container on hydrogen, alongside the shared world | anyone on the family tunnel |
+| elsewhere | just an address to join; nothing is managed | whoever can already reach it |
+
+The first two are created on first play, not when you add them, so adding a world costs
+nothing until someone wants it. First start generates terrain and takes a minute or two;
+the launcher shows a timer rather than freezing.
+
+Worlds live in `~/.local/share/minecraft/servers/<name>/` locally, and in
+`/var/lib/minecraft-servers/<name>/` on hydrogen where the nightly borg run picks them up.
+Removing a world in the launcher removes the container and keeps the directory, so the same
+name brings the world back.
+
+Ports come out of 25566-25575, opened as a range on both tunnels. That range is the limit
+on how many worlds can exist at once, because a container on a port outside it would be
+unreachable until the next rebuild.
+
+`minecraft-server-ctl` is the same thing without the menu: `list`, `create`, `start`,
+`stop`, `logs`, `remove`. hydrogen exposes exactly that over SSH behind a forced command,
+so a control key grants no shell.
+
+### Versions
+
+Every world runs the fleet pin from `packages/minecraft-version.nix`, built from the same
+`packages/fabric-server.nix` as the shared world, with the same mods and datapacks. That is
+deliberate: a container running a different build than the client payload would fail the
+assertions, or worse, not fail them.
 
 ## Mods and datapacks
 
@@ -275,7 +322,13 @@ change to `minecraft-couch-session` and the unit only, at the cost of one compos
 
 ## Known limitations
 
-- **No GUI launcher.** A new singleplayer world, version or modpack means editing Nix.
+- **One version for every world.** The on-demand servers run the fleet pin, because the
+  client payload, the mods and the Fabric mappings are all pinned together and the
+  assertions refuse anything else. A world on a different version means a second image and
+  a second set of pins.
+- **The launcher is not on the couch.** The couch keeps its own pre-launcher: its job is
+  several players on one screen with pads assigned to seats, which the per-machine
+  launcher does not do.
 - **No late join.** Whoever is not at the pre-launcher when you press *Start now* is not in
   that session. Re-tiling live windows was deliberately not attempted.
 - **Everyone is Steve or Alex.** Offline mode cannot fetch skins. Better Name Visibility
