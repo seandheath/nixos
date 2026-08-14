@@ -1,92 +1,49 @@
 { config, pkgs, lib, ... }:
-# Couch Minecraft on hydrogen: 1-4 Bluetooth gamepads driving 1-4 tiled Minecraft
-# clients on the projector, launched from a single GNOME icon. Full runbook is
-# docs/minecraft.md. There is no setup step: the game itself is a pinned Nix payload
-# (packages/minecraft-client), so a fresh hydrogen boots straight into playable.
+# Couch Minecraft on hydrogen: 1-4 gamepads driving 1-4 tiled clients on the projector from
+# one GNOME icon. Runbook in docs/minecraft.md. No setup step -- the game is a pinned Nix
+# payload, so a fresh hydrogen boots straight into playable.
 #
-# ARCHITECTURE, and why each layer exists:
-#
-#   .desktop icon  ->  minecraft-couch          (runs inside the GNOME session)
-#     -> systemd  minecraft-couch.service       (a REAL login session on tty7)
-#       -> Hyprland with a generated config     (tiles; no bars, no idle, no lock)
+#   .desktop icon -> minecraft-couch            (inside the GNOME session)
+#     -> systemd minecraft-couch.service        (a real login session on tty7)
+#       -> Hyprland, generated config           (tiles; no bars, idle or lock)
 #         -> minecraft-couch-spawn              (places N windows via hyprctl)
-#           -> minecraft-couch-menu             (the pre-launcher; see below)
+#           -> minecraft-couch-menu             (the pre-launcher)
 #           -> minecraft-couch-player NAME NODE (bubblewrap: exactly one gamepad)
 #             -> minecraft-client --name NAME --game-dir <per-player> -s 127.0.0.1
 #
-# WHY A PRE-LAUNCHER RATHER THAN PINNED CONTROLLERS. This used to key each seat to a
-# controller's Bluetooth MAC in a udev rule, which made identity a property of the
-# HARDWARE: pick up a sibling's pad and you logged in as your sibling, "2 players"
-# always meant seats 1 and 2 (so the third and fourth child's pads did nothing), and
-# four MACs had to be collected by hand before anything worked at all. Asking each
-# player who they are at session start makes identity a property of the PERSON, and
-# the question the MAC answered -- "which event node is seat N's pad?" -- simply
-# stops being asked: whichever node a child confirms on is the node bound into their
-# sandbox. Pads are interchangeable, and only the pads actually powered on get a seat.
+# A pre-launcher rather than pinned controllers, because keying seats to a pad's Bluetooth
+# MAC made identity a property of the HARDWARE: pick up a sibling's pad and you were your
+# sibling, and "2 players" always meant seats 1 and 2. Asking who is holding each pad makes
+# pads interchangeable and the MAC question stop being asked. It also pairs controllers,
+# since GNOME's Bluetooth panel is unreachable from tty7. Every screen takes keyboard as
+# well as gamepad -- with no pad paired there is otherwise no way to reach the pairing
+# screen.
 #
-# The roster is runtime state for the same reason: players get added over time, and
-# nobody should need to edit Nix and rebuild to let a friend play. The pre-launcher
-# also pairs and unpairs controllers, because the couch session is Hyprland on tty7
-# with GNOME inactive -- GNOME's Bluetooth panel is simply not reachable from here.
+# A separate VT rather than a nested compositor: GNOME must keep running for RustDesk
+# capture, but Mutter cannot tile into quadrants, let a client position itself, or
+# fullscreen a nested compositor. `PAMName=login` + `TTYPath` is what makes logind register
+# a real session; without both, Hyprland cannot take DRM master.
 #
-# WHY THE MENU TAKES KEYBOARD *AND* GAMEPAD. Chicken-and-egg: with no pad yet paired
-# there would be no way to drive a gamepad-only menu to the pairing screen. hydrogen
-# has a wired keyboard (Dell KB216), so every screen accepts both.
+# One game directory per player, holding only their options, mod config and screenshots --
+# the jar, libraries and assets are one read-only store path every client shares.
 #
-# WHY A SEPARATE VT RATHER THAN A NESTED COMPOSITOR. GNOME must keep running --
-# RustDesk's ScreenCast capture depends on that session (hosts/hydrogen.nix), and
-# gnome-remote-desktop and Sunshine were already abandoned on this box, so it is
-# not something to disturb. But Mutter cannot tile into quadrants, cannot let a
-# client position itself, and cannot fullscreen a nested compositor's window.
-# Running Hyprland as its own logind session on tty7 sidesteps all of that: the VT
-# switch makes GNOME inactive, it releases DRM master, and Hyprland gets the GPU
-# natively -- no double compositing, no explicit-sync surprises. Switching back
-# reactivates GNOME. `PAMName=login` + `TTYPath` is what makes logind register the
-# unit as a real session; without it Hyprland cannot take DRM master.
-#
-# WHY ONE GAME DIRECTORY PER PLAYER. Each child's video settings, key bindings and mod
-# configuration are theirs, and Minecraft keeps all of it in the game directory. The
-# heavy, identical parts -- the client jar, 115 libraries, 424 MiB of assets -- are NOT
-# in there: they live in one read-only store path that every client shares
-# (packages/minecraft-client), so a player directory holds only kilobytes of options
-# and a symlink to the mod set.
-#
-# This used to be a much bigger deal. Under Prism the per-player directories existed
-# because Prism refuses to run twice keyed on its data path, so a second `--launch`
-# would message the first process and spawn the game outside the second sandbox, moving
-# every character in unison; minecraft-couch-sync then had to rsync the instance and
-# symlink seven shared trees into each copy to stop that costing four copies of the
-# game. None of that machinery survives the move to a launcher that is just a process.
-#
-# WHY BUBBLEWRAP. Gamepad input is read straight from /dev/input via evdev and
-# never touches the display server, so by default every client sees every pad.
-# Each client is therefore launched with a tmpfs over /dev/input and only its own
-# player's event node bound back in.
+# bubblewrap because evdev bypasses the display server, so by default every client sees
+# every pad and all four characters move in unison.
 {
   imports = [
-    # The controllers are Bluetooth and hydrogen enables no Bluetooth stack of its
-    # own (it never needed one). Shared module, deduplicated if anything else
-    # pulls it in.
+    # The controllers are Bluetooth and hydrogen enables no stack of its own.
     ../modules/bluetooth.nix
   ];
 
   config =
     let
-      # ---------------------------------------------------------------------
-      # SEED roster only. The live roster is JSON under the user's home (see
-      # rosterFile) and is created from this list the first time the menu runs;
-      # after that the file is authoritative and this list is inert.
+      # SEED ONLY: once rosterFile exists it is authoritative and this list is inert, so
+      # editing these names later changes nothing. Add and remove players in the
+      # pre-launcher; delete the JSON to re-seed. A merge would fight "Remove a player"
+      # every time the menu started.
       #
-      # FOOTGUN: editing these names later will NOT change an existing roster.
-      # Add and remove players in the pre-launcher; to re-seed from Nix, delete
-      # the JSON file. Predictable beats clever -- a merge would fight the
-      # "Remove a player" action every time the menu started.
-      #
-      # Names are load-bearing in one direction: an offline UUID is a hash of the
-      # username, so RENAMING a player after they have played orphans that
-      # character's inventory, advancements and ender chest. Removing and
-      # re-adding the identical name is safe and returns the same character.
-      # ---------------------------------------------------------------------
+      # RENAMING a player who has played orphans that character -- an offline UUID hashes
+      # the username. Removing and re-adding the identical name is safe.
       seedPlayers = [
         "GentlemenPupil"
         "VizualWanderer"
@@ -95,44 +52,26 @@
         "LuckyObserver" # sheath, when playing from the couch rather than sulfur
       ];
 
-      # Minecraft caps usernames at 16 characters and enforces it on the wire: an
-      # over-long name fails to encode the login packet, so the client cannot
-      # connect at all. The menu applies the same rule to names typed at runtime.
+      # Enforced on the wire: an over-long name fails to encode its login packet.
       nameRe = "^[A-Za-z0-9_]{3,16}$";
 
-      # The VT the couch session takes over. 7 is clear of GDM (1) and the GNOME
-      # autologin session (2); getty@tty7 is conflicted out below.
+      # Clear of GDM (1) and the autologin session (2); getty@tty7 is conflicted out below.
       couchVt = 7;
 
       user = "sheath";
       home = config.users.users.${user}.home;
-      # Per-player game directories. Only each child's own state lives here -- their
-      # options, mod configs and screenshots; the game itself is one shared read-only
-      # store path (see WHY ONE GAME DIRECTORY PER PLAYER in the header). Created on
-      # demand by minecraft-client, so there is nothing to materialize in advance.
+      # Created on demand by minecraft-client; nothing to materialize in advance.
       couchRoot = "${home}/.local/share/minecraft-couch";
-      # The live roster. Sits beside the player directories it describes.
       rosterFile = "${couchRoot}/players.json";
 
-      # ---------------------------------------------------------------------
-      # Layer 6: the pre-launcher.
+      # The pre-launcher: pair/unpair pads, add/remove players, ask who holds which pad,
+      # then hand "<name>\t<event node>" lines to the spawner.
       #
-      # Pair/unpair controllers, add/remove players, decide who is holding which
-      # pad, then hand a "<name>\t<event node>" list to the spawner.
-      #
-      # INPUT CODES ARE THE WHOLE DIFFICULTY HERE. The three Switch Pro pads go
-      # through hid-nintendo and the Xbox Elite through xpadneo, and the two
-      # drivers do not agree on how a D-pad is reported -- it may arrive as a hat
-      # axis (ABS_HAT0X/Y) or as discrete buttons (BTN_DPAD_*), and this varies by
-      # driver version too. Rather than guess, accept every plausible encoding:
-      # any of them moves the cursor, and any OTHER button confirms. Being
-      # permissive costs nothing and removes a class of "works on my pad" bug.
-      #
-      # There is deliberately NO back button: every screen carries a "Back" entry,
-      # so only two gamepad actions ever need to work. `--probe` dumps raw events
-      # so the codes can be checked against real hardware before a session with
-      # four impatient children (docs/minecraft.md).
-      # ---------------------------------------------------------------------
+      # Input codes are the difficulty. hid-nintendo and xpadneo disagree on whether a D-pad
+      # is a hat axis or discrete buttons, and it varies by driver version, so accept every
+      # plausible encoding: any of them moves the cursor, any OTHER button confirms. No back
+      # button -- every screen carries a Back entry, so only two actions must work.
+      # `--probe` dumps raw events to check a new pad.
       couchMenu = pkgs.writers.writePython3Bin "minecraft-couch-menu"
         {
           libraries = [ pkgs.python3Packages.evdev ];
@@ -705,16 +644,9 @@
 
           total="$(wc -l < "$picks")"
 
-          # Screen geometry, straight from the compositor -- no 1080p assumption.
-          #
-          # Select the FOCUSED monitor, not .[0]. The config mirrors every external
-          # output onto eDP-1, so there should only ever be one candidate -- but
-          # .[0] is aquamarine's enumeration order, which is not the order windows
-          # open in, and a mirror rule that fails to match (a connector named
-          # something other than DP-1..3) would silently reintroduce a second entry.
-          # The windows are placed on the focused monitor, so its dimensions are the
-          # ones the quadrant math has to describe. Fall back to .[0] if nothing
-          # reports focus.
+          # From the compositor, so no 1080p assumption. FOCUSED, not .[0]: that is
+          # aquamarine's enumeration order, and a mirror rule that fails to match would
+          # silently reintroduce a second monitor. Falls back to .[0].
           mon="$(hyprctl -j monitors)"
           sw="$(printf '%s' "$mon" | jq -r 'map(select(.focused)) + . | .[0].width')"
           sh="$(printf '%s' "$mon" | jq -r 'map(select(.focused)) + . | .[0].height')"
@@ -786,43 +718,23 @@
           # control group; Hyprland exiting still kills the lot.
           wait
 
-          # ...and now make that relationship two-directional: when the last player
-          # has exited, end the session so the projector returns to GNOME by itself.
-          #
-          # Without this, quitting via Minecraft's own "Quit Game" -- the obvious
-          # thing to do, and the only exit a gamepad can reach -- left an empty
-          # compositor on a black screen, recoverable only with SUPER+SHIFT+Q on a
-          # keyboard that may not be near the couch. `wait` returns only once every
-          # backgrounded player is gone, so a session with three players still in it
-          # is unaffected by the fourth quitting.
-          #
-          # This also bounds the failure case: a player that dies without ever
-          # opening a window now ends the session (after awaitNewWindow's timeout
-          # and its notification) instead of leaving a blank screen indefinitely.
+          # When the last player exits, end the session so the projector returns to GNOME.
+          # Minecraft's own "Quit Game" is the only exit a gamepad can reach, and without
+          # this it left a black screen needing a keyboard. `wait` returns only once every
+          # backgrounded player is gone, so three players are unaffected by the fourth
+          # quitting.
           hyprctl dispatch exit
         '';
       };
 
-      # ---------------------------------------------------------------------
-      # Layer 3: the compositor config. Generated, never user state.
-      # ---------------------------------------------------------------------
+      # The compositor config. Generated, never user state.
       hyprConf = pkgs.writeText "minecraft-couch-hyprland.conf" ''
-        # ONE LOGICAL SCREEN, ALWAYS. The internal panel is the session's screen and
-        # every external output mirrors it, rather than extending the desktop.
-        #
-        # Two reasons, and the second is the one that bites. First, this box drives
-        # the projector from a laptop that is also its own console, so "play on the
-        # panel and show the same thing on the projector" is what is actually wanted
-        # -- and GNOME's display settings cannot deliver it, because the couch
-        # session is a separate compositor on tty7 that never sees them. Second, the
-        # bare `monitor = , preferred, auto, 1` catch-all this replaces positions a
-        # newly-plugged output *beside* the panel, and minecraft-couch-spawn then has
-        # two monitors to choose between when it computes quadrants (see the
-        # `.focused` selector there). Mirroring keeps that choice from existing.
-        #
-        # All three DP connectors are listed because the projector's cable can land
-        # on any of them; eDP-1 is the only output that is always present. A
-        # connector that is not plugged in costs nothing.
+        # ONE LOGICAL SCREEN: every external output mirrors the panel rather than extending
+        # it. GNOME's display settings cannot deliver this -- the couch session is a
+        # separate compositor on tty7 that never sees them -- and a catch-all monitor rule
+        # would place a new output beside the panel, giving the spawner two monitors to
+        # choose between. All three DP connectors are listed because the projector's cable
+        # can land on any of them; an unplugged connector costs nothing.
         monitor = eDP-1, preferred, auto, 1
         monitor = DP-1, preferred, auto, 1, mirror, eDP-1
         monitor = DP-2, preferred, auto, 1, mirror, eDP-1
