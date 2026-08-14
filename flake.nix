@@ -55,6 +55,12 @@
     let
       system = "x86_64-linux";
 
+      pkgs = import nixpkgs {
+        inherit system;
+        config.allowUnfree = true;
+        overlays = [ (import ./packages) ];
+      };
+
       commonModules = [
         home-manager.nixosModules.home-manager
         sops-nix.nixosModules.sops
@@ -143,10 +149,12 @@
       checks.${system} =
         nixpkgs.lib.mapAttrs (_: h: h.config.system.build.toplevel) hosts;
 
-      packages.${system} =
-        let pkgs = import nixpkgs { inherit system; config.allowUnfree = true; overlays = [ (import ./packages) ]; };
-        in {
-          inherit (pkgs) ghidra-reva imjtool jackify qwen-code re-container;
-        };
+      packages.${system} = {
+        inherit (pkgs) ghidra-reva imjtool jackify qwen-code re-container;
+      };
+
+      devShells.${system}.default = pkgs.mkShell {
+        packages = with pkgs; [ cargo rustc clippy rustfmt rust-analyzer ];
+      };
     };
 }
