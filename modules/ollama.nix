@@ -1,25 +1,12 @@
 { pkgs, ... }:
-# Local LLM inference server, used by paperless document classification.
-#
-# Bound to loopback only and deliberately given no nginx vhost: this is an internal
-# dependency of other services, not something reachable at *.luckyobserver.com. Nothing
-# is added to networking.firewall.allowedTCPPorts either.
-#
-# Models are pulled into the default /var/lib/ollama (state dir), which lives on root --
-# 395G free there, so there is no reason to put them on /data and inherit the
-# RequiresMountsFor = "/data" guard that modules/immich.nix and modules/backup.nix need.
-# Backed up implicitly? No -- deliberately NOT added to modules/backup.nix backupPaths,
-# since a model blob is re-downloadable and would only bloat the borg repo.
+# Local LLM inference for paperless classification. Loopback only, no vhost, no firewall
+# port -- this is an internal dependency, not a service. Models live in /var/lib/ollama on
+# root and are deliberately not in backupPaths: a model blob is re-downloadable.
 {
-  # The P4200 is Pascal (compute capability 6.1). nixpkgs' CUDA capability DB marks 6.1
-  # with dontDefaultAfterCudaMajorMinorVersion = "12.3", and the toolkit here is 12.8, so
-  # Pascal is NOT in the default gencode set -- pkgs.ollama-cuda ships kernels for sm_75+
-  # (Turing onward) only. At runtime ollama detects the card but logs "filtering device
-  # which didn't fully initialize" and falls back to CPU, because ggml-cuda has no Pascal
-  # kernels. 6.1 is still *supported* by CUDA 12.8 (NVIDIA drops Pascal only in CUDA 13),
-  # it just has to be requested explicitly. This forces a from-source rebuild of the CUDA
-  # ggml backend; ollama is the only CUDA consumer on hydrogen so the blast radius is just
-  # that package. Verified empirically 2026-07-21: without this, total_vram="0 B".
+  # The P4200 is Pascal (6.1), which is outside nixpkgs' default gencode set, so stock
+  # ollama-cuda detects the card and falls back to CPU with total_vram="0 B". Still
+  # supported by CUDA 12.8, just not requested by default. Forces a from-source rebuild of
+  # the CUDA ggml backend; ollama is hydrogen's only CUDA consumer.
   nixpkgs.config.cudaCapabilities = [ "6.1" ];
 
   services.ollama = {

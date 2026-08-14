@@ -1,40 +1,23 @@
-# Registry of hydrogen's two WireGuard hubs and every peer on them.
+# Registry of hydrogen's two WireGuard hubs and every peer on them. Imported by
+# vpn-hub.nix (hydrogen) and vpn-peer.nix (everything else), so an address or public key
+# appears exactly once. Also read by gen-mobile-peer.sh, gen-family-secrets.sh and
+# install.sh via `nix eval --file`.
 #
-# Imported by modules/family/vpn-hub.nix (hydrogen) and modules/family/vpn-peer.nix
-# (everything else) so the two sides cannot drift: an address or public key appears
-# exactly once, here.
+# Two hubs rather than one interface with source-address rules: they carry different
+# authority, and that should be visible in `iptables -S`. wgadm reaches sshd, RustDesk and
+# Syncthing; wgfam reaches a web server and a game port.
 #
-# WHY TWO HUBS RATHER THAN ONE INTERFACE WITH CLEVER RULES. They carry different
-# authority and that difference should be visible in `iptables -S`, not buried in a
-# source-address match. `wgadm` reaches sshd, RustDesk and Syncthing; `wgfam` reaches
-# a web server and a game port. One interface with both would mean every future rule
-# has to remember which peers are which.
-#
-# Public keys are not secret -- they are what the *other* end needs to authenticate us,
-# and they identify nobody. The private halves live in sops (`secret` below); which
-# file each one is in follows the host's own sops.defaultSopsFile:
-#   - family laptops   -> secrets/family.yaml  (family age key, see .sops.yaml)
-#   - hydrogen/sulfur -> secrets/secrets.yaml (main age key)
-#
-# Regenerate everything with ./gen-family-secrets.sh; it prints exactly the public
-# keys below.
+# Public keys are not secret. The private halves live in sops under `secret`, in the file
+# the host's own sops.defaultSopsFile names -- family.yaml for the laptops, secrets.yaml
+# for hydrogen and sulfur. Regenerate with ./gen-family-secrets.sh.
 rec {
-  # Public endpoint for both hubs -- the SAME name the router's own hub uses.
-  #
-  # An earlier draft invented hub.luckyobserver.com to avoid a "collision" that does not
-  # exist: a hostname is just an A record, and the three hubs are told apart by port
-  # (51820 -> the router itself, 51821/51822 -> hydrogen via the router's forwardPorts).
-  # Reusing vpn. means ddclient on the router already keeps it pointed at the current WAN
-  # address, and there is no Cloudflare record to remember to create.
-  #
-  # It resolves to the WAN address on the LAN too: the router's split-horizon DNS answers
-  # per-subdomain and deliberately never wildcards this zone, precisely to leave this
-  # record alone. That is fine -- peers at home reach hydrogen by its LAN address instead,
-  # which modules/family/wg-endpoint.nix tries first.
+  # The same name the router's own hub uses; the three hubs are told apart by port. ddclient
+  # already keeps it pointed at the current WAN address, so no extra DNS record exists to
+  # forget. It resolves to the WAN address on the LAN too -- peers at home reach hydrogen by
+  # its LAN address instead, which wg-endpoint.nix tries first.
   endpointHost = "vpn.luckyobserver.com";
 
-  # hydrogen's LAN address. Peers on the home network target this directly instead of
-  # bouncing off the gateway -- see modules/family/wg-endpoint.nix.
+  # Peers on the home network target this directly instead of bouncing off the gateway.
   lanEndpoint = "10.0.0.10";
   lanSubnet = "10.0.0.0/24";
 
@@ -61,17 +44,12 @@ rec {
     };
   };
 
-  # The router's management tunnel (nixrouter modules/wireguard-mgmt.nix).
+  # The router's management tunnel (nixrouter). sulfur peers with it directly, not through
+  # hydrogen -- the thing everything depends on should not depend on a service host.
   #
-  # sulfur peers with this DIRECTLY, not through hydrogen. Routing the router's
-  # administration through hydrogen would make the thing everything depends on depend on
-  # a service host; WireGuard has no hubs, only pairs, so sulfur simply holds two peer
-  # relationships and neither outage implies the other.
-  #
-  # Peers address it at `address` (10.42.0.1), NEVER at lanAddress. lanAddress is only
-  # the endpoint to dial when at home; putting it in a peer's allowedIPs routes the
-  # client's own default gateway and resolver into the tunnel and takes its network out.
-  # That is not hypothetical -- it happened to sulfur on 2026-08-06.
+  # Peers address it at `address`, NEVER at lanAddress: lanAddress is only the endpoint to
+  # dial when at home, and putting it in allowedIPs routes the client's own gateway and
+  # resolver into the tunnel. That took sulfur's network out on 2026-08-06.
   routerMgmt = {
     address = "10.42.0.1";
     lanAddress = "10.0.0.1";
@@ -80,16 +58,9 @@ rec {
     secret = "wg-priv-sulfur-adm";   # sulfur reuses its wgadm key for this peer
   };
 
-  # wgadm peers -- sheath's own devices, and nothing else.
-  #
-  # sulfur's address is referenced by name in three places (the hub's FORWARD rule, the
-  # laptops' allowedIPs, hydrogen's peer list) -- never retype it.
-  #
-  # Only entries with a `secret` are NixOS hosts that build their own wg config from it;
-  # a phone carries its key on the device and needs nothing here but a public half.
-  # Being on wgadm gives these devices network reach to sshd, RustDesk and Syncthing --
-  # all key- or password-authenticated, but it is why this list is not the place for
-  # anyone else's phone. Those go on wgfam under `mobile`.
+  # wgadm peers -- sheath's own devices only, because wgadm reaches sshd, RustDesk and
+  # Syncthing. Anyone else's phone goes on wgfam under `mobile`. Only entries with a
+  # `secret` are NixOS hosts; a phone carries its key on the device.
   admin = {
     sulfur = {
       address = "10.42.0.3";
@@ -103,26 +74,13 @@ rec {
     };
   };
 
-  # Family-tunnel peers.
+  # Family laptops. Hostnames are the Minecraft handles lowercased -- this repository is
+  # public, so not the kids' real names -- and every secret is in secrets/family.yaml.
   #
-  # Every secret is named after the host that uses it -- `wg-priv-<host>` here, matching
-  # the existing wg-priv-sulfur / wg-priv-fleet convention, and `<host>-password-hash`
-  # in secrets/family.yaml, matching nextcloud-adminpass / paperless-adminpass. There is
-  # no device numbering: an earlier draft keyed these as family-device-1..4 to keep names
-  # out of a public repo, which the handles already do, so the number was a second
-  # identifier to keep in step for nothing.
-  #
-  # Every peer here is a family laptop, so every secret is in secrets/family.yaml.
-  #
-  # Hostnames are the Minecraft handles from modules/minecraft-couch.nix, lowercased.
-  # Deliberately not the kids' real names: this repository is public. The handles are
-  # already committed there, identify nobody, and keep the login identity and the game
-  # identity in step.
-  #
-  # `minecraftName` must match modules/minecraft-couch.nix's seedPlayers EXACTLY, case
-  # included. An offline-mode UUID is a hash of the username, so a laptop that joins
-  # under a different spelling is a different character with an empty inventory --
-  # including "PhantomSpecialst", which is missing an `i` and has to stay that way.
+  # `minecraftName` must match minecraft-couch.nix's seedPlayers EXACTLY, case included: an
+  # offline-mode UUID is a hash of the username, so a different spelling is a different
+  # character with an empty inventory. That includes "PhantomSpecialst", which is missing an
+  # `i` and has to stay that way.
   family = {
     gentlemenpupil = {
       address = "10.41.0.11";
@@ -149,25 +107,15 @@ rec {
       minecraftName = "MadDreamer";
     };
 
-    # 10.41.0.3 was osmium and 10.41.0.4 was surface, both retired 2026-08-06. Left
-    # unallocated rather than recycled -- an address that once meant a different machine
+    # .3 and .4 are retired hosts, left unallocated rather than recycled -- a reused address
     # is a good way to misread a `wg show` later.
   };
 
-  # Hand-configured wgfam peers: phones and tablets. Same tunnel and the same isolation
-  # as the laptops, but nothing about them is NixOS-managed, so they carry no `secret`
-  # (their private key is generated on the device and never enters this repo) and no
-  # `minecraftName`.
+  # Phones and tablets: same tunnel and isolation as the laptops, but nothing here is
+  # NixOS-managed, so no `secret` and no `minecraftName`. Use ./gen-mobile-peer.sh.
   #
-  # LEAVE ENTRIES OUT UNTIL YOU HAVE THE REAL PUBLIC KEY. `wg setconf` rejects a
-  # malformed key and fails the whole interface, so a placeholder here does not merely
-  # not-work -- it takes wgfam down for the four laptops too.
-  #
-  # To add one:
-  #   1. Install WireGuard on the device and create a tunnel; it generates the keypair.
-  #   2. Profile: Address 10.41.0.<n>/32, AllowedIPs 10.41.0.1/32,
-  #      DNS 10.41.0.1, Endpoint hub.luckyobserver.com:51821, PersistentKeepalive 25.
-  #   3. Paste the device's PUBLIC key below, rebuild hydrogen, switch.
+  # LEAVE AN ENTRY OUT UNTIL YOU HAVE THE REAL PUBLIC KEY -- `wg setconf` rejects a
+  # malformed key and fails the whole interface, taking wgfam down for the laptops too.
   #
   # Reserved: .20 sheath's phone, .21 spouse's phone, .22+ tablets.
   mobile = {
@@ -177,31 +125,16 @@ rec {
     };
   };
 
-  # Guests: people outside the household, here for Minecraft and nothing else.
+  # People outside the household, here for Minecraft. Separate from `mobile` -- the
+  # isolation is identical, but who holds the key is what a reader needs to see at a glance.
   #
-  # A separate attrset from `mobile` because the two say different things. `mobile` is
-  # "a household device with no Nix config"; this is "not the household". The isolation
-  # is identical -- hydrogen's FORWARD policy does not distinguish them, so a guest
-  # reaches this host and no sibling, no LAN, no router -- but who holds the key is the
-  # thing a reader needs to see at a glance, and an address in the middle of the family
-  # phones would not show it.
+  # A guest key reaches more than the name suggests: wgfam's firewall list is per-INTERFACE,
+  # so it reaches 80/443 as well as 25565. Those are password-authenticated, so what becomes
+  # reachable is a login page. Accepted; if that changes, the answer is a third hub carrying
+  # only 25565, not a source-address rule.
   #
-  # WHAT A GUEST KEY ACTUALLY REACHES, stated plainly because it is more than the name
-  # suggests: wgfam's firewall list in hosts/hydrogen.nix is per-INTERFACE, not per-peer,
-  # so this key reaches 80/443 as well as 25565 -- the Nextcloud, Immich, Paperless and
-  # Calibre vhosts. Those are password-authenticated, so it is a login page that becomes
-  # reachable rather than any data. Accepted deliberately. If that ever stops being an
-  # acceptable trade the answer is a third hub (wgguest) carrying only 25565, NOT a rule
-  # here that matches on source address -- see the header on why the hubs are split by
-  # interface in the first place.
-  #
-  # No `secret`: the private half is generated on their own machine and never enters this
-  # repo. No `minecraftName` either -- they type their own username in-game, and it must
-  # not collide with a handle in `family` above. An offline-mode UUID is a hash of the
-  # username, so a collision does not clash, it silently lands them in that child's
-  # character with that child's inventory.
-  #
-  # Numbered from .30 so the .20s stay with the household mobiles above.
+  # No minecraftName: they type their own username, and it must not collide with a handle in
+  # `family` -- a collision does not clash, it lands them in that child's character.
   guests = {
     brother-laptop = {
       address = "10.41.0.30";
@@ -210,23 +143,14 @@ rec {
   };
 
 
-  # Service names. THE ROUTER IS THE ONLY RESOLVER -- hydrogen briefly ran a second
-  # dnsmasq for this same zone and that is how split-horizon DNS starts giving two
-  # different answers to one question. This list now feeds only the NixOS hosts'
-  # networking.hosts; the router keeps its own copy in localServices.names, and the two
-  # must be kept in step by hand.
+  # THE ROUTER IS THE ONLY RESOLVER: hydrogen briefly ran a second dnsmasq for this zone,
+  # which is how split-horizon DNS starts giving two answers to one question. This feeds the
+  # NixOS hosts' networking.hosts; the router keeps its own copy and the two are kept in
+  # step by hand. Phones set DNS to routerMgmt.address instead.
   #
-  # Phones have no networking.hosts, so they set DNS to the router's tunnel address
-  # (10.42.0.3) and get these answers from it over the router tunnel -- then reach the
-  # services themselves over the hydrogen tunnel. Two peers, each doing its own job.
-  #
-  # These are the vhosts in
-  # modules/{nextcloud,immich,paperless,calibre}.nix; `mc` is Minecraft, which has no
-  # vhost and exists only as a name for the kids to type.
-  #
-  # The names are unchanged from their public form on purpose -- the wildcard ACME cert
-  # in modules/reverse-proxy.nix covers *.luckyobserver.com, so pointing them at a
-  # tunnel address keeps TLS valid with no per-host certificate work.
+  # An assertion in reverse-proxy.nix ties every fleet.vhosts entry to this list. `mc` has
+  # no vhost -- it is a name for the kids to type. The names keep their public form so the
+  # wildcard ACME cert still matches when they point at a tunnel address.
   serviceNames = [
     "nc.luckyobserver.com"
     "immich.luckyobserver.com"

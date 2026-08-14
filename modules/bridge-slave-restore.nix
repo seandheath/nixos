@@ -1,64 +1,27 @@
 # Put a bridge's slave interfaces back if something detaches them.
 #
-# THE OUTAGE THIS EXISTS TO BOUND. On 2026-08-13 hydrogen's nightly rebuild completed
-# successfully and took the machine off the network for six hours. The host never
-# crashed -- journald ran the whole time -- but br0 lost enp0s31f6 and nothing put it
-# back, so the LAN address and both WireGuard hubs were unreachable until someone
-# walked over and power-cycled it. From `journalctl -b -2`, microsecond precision:
+# Bounds, but does not diagnose, the 2026-08-13 outage: br0 lost enp0s31f6 30 ms after
+# systemd logged "Reloaded Bridge Interface br0", and nothing put it back for six hours.
+# The actor is still unidentified -- two live reproductions cleared NetworkManager. See
+# CHANGELOG 2026-08-13 before re-running those experiments.
 #
-#   04:29:00.631  systemd[1]: Reloading Bridge Interface br0...
-#   04:29:00.654  kernel: br0: port 1(enp0s31f6) entered forwarding state   <- reload OK
-#   04:29:00.655  systemd[1]: Reloaded Bridge Interface br0.
-#   04:29:00.685  kernel: br0: port 1(enp0s31f6) entered disabled state     <- 30ms later
+# Deliberately not silent: every repair logs at warning level, so the bug keeps a
+# timestamped trail. Those lines appearing IS the reproduction we could not get on demand.
 #
-# br0-netdev.service carries X-ReloadIfChanged=true, so any switch that moves its store
-# paths reloads it, which is most nixpkgs bumps. The reload itself is correct: it
-# detaches every slave, re-attaches, and ends in `forwarding`. The kill is the SECOND
-# detach, 30 ms after systemd already logged "Reloaded".
-#
-# WHAT WE DO NOT KNOW, stated plainly so nobody re-runs these experiments. The actor is
-# unidentified. NetworkManager was the obvious suspect -- it holds autoconnecting
-# profiles for both br0 and enp0s31f6, and modules/wg-unmanaged.nix documents NM doing
-# exactly this to WireGuard devices -- but two live reproductions on 2026-08-13 cleared
-# it:
-#   - `systemctl restart NetworkManager` alone: bridge never flinched, kernel silent.
-#   - `systemctl reload br0-netdev.service` alone, under NM debug logging: reproduced
-#     the detach/re-attach pair, ended in `forwarding`, and NM only observed it
-#     ("restarting dynamic IP configuration (interface got carrier)").
-# The switch's full action list that night was `reloading: br0-netdev, dbus-broker` /
-# `restarting: home-manager-sheath, polkit` / `stopping: accounts-daemon` -- NM and
-# systemd-udevd were neither restarted nor reloaded. So the trigger is some interaction
-# only a real switch produces, and it is still open.
-#
-# WHY A WATCHDOG ANYWAY. The failure does not need a diagnosis to be bounded: whatever
-# detaches the slave, re-attaching it is correct and idempotent. This converts a
-# six-hour outage needing physical access into a <=30 s blip. It is deliberately NOT
-# silent -- every repair logs at warning level, so the bug keeps a visible trail with
-# timestamps, which is precisely the evidence the investigation above lacked. If those
-# lines start appearing, that is the reproduction we could not get on demand.
-#
-# The list is derived from networking.bridges rather than hardcoded, so a bridge added
-# later is covered without anyone remembering this file exists -- same reasoning as
-# modules/wg-unmanaged.nix. Imported for every host via commonModules in flake.nix;
-# on a host that declares no bridges it defines nothing at all.
-#
-# To suspend it during deliberate maintenance on a bridge:
+# Derived from networking.bridges, so a later bridge is covered and a host with none gets
+# nothing. Suspend during deliberate bridge maintenance with
 #   systemctl stop bridge-slave-restore.timer
 { config, lib, pkgs, ... }:
 let
   bridges = config.networking.bridges;
 
-  # One check per (bridge, slave) pair. Compares the CURRENT master rather than merely
-  # testing that some master exists: an interface enslaved to the wrong bridge is just
-  # as broken as one enslaved to nothing, and `ip link set ... master` fixes both.
+  # Compares the CURRENT master rather than testing that some master exists: enslaved to
+  # the wrong bridge is as broken as enslaved to nothing, and `ip link set` fixes both.
   checks = lib.concatLists (lib.mapAttrsToList (br: brCfg:
     map (iface: ''
-      # `readlink -f` is WRONG here and the first version of this used it: -f
-      # canonicalises a path whose final component does not exist and exits 0, so a
-      # detached interface reported master=master instead of master=none. The
-      # comparison below still fired correctly, but the log line is the entire point of
-      # this unit -- it is the evidence trail for a bug we have not identified -- so it
-      # has to say what was actually there. Test the symlink, then read it plainly.
+      # NOT `readlink -f`: it canonicalises a missing final component and exits 0, so a
+      # detached interface reported master=master. The log line is the point of this unit,
+      # so it has to say what was actually there.
       if [ -L /sys/class/net/${iface}/master ]; then
         current=$(${pkgs.coreutils}/bin/basename \
           "$(${pkgs.coreutils}/bin/readlink /sys/class/net/${iface}/master)")
@@ -67,9 +30,8 @@ let
       fi
       if [ "$current" != "${br}" ]; then
         echo "WARNING: ${iface} is not a slave of ${br} (master=''${current:-none}) -- re-attaching" >&2
-        # || true: a failed repair must not leave a failed unit behind that then needs
-        # its own attention. The next tick retries in 30 s, and the warning above is
-        # already in the journal either way.
+        # || true: a failed repair must not leave a failed unit needing its own attention.
+        # The next tick retries in 30 s and the warning is already in the journal.
         ${pkgs.iproute2}/bin/ip link set dev ${iface} master ${br} up || true
       fi
     '') brCfg.interfaces) bridges);
@@ -88,10 +50,8 @@ in
       timerConfig = {
         OnBootSec = "1min";
         OnUnitActiveSec = "30s";
-        # WITHOUT THIS THE TIMER IS USELESS. systemd's default AccuracySec is 1 minute,
-        # which it spends by firing anywhere inside that window -- a 30 s period with
-        # 60 s of slop is not a 30 s period. The whole value here is a short worst-case
-        # outage, so the accuracy has to be tighter than the interval.
+        # Load-bearing: the default is 1 minute, and a 30 s period with 60 s of slop is
+        # not a 30 s period.
         AccuracySec = "5s";
         Unit = "bridge-slave-restore.service";
       };
