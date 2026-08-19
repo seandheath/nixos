@@ -48,6 +48,10 @@
   # channel below.
   fleet.gitServer.enable = true;
 
+  # The fleet's flake.lock is bumped and gated here, on the only host that is always up.
+  # One writer only -- a second is a push race. see CHANGELOG 2026-08-19
+  fleet.lockUpdate.enable = true;
+
   # On-demand worlds alongside the shared one. authorizedKeys is empty until each laptop
   # has its own control key in secrets/family.yaml; sheath drives it directly over wgadm
   # in the meantime.

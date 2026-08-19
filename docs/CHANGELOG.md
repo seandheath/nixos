@@ -19,6 +19,32 @@ Also the decision log. Rationale that would otherwise bloat a code comment lives
   finding: scripted networking is detaching its own slave, and `br0-netdev`'s
   `X-ReloadIfChanged` is the next suspect.
 
+## 2026-08-19 (flake.lock describes the fleet again)
+
+- **The nightly no longer overrides nixpkgs.** `system.autoUpgrade` ran with
+  `--override-input nixpkgs <branch> --no-write-lock-file`, so it advanced the running system
+  and never recorded where to. `nr`, `nb` and any hand-run `nixos-rebuild` build the lock, so
+  every manual rebuild was a rollback of however far the nightly had drifted -- by
+  construction, not by accident. sulfur booted 20260817 while the lock said 20260813.
+- **What that cost.** nixpkgs added `X-RestartIfChanged=false` to
+  `gnome-session-monitor.service` between 20260816 and 20260817. Rolling back stripped the
+  guard, so `switch-to-configuration` stopped the unit; the whole session hangs off it
+  (`gnome-session-pre.target` -> `gnome-session@gnome.target`), so the desktop died mid-switch.
+  The dying session took the terminal holding `systemd-run --pipe`'s stdio with it, the next
+  `eprintln!` panicked on EPIPE (exit 101), and activation aborted before the start phase --
+  leaving mullvad, asusd and `local-fs.target` stopped. Every hand-run switch did this.
+- **hydrogen owns the lock.** `fleet.lockUpdate` bumps nixpkgs nightly at 01:00, runs
+  `nix flake check` -- every host's toplevel plus the installer -- and pushes only if all of
+  them build. A revision that breaks any machine in the fleet now reaches none of them, where
+  before each host resolved the branch tip independently with nothing gating it. One writer:
+  a second is a push race.
+- Not a scheduled mutation in the sense this repo forbids: it is an update cadence, the same
+  class as the nightly rebuild it feeds, and reconciles nothing against a clock.
+- `staleCheck` keeps its job and gains a second one -- a wedged lock updater stalls the fleet
+  silently, and the 21-day age check on each host is what notices.
+- `nu` gained the same gate. It committed and pushed the lock before anything built it, which
+  is the identical bug at manual speed.
+
 ## 2026-08-19 (mullvad cannot brick sulfur)
 
 - **Lockdown mode pinned off, and every Mullvad setting re-asserted rather than set once.**

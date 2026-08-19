@@ -90,6 +90,12 @@
         fi
         nix flake update --flake "$repo" || return 1
         git -C "$repo" diff --quiet flake.lock && { echo "nu: inputs already current"; return 0; }
+        # Build every host before the push, which is the point of no return: the lock
+        # reaches five machines you are not sitting at.
+        nix flake check "$repo" || {
+          echo "nu: flake check failed; lock left uncommitted in $repo" >&2
+          return 1
+        }
         git -C "$repo" commit -q -m "chore(flake): update inputs" flake.lock || return 1
         git -C "$repo" push -q || return 1
         nr
