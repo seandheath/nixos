@@ -50,6 +50,31 @@ no provenance, no verification recipes, no revert instructions.
 - **Always include a `Makefile`** with `build`, `test`, `run`, `clean`, `lint`, `fmt`, plus
   project-specific targets.
 
+## NixOS Configuration
+
+The configuration is a *description* of the system, not a program that adjusts it. Two machines
+built from the same revision must be identical.
+
+- **Declare, don't reconcile.** Prefer an existing nixpkgs option to a hand-rolled unit, and a
+  hand-rolled unit to a script that edits live state. Imperative code is for the case where an
+  upstream daemon owns mutable state the module system cannot reach -- say so in a comment.
+- **Never schedule a mutation.** No timer, cron job, or polling loop that changes settings. A
+  scheduled correction makes behaviour depend on when you looked, and silently fights whoever
+  set the value. Bind convergence to the event that causes the drift -- a unit starting, an
+  update activating, a device appearing -- never to a clock. This covers observation too: if
+  something is worth noticing, notice it at the event.
+- **Read before writing.** Where state must be asserted imperatively, compare first and write
+  only what differs, so a log line means something genuinely drifted. Treat an unparseable
+  value as drift: fail towards enforcing.
+- **Minimal.** Delete rather than accumulate. No defensive version pins -- pin only after a
+  real break, and prefer a behavioural setting to a pin. When a workaround cannot be removed
+  yet, write its removal gate into `docs/CHANGELOG.md`.
+- **One home per fact.** A module owns its `enable` and the policy that keeps it working;
+  `hosts/<name>.nix` holds only what is true of that machine alone. Never state a value twice
+  -- derive it.
+- **Secrets via sops**, never in the Nix store, never in a file committed to git. Anything that
+  must survive a reboot is declared in the impermanence persist list.
+
 ## Required Project Docs
 
 ### `docs/specification.md`
