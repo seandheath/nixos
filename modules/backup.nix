@@ -29,6 +29,10 @@ let
     # after this line was written; without it a world made from the launcher is silently
     # unprotected. Not flushed like the shared world below -- see the note there.
     "/var/lib/minecraft-servers"
+    # Bare git repos. No flush hook like Minecraft's: the object store is append-only and
+    # a ref update is an atomic rename, so a live push cannot tear an archive.
+    "/var/lib/git"
+
     # The postgresql subdirectory, NOT /var/backup -- widening it to the parent sweeps the
     # rootfs repo into every job, so each backup would archive a copy of the backups.
     "/var/backup/postgresql"

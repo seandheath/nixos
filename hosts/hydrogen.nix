@@ -16,6 +16,7 @@
     ../modules/scanner.nix
     ../modules/ollama.nix
     ../modules/backup.nix
+    ../modules/git-server.nix
     ../modules/fleet-vpn.nix
     ../modules/family/vpn-hub.nix
     ../modules/minecraft-server.nix
@@ -40,6 +41,12 @@
     # picked up by the nightly borg run. Survives Mojang or Modrinth dropping a version.
     archiveDir = "/var/lib/minecraft-archive";
   };
+
+  # Private git remotes, bare repos owned by the `git` account. No new port: sshd already
+  # answers on wgadm and wgfam, so the kids' laptops can reach the account too and only
+  # key-only auth keeps them out -- the same trade already made for the Minecraft control
+  # channel below.
+  fleet.gitServer.enable = true;
 
   # On-demand worlds alongside the shared one. authorizedKeys is empty until each laptop
   # has its own control key in secrets/family.yaml; sheath drives it directly over wgadm

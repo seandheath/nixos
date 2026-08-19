@@ -9,13 +9,10 @@
 let
   cfg = config.fleet.gitServer;
 
-  # Shell-quoted once here; every use below is inside a script.
-  repoDir = cfg.repoDir;
-
   gitRepoCli = pkgs.writeShellScriptBin "git-repo" ''
     set -eu
-    PATH=${lib.makeBinPath [ pkgs.coreutils pkgs.git pkgs.sudo pkgs.gnugrep ]}
-    repos=${lib.escapeShellArg repoDir}
+    PATH=${lib.makeBinPath [ pkgs.coreutils pkgs.git pkgs.sudo ]}
+    repos=${lib.escapeShellArg cfg.repoDir}
 
     if [ "$(id -u)" -ne 0 ]; then
       echo "git-repo must run as root." >&2
@@ -30,7 +27,7 @@ let
     # Rejects path separators, leading dots and everything else that could escape $repos.
     check_name() {
       case "$1" in
-        *[!A-Za-z0-9._-]* | "" | .* | *..*)
+        *[!A-Za-z0-9._-]* | "" | .*)
           echo "git-repo: invalid repository name: $1" >&2
           echo "Allowed: letters, digits, dot, dash, underscore; no leading dot." >&2
           exit 2
@@ -50,7 +47,7 @@ let
         install -d -o git -g git -m 0750 "$dir"
         sudo -u git git init --bare --initial-branch=main "$dir" >/dev/null
         echo "Created $dir"
-        echo "  git clone hydrogen-git:$2.git"
+        echo "  git clone hydrogen-git:$2.git   # the sulfur alias"
         ;;
 
       list)
@@ -111,6 +108,9 @@ in
       group = "git";
       home = cfg.repoDir;
       createHome = true;
+      # Also the mode of the repo root; a second tmpfiles rule for the same directory
+      # would just be a second owner of one fact.
+      homeMode = "0750";
       description = "git repository owner";
       # The confinement. No ~/git-shell-commands directory exists, so an interactive login
       # is refused outright rather than dropping to a restricted menu.
@@ -119,8 +119,6 @@ in
         k: "no-port-forwarding,no-agent-forwarding,no-X11-forwarding,no-pty ${k}"
       ) cfg.authorizedKeys;
     };
-
-    systemd.tmpfiles.rules = [ "d ${cfg.repoDir} 0750 git git -" ];
 
     environment.systemPackages = [ gitRepoCli ];
 
