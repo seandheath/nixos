@@ -5,6 +5,7 @@
     enable = true;
     settings = {
       font-family = "Inconsolata";
+      background = "000000";
       # GNOME's 1.25 text-scaling-factor is applied by VTE but not by Ghostty, so the
       # point size is pre-scaled to render at the size Ptyxis did.
       font-size = 14;
