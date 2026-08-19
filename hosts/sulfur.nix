@@ -353,31 +353,14 @@ in
   # still matches.
   networking.hosts.${adm.address} = peers.serviceNames;
 
+  # Private git remotes on hydrogen (modules/git-server.nix). Its own alias rather than
+  # `Host hydrogen`, so `User git` cannot capture an admin ssh to the same address.
+  programs.ssh.extraConfig = ''
+    Host hydrogen-git
+      HostName ${adm.address}
+      User git
+  '';
 
-  systemd.services.mullvad-configure = {
-    description = "Configure Mullvad settings (LAN sharing and custom DNS)";
-    after = [ "mullvad-daemon.service" ];
-    requires = [ "mullvad-daemon.service" ];
-    wantedBy = [ "multi-user.target" ];
-    serviceConfig = {
-      Type = "oneshot";
-      ExecStart = pkgs.writeShellScript "mullvad-configure" ''
-        until ${config.services.mullvad-vpn.package}/bin/mullvad status >/dev/null 2>&1; do
-          sleep 1
-        done
-        ${config.services.mullvad-vpn.package}/bin/mullvad lan set allow
-
-        # 1.1.1.1 alone. Mullvad rewrites resolv.conf to exactly the listed servers, in
-        # order, and the home router is reachable only through a tunnel -- glibc has no
-        # notion of an unreachable nameserver, only a slow one, so it would eat a 5s
-        # timeout per lookup. A resolver whose reachability depends on a tunnel must never
-        # be first in resolv.conf. Cost: the router's ad filtering while connected. The
-        # split-horizon names still resolve from networking.hosts, which nsswitch reads
-        # first.
-        ${config.services.mullvad-vpn.package}/bin/mullvad dns set custom 1.1.1.1
-      '';
-    };
-  };
 
   system.stateVersion = "25.11";
 }

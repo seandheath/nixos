@@ -19,6 +19,48 @@ Also the decision log. Rationale that would otherwise bloat a code comment lives
   finding: scripted networking is detaching its own slave, and `br0-netdev`'s
   `X-ReloadIfChanged` is the next suspect.
 
+## 2026-08-19 (mullvad cannot brick sulfur)
+
+- **Lockdown mode pinned off, and every Mullvad setting re-asserted rather than set once.**
+  `modules/mullvad.nix`. Roughly quarterly an upgrade migrates `/etc/mullvad-vpn/settings.json`,
+  `block_when_disconnected` comes back on, and the daemon blocks every packet; the symptom is
+  "DNS times out", which is why it cost hours each time. Availability beats the kill switch on
+  a laptop that is not always meant to be tunnelled.
+- **Two events, no schedule.** `mullvad-configure` is pulled in by `mullvad-daemon.service`,
+  so every daemon start -- which is what an upgrade does, and what migrates the settings --
+  lands on the declared state; `restartTriggers` on the generation label re-runs it on every
+  `nixos-rebuild switch`, so an update always resets Mullvad. It was `wantedBy` boot alone, and
+  so never re-ran on the one event that causes the drift.
+- `RemainAfterExit`, because switch-to-configuration does not reliably re-run a *changed*
+  oneshot that is inactive; staying active makes the per-generation restart deterministic.
+- A scheduled re-assert was built first and removed, along with a polling notifier: a timer
+  makes the system's behaviour depend on when you looked at it. Convergence belongs on the
+  event, not on a clock.
+- The unit reads each setting before writing it and writes only what differs, so a line in its
+  journal means something genuinely drifted. An unparseable value counts as drift -- a reworded
+  CLI must fail towards enforcing, not away from it.
+- Clearing the setting is not enough: the daemon keeps its `Blocked` firewall policy until the
+  tunnel state is touched, so the assert also issues `disconnect` when it finds drift.
+- **`mullvad-unblock`** is the manual escape hatch. Last resort it deletes the `inet mullvad`
+  nftables table: those rules outlive the daemon, so a daemon that dies while blocking leaves
+  nothing else that can undo them.
+
+## 2026-08-18 (private git on hydrogen)
+
+- **Bare git repos on hydrogen, served by sshd.** `modules/git-server.nix` adds a `git`
+  system user whose shell *is* `git-shell`, owning `/var/lib/git`. Chosen over a forge
+  (Forgejo/gitea): a forge brings a database, a web surface on the wildcard vhost, and an
+  account model to keep in step, none of which a single-user private remote needs. Repos
+  stay plain directories, so a Borg restore hands them back working with no import step.
+- **No new port and no change to the access boundary.** sshd already answers on wgadm and
+  wgfam, so the git account is reachable from the kids' laptops too and only key-only auth
+  keeps them out -- the same trade already made for the Minecraft control channel.
+- **`git-repo create|list|delete`** on hydrogen, root only. `delete` demands the repo name
+  typed back: the only other copy is whatever the last Borg run took.
+- **sulfur reaches it as `hydrogen-git:<name>.git`**, an SSH alias of its own rather than
+  `Host hydrogen`, so `User git` cannot capture an admin ssh to the same address. First
+  clone is trust-on-first-use; no host key is pinned for hydrogen anywhere in the fleet.
+
 ## 2026-08-14 (minecraft pre-launcher)
 
 - **A pre-launcher for everything that is not the couch.** sulfur and the kids' laptops baked

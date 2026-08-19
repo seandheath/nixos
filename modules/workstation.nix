@@ -12,6 +12,7 @@
     ./opencode.nix
     ./qwen-code.nix
     ./re-container.nix
+    ./mullvad.nix
   ];
 
   # Programs
@@ -21,7 +22,6 @@
   # Ships 54-cynthion.rules; TAG+="uaccess" grants the active session user access, so no
   # plugdev group is needed.
   services.udev.packages = [ pkgs.cynthion ];
-  services.mullvad-vpn.enable = true;
 
   # Avahi for network printer discovery (.local hostname resolution)
   services.avahi = {
