@@ -16,6 +16,12 @@ Also the decision log. Rationale that would otherwise bloat a code comment lives
   finding: scripted networking is detaching its own slave, and `br0-netdev`'s
   `X-ReloadIfChanged` is the next suspect.
 
+## 2026-08-19 (codex CLI)
+
+- **`codex` 0.147.0 on sulfur.** Package only -- no declared config: it authenticates by
+  `codex login` against a ChatGPT account and owns `~/.codex` itself. Not wired to the vLLM
+  endpoint; opencode/qwen-code already cover that path.
+
 ## 2026-08-19 (nextcloud 34, and the admin path that was a single point of failure)
 
 - **PostgreSQL collation drift repaired first.** Every database on hydrogen was created at

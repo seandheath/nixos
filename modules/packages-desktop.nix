@@ -33,6 +33,7 @@
     git
     python3
     aider-chat
+    codex   # OpenAI Codex CLI; auth via `codex login`, config in ~/.codex
     gnumake
     nodejs
     gcc
