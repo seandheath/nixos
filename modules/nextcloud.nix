@@ -8,7 +8,7 @@
 
   services.nextcloud = {
     enable = true;
-    package = pkgs.nextcloud33;
+    package = pkgs.nextcloud34;
     hostName = "nc.luckyobserver.com";
     https = true;
     # Data lives on root (/var/lib/nextcloud); backed up via Borg (modules/backup.nix).
