@@ -4,9 +4,6 @@ Also the decision log. Rationale that would otherwise bloat a code comment lives
 
 ## Open
 
-- **Nextcloud 32 → 33 on hydrogen.** Declaring `nextcloud33` *is* the upgrade and it
-  migrates the live schema; Nextcloud refuses multi-major jumps. Wants a Borg restore point
-  and a window. Currently healthy at 32.0.13, `needsDbUpgrade: false`.
 - **Narrow `pcie_aspm=off` on sulfur** to `pcie_aspm.policy=performance`, or disable the SD
   reader via udev. Disabling ASPM fleet-wide costs idle battery.
 - **Off-box failure notification.** `nixos-upgrade` failures notify the logged-in desktop,
@@ -18,6 +15,33 @@ Also the decision log. Rationale that would otherwise bloat a code comment lives
   nightlies pass with no repair logged. A repair logged after 2026-08-13 is itself the
   finding: scripted networking is detaching its own slave, and `br0-netdev`'s
   `X-ReloadIfChanged` is the next suspect.
+
+## 2026-08-19 (nextcloud 34, and the admin path that was a single point of failure)
+
+- **PostgreSQL collation drift repaired first.** Every database on hydrogen was created at
+  collation version 2.40 while the server had moved to 2.42, so text indexes were built to
+  rules glibc no longer follows -- wrong ordering, and unique constraints that stop catching
+  duplicates. `REINDEX DATABASE` + `REINDEX SYSTEM` + `ALTER DATABASE ... REFRESH COLLATION
+  VERSION` on nextcloud, immich, postgres and template1. 20s of downtime; immich was the only
+  slow one at 18s. Running a schema migration over stale indexes is how a latent fault becomes
+  a corrupt one, so this went first.
+- **Nextcloud 32 -> 33 -> 34**, sequentially, because Nextcloud refuses multi-major jumps.
+  Declaring the package *is* the upgrade: `nextcloud-setup.service` migrates the schema during
+  activation. Not reversible by generation rollback -- the older code refuses a newer schema,
+  so a real rollback restores `/var/lib/nextcloud` and the database together.
+- **wgadm gained a retry.** `networking.wireguard.interfaces` generates Type=oneshot +
+  RemainAfterExit units, so a failed start left no interface and nothing to retry it. A switch
+  restarted wgadm, it did not come back, and hydrogen had no remote management path at all --
+  recovery was the physical console. `OnFailure` now triggers a retry bound to the failure
+  event rather than a clock, rate-limited so a wedged interface cannot become a restart loop
+  that hides its own cause.
+- **sshd now listens on br0, key-only.** br0 deliberately carried nothing, which is what turned
+  one unit failure into a trip upstairs. The router does not forward 22, so this widens reach to
+  the house, not the internet; every other service stays wgadm-scoped. `PasswordAuthentication`
+  is off here because the LAN is not a trusted network and sheath's hash is shared with the
+  kids' laptops.
+- A single management path whose availability depends on a service that rebuilds restart is not
+  a boundary, it is a trip-wire. The boundary is key possession; that has not changed.
 
 ## 2026-08-19 (flake.lock describes the fleet again)
 

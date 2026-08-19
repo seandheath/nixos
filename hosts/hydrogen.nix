@@ -96,6 +96,12 @@
   # rule can subtract from. 22 appears only in the wgadm list below.
   services.openssh.openFirewall = false;
 
+  # sshd on the LAN, key-only, as the backup path. br0 used to carry nothing, which meant a
+  # wgadm failure left no remote way in at all -- that cost a trip to the console on
+  # 2026-08-19. The router does not forward 22, so this widens reach to the house, not the
+  # internet. Every other service stays wgadm-scoped. see CHANGELOG 2026-08-19
+  networking.firewall.interfaces."br0".allowedTCPPorts = [ 22 ];
+
   # br0 carries nothing, so a wgadm failure leaves no remote way in and recovery is the
   # physical console. That is survivable only because this is a laptop with a working
   # panel, GDM autologins sheath, and sheath has NOPASSWD sudo. Do not remove any of the
@@ -130,7 +136,10 @@
 
   services.openssh = {
     enable = true;
-    settings.PasswordAuthentication = true;
+    # Key-only, because 22 now faces the LAN as well as wgadm. A password prompt on the
+    # house network is what the wgadm boundary existed to prevent, and sheath's hash is
+    # shared with laptops the kids hold. see CHANGELOG 2026-08-19
+    settings.PasswordAuthentication = false;
     settings.PermitRootLogin = "no";
   };
 
