@@ -68,6 +68,7 @@
         # Inert until a host sets fleet.disk.enable, so the hosts still carried by a
         # hand-written hardware/<host>.nix are untouched by adding it here.
         ./modules/disk-layout.nix
+        ./modules/provisioning.nix
         ./modules/nix-settings.nix
         ./modules/sops.nix
         ./modules/accounts.nix
@@ -104,6 +105,11 @@
         nixpkgs.lib.optional (builtins.pathExists (./disk-config + "/${hostName}.nix"))
           (./disk-config + "/${hostName}.nix");
 
+      provisioningFor = hostName:
+        nixpkgs.lib.optional
+          (builtins.pathExists (./provisioning + "/${hostName}/default.nix"))
+          (./provisioning + "/${hostName}/default.nix");
+
       mkHost = { hostName, extraModules ? [ ] }: nixpkgs.lib.nixosSystem {
         inherit system;
         specialArgs = { inherit inputs; };
@@ -139,7 +145,7 @@
           ./modules/family/profile.nix
           ./hardware/${hostName}.nix
           { networking.hostName = hostName; }
-        ] ++ diskConfigFor hostName ++ extraModules ++ commonModules;
+        ] ++ provisioningFor hostName ++ extraModules ++ commonModules;
       }) familyHosts;
     in {
       nixosConfigurations = hosts;
@@ -166,7 +172,7 @@
       };
 
       devShells.${system}.default = pkgs.mkShell {
-        packages = with pkgs; [ cargo rustc clippy rustfmt rust-analyzer ];
+        packages = with pkgs; [ python3 python3Packages.black ];
       };
     };
 }

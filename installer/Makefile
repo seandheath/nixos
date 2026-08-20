@@ -1,24 +1,21 @@
 .PHONY: build test run clean lint fmt check
 
 build:
-	cargo build --release
+	python3 -m py_compile installer.py
 
 test:
-	cargo test
+	python3 -m unittest -v
 
 run:
-	cargo run --
+	python3 installer.py --repo ..
 
 clean:
-	cargo clean
+	find . -type d -name __pycache__ -prune -exec rm -rf {} +
 
 lint:
-	cargo clippy --all-targets -- -D warnings
+	python3 -m py_compile installer.py test_installer.py
 
 fmt:
-	cargo fmt
+	python3 -m black installer.py test_installer.py
 
-check: fmt-check lint test
-
-fmt-check:
-	cargo fmt --check
+check: build lint test

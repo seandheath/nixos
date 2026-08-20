@@ -51,6 +51,7 @@ in
 
   config = {
     family.enable = true;
+    fleet.provisioning.enable = true;
     system.stateVersion = "25.11";
 
     # These machines leave the house and are not disk-encrypted, so they carry the FAMILY
@@ -120,8 +121,8 @@ in
       alias dmesg="dmesg --color=always"
 
       # No `nu`: bumping inputs from a child's laptop would rewrite the fleet's lock.
-      nr() { sudo nixos-rebuild switch --refresh --flake github:seandheath/nixos#${hostName}; }
-      nb() { sudo nixos-rebuild boot   --refresh --flake github:seandheath/nixos#${hostName}; }
+      nr() { sudo fleet-rebuild switch; }
+      nb() { sudo fleet-rebuild boot; }
     '';
 
     networking.networkmanager.enable = true;

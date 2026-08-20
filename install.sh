@@ -21,14 +21,14 @@ fi
     exit 1
 }
 
-# Untracked files are invisible to flake evaluation, and the installer both reads the
-# flake and writes disk-config/<host>.nix into it.
+# A clone supplies the tracked flake and installer source. Generated machine facts stay on
+# the installed machine under /persist/nixos-install rather than being committed here.
 [[ -d "${REPO}/.git" ]] || {
     echo "install.sh: ${REPO} is not a git checkout; clone it rather than copying." >&2
     exit 1
 }
 
-echo "install.sh: building the installer (first run compiles it; later runs are cached)"
+echo "install.sh: building the installer (later runs are cached)"
 
 # The ISO ships with flakes off, and every nix call below needs them.
 exec nix --extra-experimental-features "nix-command flakes" \

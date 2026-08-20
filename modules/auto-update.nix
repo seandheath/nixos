@@ -5,6 +5,39 @@ let
   cfg = config.fleet.lockUpdate;
 
   remote = "git@github.com:seandheath/nixos";
+  publicRemote = "https://github.com/seandheath/nixos.git";
+
+  localRebuild = pkgs.writeShellApplication {
+    name = "fleet-rebuild";
+    runtimeInputs = [ pkgs.git pkgs.coreutils ];
+    text = ''
+      action="''${1:-switch}"
+      case "$action" in switch|boot|build) ;; *) echo "usage: fleet-rebuild [switch|boot|build]" >&2; exit 2;; esac
+
+      state="''${STATE_DIRECTORY:-/var/lib/nixos-upgrade}"
+      repo="$state/checkout"
+      provision=/persist/nixos-install
+      host=${lib.escapeShellArg config.networking.hostName}
+
+      for file in default.nix disk.nix hardware.nix; do
+        [ -s "$provision/$file" ] || { echo "missing local provisioning file: $provision/$file" >&2; exit 1; }
+      done
+
+      if [ ! -d "$repo/.git" ]; then
+        rm -rf -- "$repo"
+        git clone --branch main ${lib.escapeShellArg publicRemote} "$repo"
+      fi
+      git -C "$repo" remote set-url origin ${lib.escapeShellArg publicRemote}
+      git -C "$repo" fetch --prune origin main
+      git -C "$repo" reset --hard origin/main
+      git -C "$repo" clean -ffdx
+
+      target="$repo/provisioning/$host"
+      mkdir -p "$target"
+      install -m 0600 "$provision/default.nix" "$provision/disk.nix" "$provision/hardware.nix" "$target/"
+      exec ${config.system.build.nixos-rebuild}/bin/nixos-rebuild "$action" --flake "$repo#$host" -L
+    '';
+  };
 
   notify = pkgs.writeShellScript "fleet-notify" ''
     # Deliver into every live session bus rather than guessing a username, so this works
@@ -127,6 +160,34 @@ in
         '';
       };
     }
+
+    (lib.mkIf config.fleet.provisioning.enable {
+      system.autoUpgrade.enable = lib.mkForce false;
+      environment.systemPackages = [ localRebuild ];
+
+      systemd.services.nixos-upgrade = {
+        description = "Rebuild from the fleet configuration and local provisioning state";
+        after = [ "network-online.target" ];
+        wants = [ "network-online.target" ];
+        serviceConfig = {
+          Type = "oneshot";
+          StateDirectory = "nixos-upgrade";
+          ExecStart = "${localRebuild}/bin/fleet-rebuild switch";
+          # A GitHub-placeholder preflight from a local customization cannot apply to the
+          # assembled checkout; the rebuild script instead requires local facts above.
+          ExecStartPre = lib.mkForce [ ];
+        };
+      };
+
+      systemd.timers.nixos-upgrade = {
+        wantedBy = [ "timers.target" ];
+        timerConfig = {
+          OnCalendar = "04:00";
+          RandomizedDelaySec = "45min";
+          Persistent = true;
+        };
+      };
+    })
 
     (lib.mkIf cfg.enable {
       # Write access to the one repo, and nothing else on the account. Root-owned 0400 by
