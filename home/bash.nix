@@ -47,11 +47,9 @@
           srm -rf "$dir"
       }
       
-      # The fleet flake. nr/nb build from here, not from the local checkout, so what a
-      # host runs is always something that was pushed -- same source the nightly uses.
-      # To test uncommitted work, run nixos-rebuild against the checkout directly:
-      #   sudo nixos-rebuild switch --flake ~/nixos#$HOSTNAME
-      FLAKE="github:seandheath/nixos"
+      # Build from this checkout. nr/nb intentionally include local, uncommitted changes;
+      # use git status before rebuilding when a reproducible deployed revision matters.
+      FLAKE="$HOME/nixos"
 
       # Pick the host to build for: fzf-choose on the generic "nixos" installer image,
       # otherwise the current machine.
@@ -64,13 +62,11 @@
         fi
       }
 
-      # --refresh is load-bearing: nix caches a github: ref for tarball-ttl (1h), so
-      # without it an nr straight after a push rebuilds the previous commit.
       _nix_rebuild() {
         local op="$1" target_host
         target_host=$(_nix_target_host) || return 1
         [[ -n "$target_host" ]] || return 1
-        sudo nixos-rebuild "$op" --refresh --flake "$FLAKE#$target_host"
+        sudo nixos-rebuild "$op" --flake "$FLAKE#$target_host"
       }
 
       # nr: switch now. nb: stage for next boot (kernel/bootloader changes). Neither
@@ -79,8 +75,7 @@
       nb() { _nix_rebuild boot; }
 
       # nu: deliberately bump every flake input. The lock has to reach the remote before
-      # nr can build it, so this commits and pushes rather than leaving a local change
-      # nothing will pick up. Refuses to run with anything else uncommitted, so it cannot
+      # other machines can pick it up. Refuses to run with anything else uncommitted, so it cannot
       # sweep up work in progress.
       nu() {
         local repo="$HOME/nixos"
