@@ -7,6 +7,7 @@ import argparse
 import curses
 import json
 import os
+import pwd
 import queue
 import shutil
 import subprocess
@@ -125,10 +126,21 @@ def is_size(value: str) -> bool:
     return len(value) > 1 and value[-1:] in "KMGTP" and value[:-1].isdigit()
 
 
+def child_env() -> dict[str, str]:
+    """Avoid carrying the live ISO user's HOME into root-run Nix commands."""
+    env = os.environ.copy()
+    if os.geteuid() == 0:
+        env["HOME"] = pwd.getpwuid(0).pw_dir
+        # These paths commonly point into the ISO user's home too.
+        env.pop("XDG_CACHE_HOME", None)
+        env.pop("XDG_CONFIG_HOME", None)
+    return env
+
+
 def command(args: list[str], what: str, *, input_text: str | None = None) -> str:
-    result = subprocess.run(args, input=input_text, text=True, capture_output=True)
+    result = subprocess.run(args, input=input_text, text=True, capture_output=True, env=child_env())
     if result.returncode:
-        detail = result.stderr.strip() or result.stdout.strip()
+        detail = "\n".join(part for part in (result.stderr.strip(), result.stdout.strip()) if part)
         raise RuntimeError(f"{what} failed: {detail}")
     return result.stdout
 
@@ -374,7 +386,7 @@ def provisioning_module() -> str:
 
 
 def stream(args: list[str], what: str, log: Callable[[str], None], input_text: str | None = None) -> None:
-    process = subprocess.Popen(args, stdin=subprocess.PIPE if input_text is not None else None, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    process = subprocess.Popen(args, stdin=subprocess.PIPE if input_text is not None else None, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, env=child_env())
     if input_text is not None: process.stdin.write(input_text); process.stdin.close()
     assert process.stdout
     for line in process.stdout: log(line.rstrip())

@@ -2,9 +2,10 @@
 
 import unittest
 import inspect
+from types import SimpleNamespace
 from unittest.mock import patch
 
-from installer import Board, Profile, UNSET_DEVICE, facts, is_size, local_flake, provisioning_module, shell_quote
+from installer import Board, Profile, UNSET_DEVICE, child_env, facts, is_size, local_flake, provisioning_module, shell_quote
 
 
 class ProfileTests(unittest.TestCase):
@@ -37,6 +38,12 @@ class ProfileTests(unittest.TestCase):
 
     def test_local_flake_keeps_untracked_provisioning_files(self):
         self.assertEqual(local_flake("/mnt/home/sheath/nixos", "test"), "path:/mnt/home/sheath/nixos#test")
+
+    def test_root_child_environment_uses_root_home(self):
+        with patch("installer.os.geteuid", return_value=0), patch("installer.pwd.getpwuid", return_value=SimpleNamespace(pw_dir="/root")), patch.dict("installer.os.environ", {"HOME": "/home/nixos", "XDG_CACHE_HOME": "/home/nixos/.cache"}, clear=True):
+            environment = child_env()
+        self.assertEqual(environment["HOME"], "/root")
+        self.assertNotIn("XDG_CACHE_HOME", environment)
 
     def test_encryption_moves_together_and_clears_secret(self):
         board = Board(".", ["test"])
