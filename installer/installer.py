@@ -462,12 +462,19 @@ class Tui:
         self.log: list[str] = []
         self.events: queue.Queue[tuple[str, str]] = queue.Queue()
         self.install_thread: threading.Thread | None = None
+        self.validation_thread: threading.Thread | None = None
         self.current_phase = ""
         self.phase_started = 0.0
         self.spinner = 0
 
     def run(self, screen: curses.window) -> None:
         curses.curs_set(0); screen.keypad(True); screen.timeout(150)
+        if curses.has_colors():
+            curses.start_color()
+            curses.init_pair(1, curses.COLOR_GREEN, -1)
+            curses.init_pair(2, curses.COLOR_RED, -1)
+            curses.init_pair(3, curses.COLOR_YELLOW, -1)
+            curses.init_pair(4, curses.COLOR_CYAN, -1)
         self.board.load_host()
         while True:
             self.pump()
@@ -475,19 +482,20 @@ class Tui:
             self.draw(screen)
             try: key = screen.get_wch()
             except curses.error: continue
-            if self.install_thread and self.install_thread.is_alive():
+            if (self.install_thread and self.install_thread.is_alive()) or (self.validation_thread and self.validation_thread.is_alive()):
                 continue
             if key in ("q", "Q"): return
             if key in (curses.KEY_UP, "k"): self.row = max(0, self.row - 1)
             elif key in (curses.KEY_DOWN, "j"): self.row = min(len(CHECKS) - 1, self.row + 1)
-            elif key in ("v", "V"): self.board.check_all(); self.message = "all decisions validated" if self.board.ready else "some decisions need attention"
+            elif key in ("v", "V"): self.start_validation()
             elif key in ("r", "R"): self.start_install(screen)
             elif key in ("m", "M"): self.remount()
             elif key in ("\n", curses.KEY_ENTER, " "): self.edit(screen, CHECKS[self.row])
 
     def draw(self, screen: curses.window) -> None:
         screen.erase(); height, width = screen.getmaxyx(); running = self.install_thread and self.install_thread.is_alive()
-        ready = "INSTALLING" if running else ("READY" if self.board.ready else "INCOMPLETE")
+        validating = self.validation_thread and self.validation_thread.is_alive()
+        ready = "INSTALLING" if running else ("VERIFYING" if validating else ("READY" if self.board.ready else "INCOMPLETE"))
         progress = ""
         if running and self.current_phase:
             elapsed = int(time.monotonic() - self.phase_started)
@@ -496,14 +504,17 @@ class Tui:
         self.add(screen, 1, 0, "─" * max(1, width - 1))
         for index, name in enumerate(CHECKS):
             status = self.board.status[name]; prefix = ">" if index == self.row else " "
-            self.add(screen, index + 2, 0, f"{prefix} {status.glyph} {name:<14} {status.summary}", curses.A_REVERSE if index == self.row else 0)
+            style = self.status_style(status)
+            if index == self.row:
+                style |= curses.A_REVERSE
+            self.add(screen, index + 2, 0, f"{prefix} {status.glyph} {name:<14} {status.summary}", style)
         detail_y = len(CHECKS) + 3
         if detail_y < height - 3:
             selected = CHECKS[self.row]
             detail = "\n".join(self.log[-max(1, height - detail_y - 3):]) if self.install_thread else (self.board.profile.to_nix() if selected == "layout" and self.board.profile else self.board.status[selected].summary)
             self.add(screen, detail_y, 0, "─" * max(1, width - 1))
             for index, line in enumerate(detail.splitlines()[:height - detail_y - 3]): self.add(screen, detail_y + 1 + index, 0, line)
-        help_text = "installing — live output below" if self.install_thread and self.install_thread.is_alive() else "j/k move  Enter select/edit  v validate all  m mount existing  r install  q quit"
+        help_text = "installing — live output below" if running else ("verifying — checking each decision" if validating else "j/k move  Enter select/edit  v validate all  m mount existing  r install  q quit")
         self.add(screen, height - 2, 0, help_text)
         screen.refresh()
 
@@ -511,6 +522,17 @@ class Tui:
     def add(screen: curses.window, y: int, x: int, text: str, style: int = 0) -> None:
         try: screen.addnstr(y, x, text, max(0, screen.getmaxyx()[1] - x - 1), style)
         except curses.error: pass
+
+    @staticmethod
+    def status_style(status: Status) -> int:
+        if not curses.has_colors():
+            return curses.A_BOLD if status.kind == "ok" else curses.A_NORMAL
+        return {
+            "ok": curses.color_pair(1) | curses.A_BOLD,
+            "failed": curses.color_pair(2) | curses.A_BOLD,
+            "pending": curses.color_pair(3),
+            "na": curses.A_DIM,
+        }[status.kind]
 
     def prompt(self, screen: curses.window, label: str, secret: bool = False, initial: str = "") -> str | None:
         height, width = screen.getmaxyx(); value = list(initial); curses.curs_set(1); screen.timeout(-1)
@@ -552,7 +574,7 @@ class Tui:
         elif name == "root password": self.set_secret(screen, "root_password", "root password"); self.board.check(name)
         elif name == "age key": self.set_secret(screen, "age_passphrase", "age key passphrase"); self.board.check(name)
         elif name == "sizes" and self.board.profile: self.edit_sizes(screen)
-        else: self.board.check(name)
+        else: self.start_validation((name,))
 
     def set_secret(self, screen: curses.window, attribute: str, label: str) -> None:
         first = self.prompt(screen, label, True)
@@ -606,6 +628,18 @@ class Tui:
         self.install_thread = threading.Thread(target=install, daemon=True)
         self.install_thread.start()
 
+    def start_validation(self, checks: tuple[str, ...] = CHECKS) -> None:
+        """Validate decisions without freezing the dashboard."""
+        self.message = f"checking {checks[0]}..."
+        def validate() -> None:
+            for name in checks:
+                self.events.put(("checking", name))
+                self.board.check(name)
+                self.events.put(("checked", name))
+            self.events.put(("validation-done", ""))
+        self.validation_thread = threading.Thread(target=validate, daemon=True)
+        self.validation_thread.start()
+
     def pump(self) -> None:
         """Move worker events onto the screen-owning thread."""
         while True:
@@ -617,6 +651,9 @@ class Tui:
                     self.current_phase = value.removeprefix("== ").split(" (", 1)[0]
                     self.phase_started = time.monotonic()
             elif kind == "done": self.current_phase = "complete"; self.message = value
+            elif kind == "checking": self.message = f"checking {value}..."
+            elif kind == "checked": self.message = f"{value}: {self.board.status[value].summary}"
+            elif kind == "validation-done": self.message = "all decisions verified" if self.board.ready else "some decisions need attention"
             else: self.current_phase = "failed"; self.message = f"install failed: {value}"; self.log.append(value)
 
 
