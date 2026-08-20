@@ -353,13 +353,24 @@ in
   # still matches.
   networking.hosts.${adm.address} = peers.serviceNames;
 
-  # Private git remotes on hydrogen (modules/git-server.nix). Its own alias rather than
-  # `Host hydrogen`, so `User git` cannot capture an admin ssh to the same address.
+  # Stable SSH destinations: the laptops' LAN leases change, but their family-tunnel
+  # addresses do not. Hydrogen forwards only sulfur's TCP/22 traffic to these peers.
   programs.ssh.extraConfig = ''
+    Host hydrogen
+      HostName ${adm.address}
+      User sheath
+
+    Host router nixrouter
+      HostName ${rtr.address}
+
     Host hydrogen-git
       HostName ${adm.address}
       User git
-  '';
+  '' + lib.concatStrings (lib.mapAttrsToList (name: peer: ''
+    Host ${name}
+      HostName ${peer.address}
+      User sheath
+  '') peers.family);
 
 
   system.stateVersion = "25.11";
