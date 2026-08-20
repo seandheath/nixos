@@ -137,6 +137,11 @@ def nix(repo: Path, args: list[str], what: str) -> str:
     return command(["nix", "--extra-experimental-features", "nix-command flakes", *args], what)
 
 
+def local_flake(repo: Path, host: str) -> str:
+    """Keep generated, intentionally untracked provisioning files in the flake source."""
+    return f"path:{repo}#{host}"
+
+
 def hosts(repo: Path) -> list[str]:
     text = nix(repo, ["eval", "--raw", f"{repo}#nixosConfigurations", "--apply", 'c: builtins.concatStringsSep "\\n" (builtins.attrNames c)'], "listing hosts")
     return [host for host in text.splitlines() if host]
@@ -319,7 +324,7 @@ class Board:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(self.profile.to_nix())
         (self.provisioning_dir / "default.nix").write_text(provisioning_module())
-        nix(self.repo, ["build", "--no-link", "--print-out-paths", f"path:{self.repo}#nixosConfigurations.{self.host}.config.system.build.diskoScript"], "building the partitioning script")
+        nix(self.repo, ["build", "--no-link", "--print-out-paths", f"{local_flake(self.repo, self.host)}.config.system.build.diskoScript"], "building the partitioning script")
         return Status("ok", "disko accepts the layout")
 
     @property
@@ -407,15 +412,20 @@ def run_install(board: Board, log: Callable[[str], None]) -> None:
                 TARGET / "etc/ssh/ssh_host_rsa_key",
             )
             return key.is_file() and key.stat().st_size > 0 and all(path.is_file() for path in host_keys)
-        if name == "install": return (TARGET / "nix/var/nix/profiles/system").is_symlink()
+        if name == "install":
+            # Version this completion marker. Earlier installers resolved the target as a
+            # Git flake, which omitted untracked local provisioning facts and produced an
+            # unbootable placeholder filesystem. Reinstall that generation exactly once.
+            return (TARGET / "nix/var/nix/profiles/system").is_symlink() and marked("install-local-provisioning")
         return False
     def phase(name: str, action: Callable[[], None]) -> None:
         if done(name): log(f"== {name} (already complete)"); return
         log(f"== {name}"); action(); mark(name)
+        if name == "install": mark("install-local-provisioning")
     def partition() -> None:
         if context.luks_passphrase:
             SCRATCH.mkdir(mode=0o700, exist_ok=True); key = SCRATCH / "luks.key"; key.write_text(context.luks_passphrase); key.chmod(0o600)
-        try: stream([context.disko, "--mode", "destroy,format,mount", "--yes-wipe-all-disks", "--flake", f"{context.repo}#{context.host}"], "disko", log)
+        try: stream([context.disko, "--mode", "destroy,format,mount", "--yes-wipe-all-disks", "--flake", local_flake(context.repo, context.host)], "disko", log)
         finally: (SCRATCH / "luks.key").unlink(missing_ok=True)
     def hardware() -> None:
         dest = TARGET / "persist/nixos-install/hardware.nix"
@@ -461,7 +471,7 @@ def run_install(board: Board, log: Callable[[str], None]) -> None:
             password = TARGET / "persist/secrets/root-password"; password.parent.mkdir(parents=True, exist_ok=True); password.parent.chmod(0o700)
             if not password.exists(): password.write_text(command(["mkpasswd", "-m", "sha-512", "--stdin"], "hashing root password", input_text=context.root_password).rstrip() + "\n"); password.chmod(0o600)
     phase("partition", partition); phase("hardware", hardware); phase("config", config); phase("secrets", secrets)
-    phase("install", lambda: stream(["nixos-install", "--root", str(TARGET), "--no-root-passwd", "--flake", f"{TARGET}/home/sheath/nixos#{context.host}"], "nixos-install", log))
+    phase("install", lambda: stream(["nixos-install", "--root", str(TARGET), "--no-root-passwd", "--flake", local_flake(TARGET / "home/sheath/nixos", context.host)], "nixos-install", log))
     def finalize() -> None:
         try:
             stream(["nixos-enter", "--root", str(TARGET), "-c", "chown -R sheath:sheath /home/sheath"], "fixing ownership", log)
@@ -481,6 +491,7 @@ class Tui:
         self.phase_started = 0.0
         self.spinner = 0
         self.colors = False
+        self.completed = False
 
     def run(self, screen: curses.window) -> None:
         curses.curs_set(0); screen.keypad(True); screen.timeout(150)
@@ -503,6 +514,8 @@ class Tui:
             except curses.error: continue
             if (self.install_thread and self.install_thread.is_alive()) or (self.validation_thread and self.validation_thread.is_alive()):
                 continue
+            if self.completed and key in ("q", "Q", "\n", curses.KEY_ENTER, " "):
+                return
             if key in ("q", "Q"): return
             if key in (curses.KEY_UP, "k"): self.row = max(0, self.row - 1)
             elif key in (curses.KEY_DOWN, "j"): self.row = min(len(CHECKS) - 1, self.row + 1)
@@ -514,7 +527,7 @@ class Tui:
     def draw(self, screen: curses.window) -> None:
         screen.erase(); height, width = screen.getmaxyx(); running = self.install_thread and self.install_thread.is_alive()
         validating = self.validation_thread and self.validation_thread.is_alive()
-        ready = "INSTALLING" if running else ("VERIFYING" if validating else ("READY" if self.board.ready else "INCOMPLETE"))
+        ready = "INSTALLING" if running else ("VERIFYING" if validating else ("COMPLETE" if self.completed else ("READY" if self.board.ready else "INCOMPLETE")))
         progress = ""
         if running and self.current_phase:
             elapsed = int(time.monotonic() - self.phase_started)
@@ -533,7 +546,7 @@ class Tui:
             detail = "\n".join(self.log[-max(1, height - detail_y - 3):]) if self.install_thread else (self.board.profile.to_nix() if selected == "layout" and self.board.profile else self.board.status[selected].summary)
             self.add(screen, detail_y, 0, "─" * max(1, width - 1))
             for index, line in enumerate(detail.splitlines()[:height - detail_y - 3]): self.add(screen, detail_y + 1 + index, 0, line)
-        help_text = "installing — live output below" if running else ("verifying — checking each decision" if validating else "j/k move  Enter select/edit  v validate all  m mount existing  r install  q quit")
+        help_text = "installation complete — remove the install media, reboot, then press Enter or q to exit" if self.completed else ("installing — live output below" if running else ("verifying — checking each decision" if validating else "j/k move  Enter select/edit  v validate all  m mount existing  r install  q quit"))
         self.add(screen, height - 2, 0, help_text)
         screen.refresh()
 
@@ -628,7 +641,7 @@ class Tui:
     def remount(self) -> None:
         if not self.board.disko: self.board.check("disko")
         if self.board.disko:
-            try: command([self.board.disko, "--mode", "mount", "--flake", f"{self.board.repo}#{self.board.host}"], "mounting target"); self.message = "target mounted"
+            try: command([self.board.disko, "--mode", "mount", "--flake", local_flake(self.board.repo, self.board.host)], "mounting target"); self.message = "target mounted"
             except RuntimeError as error: self.message = str(error)
 
     def start_install(self, screen: curses.window) -> None:
@@ -668,7 +681,7 @@ class Tui:
                 if value.startswith("== "):
                     self.current_phase = value.removeprefix("== ").split(" (", 1)[0]
                     self.phase_started = time.monotonic()
-            elif kind == "done": self.current_phase = "complete"; self.message = value
+            elif kind == "done": self.current_phase = "complete"; self.completed = True; self.message = value
             elif kind == "checking": self.message = f"checking {value}..."
             elif kind == "checked": self.message = f"{value}: {self.board.status[value].summary}"
             elif kind == "validation-done": self.message = "all decisions verified" if self.board.ready else "some decisions need attention"

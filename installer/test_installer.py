@@ -4,7 +4,7 @@ import unittest
 import inspect
 from unittest.mock import patch
 
-from installer import Board, Profile, UNSET_DEVICE, facts, is_size, provisioning_module, shell_quote
+from installer import Board, Profile, UNSET_DEVICE, facts, is_size, local_flake, provisioning_module, shell_quote
 
 
 class ProfileTests(unittest.TestCase):
@@ -34,6 +34,9 @@ class ProfileTests(unittest.TestCase):
 
     def test_shell_quote_handles_single_quotes(self):
         self.assertEqual(shell_quote("a'b"), "'a'\\''b'")
+
+    def test_local_flake_keeps_untracked_provisioning_files(self):
+        self.assertEqual(local_flake("/mnt/home/sheath/nixos", "test"), "path:/mnt/home/sheath/nixos#test")
 
     def test_encryption_moves_together_and_clears_secret(self):
         board = Board(".", ["test"])
@@ -72,6 +75,11 @@ class ProfileTests(unittest.TestCase):
 
         self.assertIn("--no-root-passwd", inspect.getsource(run_install))
 
+    def test_install_completion_is_versioned_for_local_provisioning(self):
+        from installer import run_install
+
+        self.assertIn('marked("install-local-provisioning")', inspect.getsource(run_install))
+
     def test_install_seeds_ssh_keys_before_nixos_activation(self):
         from installer import run_install
 
@@ -83,6 +91,15 @@ class ProfileTests(unittest.TestCase):
         from installer import run_install
 
         self.assertIn("all(path.is_file() for path in host_keys)", inspect.getsource(run_install))
+
+    def test_completed_install_shows_completion_state(self):
+        from installer import Tui
+
+        tui = Tui(Board(".", ["test"]))
+        tui.events.put(("done", "installed"))
+        tui.pump()
+        self.assertTrue(tui.completed)
+        self.assertEqual(tui.current_phase, "complete")
 
 
 if __name__ == "__main__":
