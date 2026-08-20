@@ -149,9 +149,9 @@ def nix(repo: Path, args: list[str], what: str) -> str:
     return command(["nix", "--extra-experimental-features", "nix-command flakes", *args], what)
 
 
-def local_flake(repo: Path, host: str) -> str:
+def local_flake(repo: Path) -> str:
     """Keep generated, intentionally untracked provisioning files in the flake source."""
-    return f"path:{repo}#{host}"
+    return f"path:{repo}"
 
 
 def hosts(repo: Path) -> list[str]:
@@ -336,7 +336,7 @@ class Board:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(self.profile.to_nix())
         (self.provisioning_dir / "default.nix").write_text(provisioning_module())
-        nix(self.repo, ["build", "--no-link", "--print-out-paths", f"{local_flake(self.repo, self.host)}.config.system.build.diskoScript"], "building the partitioning script")
+        nix(self.repo, ["build", "--no-link", "--print-out-paths", f"{local_flake(self.repo)}#nixosConfigurations.{self.host}.config.system.build.diskoScript"], "building the partitioning script")
         return Status("ok", "disko accepts the layout")
 
     @property
@@ -437,7 +437,7 @@ def run_install(board: Board, log: Callable[[str], None]) -> None:
     def partition() -> None:
         if context.luks_passphrase:
             SCRATCH.mkdir(mode=0o700, exist_ok=True); key = SCRATCH / "luks.key"; key.write_text(context.luks_passphrase); key.chmod(0o600)
-        try: stream([context.disko, "--mode", "destroy,format,mount", "--yes-wipe-all-disks", "--flake", local_flake(context.repo, context.host)], "disko", log)
+        try: stream([context.disko, "--mode", "destroy,format,mount", "--yes-wipe-all-disks", "--flake", f"{local_flake(context.repo)}#{context.host}"], "disko", log)
         finally: (SCRATCH / "luks.key").unlink(missing_ok=True)
     def hardware() -> None:
         dest = TARGET / "persist/nixos-install/hardware.nix"
@@ -483,7 +483,7 @@ def run_install(board: Board, log: Callable[[str], None]) -> None:
             password = TARGET / "persist/secrets/root-password"; password.parent.mkdir(parents=True, exist_ok=True); password.parent.chmod(0o700)
             if not password.exists(): password.write_text(command(["mkpasswd", "-m", "sha-512", "--stdin"], "hashing root password", input_text=context.root_password).rstrip() + "\n"); password.chmod(0o600)
     phase("partition", partition); phase("hardware", hardware); phase("config", config); phase("secrets", secrets)
-    phase("install", lambda: stream(["nixos-install", "--root", str(TARGET), "--no-root-passwd", "--flake", local_flake(TARGET / "home/sheath/nixos", context.host)], "nixos-install", log))
+    phase("install", lambda: stream(["nixos-install", "--root", str(TARGET), "--no-root-passwd", "--flake", f"{local_flake(TARGET / 'home/sheath/nixos')}#{context.host}"], "nixos-install", log))
     def finalize() -> None:
         try:
             stream(["nixos-enter", "--root", str(TARGET), "-c", "chown -R sheath:sheath /home/sheath"], "fixing ownership", log)
@@ -653,7 +653,7 @@ class Tui:
     def remount(self) -> None:
         if not self.board.disko: self.board.check("disko")
         if self.board.disko:
-            try: command([self.board.disko, "--mode", "mount", "--flake", local_flake(self.board.repo, self.board.host)], "mounting target"); self.message = "target mounted"
+            try: command([self.board.disko, "--mode", "mount", "--flake", f"{local_flake(self.board.repo)}#{self.board.host}"], "mounting target"); self.message = "target mounted"
             except RuntimeError as error: self.message = str(error)
 
     def start_install(self, screen: curses.window) -> None:

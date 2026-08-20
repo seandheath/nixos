@@ -37,7 +37,7 @@ class ProfileTests(unittest.TestCase):
         self.assertEqual(shell_quote("a'b"), "'a'\\''b'")
 
     def test_local_flake_keeps_untracked_provisioning_files(self):
-        self.assertEqual(local_flake("/mnt/home/sheath/nixos", "test"), "path:/mnt/home/sheath/nixos#test")
+        self.assertEqual(local_flake("/mnt/home/sheath/nixos"), "path:/mnt/home/sheath/nixos")
 
     def test_root_child_environment_uses_root_home(self):
         with patch("installer.os.geteuid", return_value=0), patch("installer.pwd.getpwuid", return_value=SimpleNamespace(pw_dir="/root")), patch.dict("installer.os.environ", {"HOME": "/home/nixos", "XDG_CACHE_HOME": "/home/nixos/.cache"}, clear=True):
