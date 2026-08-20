@@ -72,6 +72,13 @@ class ProfileTests(unittest.TestCase):
 
         self.assertIn("--no-root-passwd", inspect.getsource(run_install))
 
+    def test_install_seeds_ssh_keys_before_nixos_activation(self):
+        from installer import run_install
+
+        source = inspect.getsource(run_install)
+        self.assertIn('TARGET / "etc/ssh"', source)
+        self.assertIn("ssh-keygen", source)
+
 
 if __name__ == "__main__":
     unittest.main()

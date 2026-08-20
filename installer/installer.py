@@ -434,14 +434,25 @@ def run_install(board: Board, log: Callable[[str], None]) -> None:
             shutil.copyfile(persistent / name, provision / name)
     def secrets() -> None:
         destination = TARGET / context.facts.age_key_file.lstrip("/"); destination.parent.mkdir(parents=True, exist_ok=True); age_decrypt(context.repo / context.facts.age_key_source, destination, context.age_passphrase); destination.chmod(0o600)
-        if context.facts.persist_ssh:
-            ssh_dir = TARGET / "persist/etc/ssh"; ssh_dir.mkdir(parents=True, exist_ok=True)
-            for kind, name in (("ed25519", "ssh_host_ed25519_key"), ("rsa", "ssh_host_rsa_key")):
+        ssh_dir = TARGET / "etc/ssh"
+        persistent_ssh_dir = TARGET / "persist/etc/ssh"
+        key_specs = (("ed25519", "ssh_host_ed25519_key"), ("rsa", "ssh_host_rsa_key"))
+        if context.facts.persist_ssh and all((persistent_ssh_dir / name).is_file() for _, name in key_specs):
+            ssh_dir.mkdir(parents=True, exist_ok=True)
+            for _, name in key_specs:
+                shutil.copy2(persistent_ssh_dir / name, ssh_dir / name)
+        else:
+            ssh_dir.mkdir(parents=True, exist_ok=True)
+            for kind, name in key_specs:
                 key = ssh_dir / name
                 if not key.exists():
                     args = ["ssh-keygen", "-t", kind, "-f", str(key), "-N", ""]
                     if kind == "rsa": args[3:3] = ["-b", "4096"]
                     stream(args, "ssh-keygen", log)
+            if context.facts.persist_ssh:
+                persistent_ssh_dir.mkdir(parents=True, exist_ok=True)
+                for _, name in key_specs:
+                    shutil.copy2(ssh_dir / name, persistent_ssh_dir / name)
         if context.facts.root_password == "persist":
             password = TARGET / "persist/secrets/root-password"; password.parent.mkdir(parents=True, exist_ok=True); password.parent.chmod(0o700)
             if not password.exists(): password.write_text(command(["mkpasswd", "-m", "sha-512", "--stdin"], "hashing root password", input_text=context.root_password).rstrip() + "\n"); password.chmod(0o600)
