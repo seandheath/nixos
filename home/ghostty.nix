@@ -6,6 +6,9 @@
     settings = {
       font-family = "Inconsolata";
       background = "000000";
+      # Keep the Wayland primary selection populated for traditional select-to-copy /
+      # middle-click paste, while also making the selection available to Ctrl+V.
+      copy-on-select = "clipboard";
       # GNOME's 1.25 text-scaling-factor is applied by VTE but not by Ghostty, so the
       # point size is pre-scaled to render at the size Ptyxis did.
       font-size = 14;
