@@ -466,15 +466,20 @@ class Tui:
         self.current_phase = ""
         self.phase_started = 0.0
         self.spinner = 0
+        self.colors = False
 
     def run(self, screen: curses.window) -> None:
         curses.curs_set(0); screen.keypad(True); screen.timeout(150)
         if curses.has_colors():
-            curses.start_color()
-            curses.init_pair(1, curses.COLOR_GREEN, -1)
-            curses.init_pair(2, curses.COLOR_RED, -1)
-            curses.init_pair(3, curses.COLOR_YELLOW, -1)
-            curses.init_pair(4, curses.COLOR_CYAN, -1)
+            try:
+                curses.start_color()
+                curses.use_default_colors()
+                curses.init_pair(1, curses.COLOR_GREEN, -1)
+                curses.init_pair(2, curses.COLOR_RED, -1)
+                curses.init_pair(3, curses.COLOR_YELLOW, -1)
+                self.colors = True
+            except curses.error:
+                self.colors = False
         self.board.load_host()
         while True:
             self.pump()
@@ -523,9 +528,8 @@ class Tui:
         try: screen.addnstr(y, x, text, max(0, screen.getmaxyx()[1] - x - 1), style)
         except curses.error: pass
 
-    @staticmethod
-    def status_style(status: Status) -> int:
-        if not curses.has_colors():
+    def status_style(self, status: Status) -> int:
+        if not self.colors:
             return curses.A_BOLD if status.kind == "ok" else curses.A_NORMAL
         return {
             "ok": curses.color_pair(1) | curses.A_BOLD,
