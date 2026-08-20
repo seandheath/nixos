@@ -397,8 +397,9 @@ def run_install(board: Board, log: Callable[[str], None]) -> None:
             path = TARGET / "persist/nixos-install/hardware.nix"
             return path.is_file() and path.stat().st_size > 0
         if name == "config":
-            source, copy = context.provisioning_dir / "disk.nix", TARGET / "home/sheath/nixos" / "provisioning" / context.host / "disk.nix"
-            return (TARGET / "home/sheath/nixos/flake.nix").is_file() and source.is_file() and copy.is_file() and source.read_bytes() == copy.read_bytes()
+            # Always refresh the target checkout on resume: a failed installation is often
+            # retried after pulling a configuration fix, and this phase is idempotent.
+            return False
         if name == "secrets":
             key = TARGET / context.facts.age_key_file.lstrip("/")
             return key.is_file() and key.stat().st_size > 0
