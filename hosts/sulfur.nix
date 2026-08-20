@@ -359,6 +359,8 @@ in
     Host hydrogen
       HostName ${adm.address}
       User sheath
+      IdentityFile /home/sheath/.ssh/personal
+      IdentitiesOnly yes
 
     Host router nixrouter
       HostName ${rtr.address}
@@ -370,6 +372,8 @@ in
     Host ${name}
       HostName ${peer.address}
       User sheath
+      IdentityFile /home/sheath/.ssh/personal
+      IdentitiesOnly yes
   '') peers.family);
 
 
