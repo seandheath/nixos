@@ -4,6 +4,9 @@
   # behind a forced command; see modules/minecraft-servers.nix.
   hydrogenHost ? "mc.luckyobserver.com"
 , hydrogenUser ? "mcctl"
+, defaultPlayer ? ""
+, defaultServer ? ""
+, controlKeyFile ? ""
 }:
 
 # The pre-launcher for machines that are not the couch: choose a player, choose a server,
@@ -51,6 +54,9 @@ pkgs.writers.writePython3Bin "minecraft-launcher"
     SSH = "${pkgs.openssh}/bin/ssh"
     HYDROGEN_HOST = "${hydrogenHost}"
     HYDROGEN_USER = "${hydrogenUser}"
+    DEFAULT_PLAYER = ${builtins.toJSON defaultPlayer}
+    DEFAULT_SERVER = ${builtins.toJSON defaultServer}
+    CONTROL_KEY = ${builtins.toJSON controlKeyFile}
 
     STATE = os.path.join(
         os.environ.get("XDG_DATA_HOME", os.path.expanduser("~/.local/share")),
@@ -72,7 +78,45 @@ pkgs.writers.writePython3Bin "minecraft-launcher"
 
     def load():
         data = load_json(STATE, {})
-        return data.get("players", []), data.get("servers", [])
+        players = data.get("players", [])
+        servers = data.get("servers", [])
+        # The ordinary Minecraft icon already has a configured identity. Make that same
+        # player available here automatically; the launcher roster is only for additional
+        # players, not a second setup step for the machine's owner.
+        if DEFAULT_PLAYER and DEFAULT_PLAYER not in players:
+            players.insert(0, DEFAULT_PLAYER)
+        if DEFAULT_SERVER:
+            host, _, port_text = DEFAULT_SERVER.partition(":")
+            port = int(port_text) if port_text else 25565
+            known = any(
+                server.get("where") == REMOTE and server.get("host") == host and server.get("port", 25565) == port
+                for server in servers
+            )
+            if not known:
+                servers.insert(0, {
+                    "name": "Family world",
+                    "where": REMOTE,
+                    "host": host,
+                    "port": port,
+                })
+        # Hydrogen is the source of truth for shared worlds. Merge its real directories
+        # into the local cache so every laptop sees worlds created by every other laptop.
+        try:
+            for line in ctl_run(HYDROGEN, "worlds").splitlines():
+                name, state, port_text = (line.split("\t") + ["", ""])[:3]
+                if not name:
+                    continue
+                found = next((s for s in servers if s.get("where") == HYDROGEN and s.get("name") == name), None)
+                if found is None:
+                    found = {"name": name, "where": HYDROGEN, "port": None}
+                    servers.append(found)
+                if port_text:
+                    found["port"] = int(port_text)
+        except (RuntimeError, ValueError):
+            # Offline laptops can still use cached entries and local worlds.
+            pass
+        save(players, servers)
+        return players, servers
 
 
     def save(players, servers):
@@ -88,7 +132,7 @@ pkgs.writers.writePython3Bin "minecraft-launcher"
         forced command, so there is one implementation rather than two.
         """
         if where == HYDROGEN:
-            cmd = [SSH, "-o", "BatchMode=yes", "%s@%s" % (HYDROGEN_USER, HYDROGEN_HOST)] + list(args)
+            cmd = hydrogen_ssh() + list(args)
         else:
             cmd = [CTL] + list(args)
         done = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
@@ -100,10 +144,18 @@ pkgs.writers.writePython3Bin "minecraft-launcher"
     def ctl_spawn(where, *args):
         """Same, but non-blocking, so a progress screen can be drawn while it runs."""
         if where == HYDROGEN:
-            cmd = [SSH, "-o", "BatchMode=yes", "%s@%s" % (HYDROGEN_USER, HYDROGEN_HOST)] + list(args)
+            cmd = hydrogen_ssh() + list(args)
         else:
             cmd = [CTL] + list(args)
         return subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+
+    def hydrogen_ssh():
+        cmd = [SSH, "-o", "BatchMode=yes", "-o", "ConnectTimeout=10",
+               "-o", "StrictHostKeyChecking=accept-new"]
+        if CONTROL_KEY:
+            cmd += ["-o", "IdentitiesOnly=yes", "-i", CONTROL_KEY]
+        return cmd + ["%s@%s" % (HYDROGEN_USER, HYDROGEN_HOST)]
 
 
     def wait_with_progress(inp, server):
@@ -197,21 +249,25 @@ pkgs.writers.writePython3Bin "minecraft-launcher"
 
     def describe(server):
         where = server["where"]
+        if server["name"] == "Family world" and where == REMOTE:
+            return "%s   shared" % server["name"]
         if where == REMOTE:
             return "%s   %s:%s" % (server["name"], server["host"], server.get("port", 25565))
-        return "%s   %s" % (server["name"], WHERE_LABEL[where])
+        if where == HYDROGEN:
+            return "%s   shared" % server["name"]
+        return "%s   only this computer" % server["name"]
 
 
     def choose_server(inp, players, servers):
         while True:
-            options = [describe(s) for s in servers] + ["Add a server", "Remove a server", "Back"]
-            idx = menu(inp, "Which server?", options)
+            options = [describe(s) for s in servers] + ["Create a new world", "Forget a world", "Back"]
+            idx = menu(inp, "Which world?", options)
             if idx is None or options[idx] == "Back":
                 return None
-            if options[idx] == "Add a server":
+            if options[idx] == "Create a new world":
                 add_server(inp, players, servers)
                 continue
-            if options[idx] == "Remove a server":
+            if options[idx] == "Forget a world":
                 remove_server(inp, players, servers)
                 continue
             return servers[idx]
@@ -227,15 +283,15 @@ pkgs.writers.writePython3Bin "minecraft-launcher"
         if not name:
             return
 
-        where_idx = menu(inp, "Where should %s run?" % name, [
-            "On this machine",
-            "On hydrogen",
-            "Somewhere else -- just join it",
+        where_idx = menu(inp, "Who can play in %s?" % name, [
+            "Everyone -- shared on hydrogen",
+            "Only players on this computer",
+            "Join a world hosted somewhere else",
             "Back",
         ])
         if where_idx is None or where_idx == 3:
             return
-        where = [LOCAL, HYDROGEN, REMOTE][where_idx]
+        where = [HYDROGEN, LOCAL, REMOTE][where_idx]
 
         server = {"name": name, "where": where}
         if where == REMOTE:

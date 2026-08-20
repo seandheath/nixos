@@ -86,24 +86,28 @@ rec {
       publicKey = "gZrsl4Mv8jvv+Dp37RUqWCIT5Owi4C9YXLhsZAAXZmw=";
       secret = "wg-priv-gentlemenpupil";
       minecraftName = "GentlemenPupil";
+      minecraftControlPublicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINx5O4lDxrgv+vuUWV+egyuDgA9uZxHUxryaYgs47t4g minecraft-control-gentlemenpupil";
     };
     vizualwanderer = {
       address = "10.41.0.12";
       publicKey = "sHSgp24NhRsy7HW8gszTJKandRMw9mjjIBtdGsw+nAo=";
       secret = "wg-priv-vizualwanderer";
       minecraftName = "VizualWanderer";
+      minecraftControlPublicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICK5Z+OSkuNZnZkp5dXcCdHp2ZEkLOKJGbRM5juheISE minecraft-control-vizualwanderer";
     };
     phantomspecialst = {
       address = "10.41.0.13";
       publicKey = "kUX1m8dFnmIzPuXxKsVuqX3xuRWhNy9M1QpFeH3SYm0=";
       secret = "wg-priv-phantomspecialst";
       minecraftName = "PhantomSpecialst";
+      minecraftControlPublicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJ01Mzc22w/nGvjE3yLEBtZLmQnQU1+XJ6VsANnZn5mn minecraft-control-phantomspecialst";
     };
     maddreamer = {
       address = "10.41.0.14";
       publicKey = "3sp3RatkKmc8WVawl0G4HG9D53NiG+qQyYxq4DWbNFY=";
       secret = "wg-priv-maddreamer";
       minecraftName = "MadDreamer";
+      minecraftControlPublicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINTSY6wbOWuWg92tG5asAREtGwU4NyH+YIpz9fONdlEk minecraft-control-maddreamer";
     };
 
     # .3 and .4 are retired hosts, left unallocated rather than recycled -- a reused address

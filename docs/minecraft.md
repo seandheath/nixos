@@ -21,7 +21,7 @@
 | Play on the couch | Click **Minecraft (Couch)** in the GNOME app grid |
 | Play from sulfur | Click **Minecraft**, or run `minecraft-client` |
 | Choose a player and a world | Click **Minecraft (choose a world)**, or run `minecraft-launcher` |
-| Make a new world | In the launcher: *Add a server* → on this machine, or on hydrogen |
+| Make a new world | In the launcher: *Create a new world* → shared, or only this computer |
 | See the on-demand worlds | `minecraft-server-ctl list` |
 | Stop one | `minecraft-server-ctl stop <name>` |
 | Leave the game | `SUPER`+`SHIFT`+`Q` |
@@ -125,7 +125,16 @@ Each player gets a game directory holding only `options.txt`, `config/`, `screen
 
 Everything except the couch runs `minecraft-launcher` first: pick who is playing, pick
 which world, and it starts the world before starting the game. The plain **Minecraft**
-icon still quick-plays straight into the family server and is the faster way there.
+icon still quick-plays straight into the family server and is the faster way there. New
+worlds default to hydrogen and are shared; local-only is an explicit second choice.
+
+Every laptop has a dedicated `minecraft-control-<host>` private key encrypted in its SOPS
+file and materialized mode 0400 for its player. Hydrogen authorizes only the public half,
+behind the forced `minecraft-server-ctl-ssh` command, so the key grants no shell. The
+launcher asks hydrogen for `minecraft-server-ctl worlds` on startup; persistent world
+directories are authoritative, so all laptops see stopped worlds and worlds created by
+another player. If hydrogen is temporarily unreachable, the last cached list and local
+worlds remain usable.
 
 A world is one of three things:
 

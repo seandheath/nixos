@@ -1,5 +1,9 @@
 # hydrogen: the 24/7 server. Services, backups, and the couch Minecraft box.
-{ config, pkgs, lib, ... }: {
+{ config, pkgs, lib, ... }:
+let
+  peers = import ../modules/family/peers.nix;
+in
+{
   imports = [
     ../hardware/hydrogen.nix
     ../modules/gnome.nix
@@ -53,12 +57,13 @@
   # One writer only -- a second is a push race. see CHANGELOG 2026-08-19
   fleet.lockUpdate.enable = true;
 
-  # On-demand worlds alongside the shared one. authorizedKeys is empty until each laptop
-  # has its own control key in secrets/family.yaml; sheath drives it directly over wgadm
-  # in the meantime.
+  # On-demand worlds alongside the shared one. Each launcher has a dedicated SOPS-managed
+  # key; the public halves below are restricted to the forced Minecraft control command.
   fleet.minecraftServers = {
     enable = true;
-    authorizedKeys = [ ];
+    authorizedKeys =
+      [ "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILxJG3+Zq8fSH/PG8cL3g1WQikuWE7U9XZCRsaSE9DgN minecraft-control-sulfur" ]
+      ++ map (peer: peer.minecraftControlPublicKey) (builtins.attrValues peers.family);
   };
 
   services.familyValheim.enable = true;

@@ -29,6 +29,11 @@ in
 
   # The plain client icon still quick-plays into the family world; this one asks first.
   services.minecraftLauncher.enable = true;
+  services.minecraftLauncher.controlKeyFile = config.sops.secrets.minecraft-control-sulfur.path;
+  sops.secrets.minecraft-control-sulfur = {
+    owner = "sheath";
+    mode = "0400";
+  };
 
   fleet.bootGenerations = 20;
   # Not sops: the age key lives under /home, which is exactly what has not mounted when
@@ -282,7 +287,7 @@ in
 
     # Two peers on one interface: hydrogen and the router are peers of sulfur, not of each
     # other, so losing one costs nothing on the other. The endpoint is a bootstrap value --
-    # modules/family/wg-endpoint.nix rewrites it with `wg set` once the interface is up.
+    # wg-endpoint.nix rewrites it with `wg set` once the interface is up.
     "wireguard-peer.${adm.publicKey}" = {
       allowed-ips = "${adm.address}/32;${peers.hubs.fam.subnet};";
       endpoint = "${peers.lanEndpoint}:${toString adm.port}";
@@ -363,6 +368,17 @@ in
 
     Host router nixrouter
       HostName ${rtr.address}
+      User admin
+      IdentityFile /home/sheath/.ssh/personal
+      IdentitiesOnly yes
+      IPQoS none
+
+    Host router-lan
+      HostName ${rtr.lanAddress}
+      User admin
+      IdentityFile /home/sheath/.ssh/personal
+      IdentitiesOnly yes
+      IPQoS none
 
     Host hydrogen-git
       HostName ${adm.address}

@@ -13,6 +13,15 @@ let
     inherit pkgs;
     mcClient = config.services.minecraftClient.package;
     inherit (cfg) hydrogenHost;
+    controlKeyFile = if cfg.controlKeyFile == null then "" else cfg.controlKeyFile;
+    defaultPlayer =
+      if config.services.minecraftClient.playerName == null
+      then ""
+      else config.services.minecraftClient.playerName;
+    defaultServer =
+      if config.services.minecraftClient.server == null
+      then ""
+      else config.services.minecraftClient.server;
   };
 
   desktopItem = pkgs.makeDesktopItem {
@@ -52,6 +61,12 @@ in
       type = lib.types.bool;
       default = true;
       description = "Install a desktop entry. Wants a terminal, unlike the plain client.";
+    };
+
+    controlKeyFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = "SOPS-managed SSH private key used only for Minecraft world control on hydrogen.";
     };
   };
 

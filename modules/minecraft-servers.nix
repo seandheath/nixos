@@ -27,7 +27,7 @@ let
       set -- ''${SSH_ORIGINAL_COMMAND:-}
 
       case "''${1:-}" in
-        list | create | start | wait | stop | status | logs | remove) ;;
+        list | worlds | create | start | wait | stop | status | logs | remove) ;;
         *)
           echo "refused: this key may only run minecraft-server-ctl subcommands" >&2
           exit 1

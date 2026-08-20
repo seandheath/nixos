@@ -28,6 +28,7 @@ in
     ../sops.nix
     ../steam.nix
     ../minecraft-client.nix
+    ../minecraft-launcher.nix
     ./vpn-peer.nix
   ];
 
@@ -111,6 +112,15 @@ in
       enable = config.family.minecraft;
       playerName = self.minecraftName;
       server = "mc.luckyobserver.com:25565";
+    };
+
+    services.minecraftLauncher = {
+      enable = config.family.minecraft;
+      controlKeyFile = config.sops.secrets."minecraft-control-${username}".path;
+    };
+    sops.secrets."minecraft-control-${username}" = {
+      owner = username;
+      mode = "0400";
     };
 
     # System-wide rather than home-manager: the kids have no home-manager config. Builds

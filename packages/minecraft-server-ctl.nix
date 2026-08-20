@@ -97,6 +97,26 @@ pkgs.writeShellApplication {
       done
     }
 
+    cmd_worlds() {
+      # Directories, not containers, are authoritative: removing a container deliberately
+      # keeps its world, and it must remain discoverable from every launcher.
+      [ -d "$root" ] || return 0
+      for dir in "$root"/*; do
+        [ -d "$dir" ] || continue
+        local n st port
+        n="''${dir##*/}"
+        check_name "$n"
+        if podman container exists "$(ctr "$n")"; then
+          st="$(podman inspect --format '{{.State.Status}}' "$(ctr "$n")")"
+          port="$(port_of "$n")"
+        else
+          st=absent
+          port=
+        fi
+        printf '%s\t%s\t%s\n' "$n" "$st" "$port"
+      done
+    }
+
     cmd_create() {
       local name="$1" port="''${2:-}"
       check_name "$name"
@@ -225,6 +245,7 @@ pkgs.writeShellApplication {
     usage: minecraft-server-ctl SUBCOMMAND [ARGS]
 
       list                     name, state and port of every server, tab separated
+      worlds                   every persistent world, including ones without a container
       create NAME [PORT]       create and start; prints the port
       start NAME               start an existing one; prints the port
       wait NAME [TIMEOUT]      block until the server answers RCON
@@ -241,6 +262,7 @@ pkgs.writeShellApplication {
     if [ $# -gt 0 ]; then shift; fi
     case "$sub" in
       list)   cmd_list ;;
+      worlds) cmd_worlds ;;
       create) cmd_create "''${1:-}" "''${2:-}" ;;
       start)  cmd_start "''${1:-}" ;;
       wait)   cmd_wait "''${1:-}" "''${2:-300}" ;;
