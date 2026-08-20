@@ -513,23 +513,29 @@ class Tui:
         except curses.error: pass
 
     def prompt(self, screen: curses.window, label: str, secret: bool = False, initial: str = "") -> str | None:
-        height, width = screen.getmaxyx(); value = list(initial); curses.curs_set(1)
-        while True:
-            self.add(screen, height - 1, 0, " " * (width - 1)); shown = "*" * len(value) if secret else "".join(value)
-            self.add(screen, height - 1, 0, f"{label}: {shown}"); screen.refresh(); key = screen.get_wch()
-            if key == "\x1b": curses.curs_set(0); return None
-            if key in ("\n", curses.KEY_ENTER): curses.curs_set(0); return "".join(value)
-            if key in (curses.KEY_BACKSPACE, "\b", "\x7f"): value.pop()
-            elif isinstance(key, str) and key.isprintable(): value.append(key)
+        height, width = screen.getmaxyx(); value = list(initial); curses.curs_set(1); screen.timeout(-1)
+        try:
+            while True:
+                self.add(screen, height - 1, 0, " " * (width - 1)); shown = "*" * len(value) if secret else "".join(value)
+                self.add(screen, height - 1, 0, f"{label}: {shown}"); screen.refresh(); key = screen.get_wch()
+                if key == "\x1b": return None
+                if key in ("\n", curses.KEY_ENTER): return "".join(value)
+                if key in (curses.KEY_BACKSPACE, "\b", "\x7f"): value.pop()
+                elif isinstance(key, str) and key.isprintable(): value.append(key)
+        finally:
+            curses.curs_set(0); screen.timeout(150)
 
     def choose(self, screen: curses.window, label: str, options: list[str]) -> int | None:
-        index = 0
-        while True:
-            height, _ = screen.getmaxyx(); self.add(screen, height - 3, 0, f"{label}: " + "  ".join((f"[{value}]" if i == index else value) for i, value in enumerate(options))); screen.refresh(); key = screen.get_wch()
-            if key == "\x1b": return None
-            if key in ("\n", curses.KEY_ENTER): return index
-            if key in (curses.KEY_LEFT, "h"): index = (index - 1) % len(options)
-            if key in (curses.KEY_RIGHT, "l"): index = (index + 1) % len(options)
+        index = 0; screen.timeout(-1)
+        try:
+            while True:
+                height, _ = screen.getmaxyx(); self.add(screen, height - 3, 0, f"{label}: " + "  ".join((f"[{value}]" if i == index else value) for i, value in enumerate(options))); screen.refresh(); key = screen.get_wch()
+                if key == "\x1b": return None
+                if key in ("\n", curses.KEY_ENTER): return index
+                if key in (curses.KEY_LEFT, "h"): index = (index - 1) % len(options)
+                if key in (curses.KEY_RIGHT, "l"): index = (index + 1) % len(options)
+        finally:
+            screen.timeout(150)
 
     def edit(self, screen: curses.window, name: str) -> None:
         if name == "host":
