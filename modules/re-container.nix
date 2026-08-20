@@ -67,11 +67,15 @@ let
     qwen_context="$(readlink -f "$HOME/.qwen/QWEN.md" 2>/dev/null || true)"
     oc_config="$(readlink -f "$HOME/.config/opencode/opencode.json" 2>/dev/null || true)"
     oc_prompt="$(readlink -f "$HOME/.config/opencode/re-instructions.md" 2>/dev/null || true)"
+    oc_datasheet_skill_file="$(readlink -f "$HOME/.config/opencode/skills/datasheet-reference/SKILL.md" 2>/dev/null || true)"
+    oc_datasheet_skill=""
+    [[ -f "$oc_datasheet_skill_file" ]] && oc_datasheet_skill="$(dirname "$oc_datasheet_skill_file")"
 
     [[ -f "$qwen_settings" ]] && config_args+=(-v "$qwen_settings:/run/config/qwen/settings.json:ro")
     [[ -f "$qwen_context"  ]] && config_args+=(-v "$qwen_context:/run/config/qwen/QWEN.md:ro")
     [[ -f "$oc_config"     ]] && config_args+=(-v "$oc_config:/home/re/.config/opencode/opencode.json:ro")
     [[ -f "$oc_prompt"     ]] && config_args+=(-v "$oc_prompt:$HOME/.config/opencode/re-instructions.md:ro")
+    [[ -d "$oc_datasheet_skill" ]] && config_args+=(-v "$oc_datasheet_skill:/home/re/.config/opencode/skills/datasheet-reference:ro")
 
     # Endpoint secrets, sourced from the sops-rendered .env and passed through as env vars.
     env_args=()

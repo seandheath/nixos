@@ -7,13 +7,22 @@ in
 # (modules/vllm-endpoint.nix) and Ghidra's ReVa MCP server (packages/ghidra-reva.nix).
 # Imported from workstation.nix, which is the host gate -- hydrogen never evaluates this.
 {
-  environment.systemPackages = [ pkgs.opencode ];
+  environment.systemPackages = [ pkgs.opencode pkgs.reference-download ];
+  environment.variables.OPENCODE_ENABLE_EXA = "1";
 
   # prompts/re-agent.md is the canonical copy, shared with qwen-code.nix; keep it
   # client-neutral, since the two name the shell tool differently. NOT called AGENTS.md:
   # OpenCode auto-loads that into every session, where this prose is noise.
   home-manager.users.sheath.xdg.configFile."opencode/re-instructions.md" = {
     source = ../prompts/re-agent.md;
+    force = true;
+  };
+
+  # Available to the host OpenCode. The container launcher mounts this same resolved tree,
+  # so both clients use one canonical copy and load it only when the workflow is relevant.
+  home-manager.users.sheath.xdg.configFile."opencode/skills/datasheet-reference" = {
+    source = ../skills/datasheet-reference;
+    recursive = true;
     force = true;
   };
 
@@ -82,8 +91,12 @@ in
           # the command forms in that prompt.
           permission.bash = {
             "python3 -c *" = "allow";
+            "reference-download *" = "allow";
             "*" = "ask";
           };
+          permission.skill."datasheet-reference" = "allow";
+          permission.webfetch = "allow";
+          permission.websearch = "allow";
         };
       };
     };

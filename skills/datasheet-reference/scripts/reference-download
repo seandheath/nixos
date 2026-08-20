@@ -1,0 +1,92 @@
+set -euo pipefail
+
+usage() {
+  echo "usage: reference-download <https-url> <destination.pdf>" >&2
+  exit 2
+}
+
+[[ $# -eq 2 ]] || usage
+url=$1
+destination=$2
+
+[[ $url == https://* ]] || {
+  echo "reference-download: only https URLs are accepted" >&2
+  exit 2
+}
+
+[[ $destination == *.pdf ]] || {
+  echo "reference-download: destination must end in .pdf" >&2
+  exit 2
+}
+
+case $destination in
+  /*) ;;
+  *) destination="$PWD/$destination" ;;
+esac
+
+destination=$(realpath --canonicalize-missing -- "$destination")
+workspace=$(realpath -- "$PWD")
+case $destination in
+  "$workspace"/*) ;;
+  *)
+    echo "reference-download: destination must be inside the current workspace" >&2
+    exit 2
+    ;;
+esac
+
+[[ ! -e $destination ]] || {
+  echo "reference-download: refusing to overwrite $destination" >&2
+  exit 1
+}
+
+directory=$(dirname -- "$destination")
+[[ -d $directory ]] || {
+  echo "reference-download: destination directory does not exist: $directory" >&2
+  exit 1
+}
+
+temporary=$(mktemp --tmpdir="$directory" .reference-download.XXXXXX)
+final_url_file=$(mktemp --tmpdir=/tmp reference-download-url.XXXXXX)
+trap 'rm -f -- "$temporary" "$final_url_file"' EXIT
+
+curl \
+  --fail-with-body \
+  --location \
+  --proto '=https' \
+  --proto-redir '=https' \
+  --connect-timeout 15 \
+  --max-time 300 \
+  --max-filesize 209715200 \
+  --retry 2 \
+  --retry-all-errors \
+  --output "$temporary" \
+  --silent \
+  --show-error \
+  --write-out '%{url_effective}\n' \
+  "$url" >"$final_url_file"
+
+[[ $(head -c 5 -- "$temporary") == '%PDF-' ]] || {
+  echo "reference-download: response does not begin with a PDF signature" >&2
+  exit 1
+}
+
+mime=$(file --brief --mime-type -- "$temporary")
+[[ $mime == application/pdf ]] || {
+  echo "reference-download: downloaded content has unexpected MIME type: $mime" >&2
+  exit 1
+}
+
+pdfinfo "$temporary" >/dev/null
+mv -- "$temporary" "$destination"
+
+final_url=$(cat -- "$final_url_file")
+retrieved=$(date --utc +%Y-%m-%dT%H:%M:%SZ)
+sha256=$(sha256sum -- "$destination" | cut -d' ' -f1)
+pages=$(pdfinfo "$destination" | awk -F: '$1 == "Pages" { sub(/^[[:space:]]+/, "", $2); print $2 }')
+
+printf 'file: %s\n' "$destination"
+printf 'source-url: %s\n' "$url"
+printf 'final-url: %s\n' "$final_url"
+printf 'retrieved: %s\n' "$retrieved"
+printf 'sha256: %s\n' "$sha256"
+printf 'pages: %s\n' "$pages"

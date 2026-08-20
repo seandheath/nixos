@@ -28,6 +28,7 @@ final: prev: {
   minecraft-server-image = import ./minecraft-server-image.nix { pkgs = final; };
   minecraft-server-ctl = import ./minecraft-server-ctl.nix { pkgs = final; };
   qwen-code = import ./qwen-code.nix { pkgs = final; };
+  reference-download = import ./reference-download.nix { pkgs = final; };
   re-container = import ./re-container.nix { pkgs = final; };
 
   # Not a derivation: an attrset of { pythonWithDbus, script, package }, because the

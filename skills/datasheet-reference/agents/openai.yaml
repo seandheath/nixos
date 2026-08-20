@@ -1,0 +1,4 @@
+interface:
+  display_name: "Datasheet Reference"
+  short_description: "Download and catalog primary hardware documents"
+  default_prompt: "Use $datasheet-reference to retrieve and catalog the primary documents for this component."

@@ -167,6 +167,7 @@
           minecraft-server-ctl
           minecraft-server-image
           qwen-code
+          reference-download
           re-container
           ;
       };

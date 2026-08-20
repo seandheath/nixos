@@ -75,6 +75,11 @@ pkgs.dockerTools.buildLayeredImage {
     # to computing in its head, which is the failure the prompt exists to prevent.
     pkgs.python3
 
+    # Primary-document retrieval and inspection. reference-download is the constrained,
+    # pre-approved path; poppler-utils remains available for page-aware ad-hoc inspection.
+    pkgs.reference-download
+    pkgs.poppler-utils
+
     # Reading a reference source tree (see the "Reference source" section of the prompt).
     # Both agents have ripgrep-backed search tools of their own, but they also shell out to
     # ordinary text utilities, and a missing grep surfaces as a confusing tool failure rather
@@ -131,6 +136,7 @@ pkgs.dockerTools.buildLayeredImage {
       "HOME=${homeDir}"
       "SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
       "NIX_SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
+      "OPENCODE_ENABLE_EXA=1"
       "PATH=/bin"
       "LANG=C.UTF-8"
       # dockerTools unpacks package outputs at the image root, so ncurses' terminfo tree
