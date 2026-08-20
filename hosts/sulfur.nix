@@ -60,6 +60,10 @@ in
   networking.hostName = "sulfur";
   networking.networkmanager.enable = true;
   networking.networkmanager.wifi.powersave = false;
+  # The Intel driver hit `Tx queue alloc failed` while roaming, leaving LAN traffic at
+  # triple-digit latency even after NetworkManager re-associated. Disable its independent
+  # power-save path too; NetworkManager's setting above does not set this module option.
+  boot.kernelParams = [ "iwlwifi.power_save=0" ];
 
   environment.systemPackages = with pkgs; [
     asusctl
