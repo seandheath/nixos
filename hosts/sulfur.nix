@@ -17,7 +17,6 @@ in
     ../modules/fleet-vpn.nix
     ../modules/minecraft-client.nix       # the offline client (game + mods pinned), shared with hydrogen
     ../modules/minecraft-launcher.nix     # pick a player and a server; spins servers up on demand
-    ../modules/family/wg-endpoint.nix     # keeps wgadm pointed at the LAN or the WAN
   ];
 
   # Reached by name over wgadm; networking.hosts below resolves it. See docs/minecraft.md.
@@ -254,7 +253,7 @@ in
 
     "wireguard-peer.ILwElzleBCCQ8vrGGiV2gUY0B33IHB456MQtgT2ZUTE=" = {
       allowed-ips = "10.0.0.0/24;10.40.0.0/24;";
-      endpoint = "vpn.luckyobserver.com:51820";
+      endpoint = "${peers.routerEndpointHost}:51820";
       persistent-keepalive = 25;
     };
 
@@ -290,11 +289,11 @@ in
     };
 
     # Two peers on one interface: hydrogen and the router are peers of sulfur, not of each
-    # other, so losing one costs nothing on the other. The endpoint is a bootstrap value --
-    # wg-endpoint.nix rewrites it with `wg set` once the interface is up.
+    # other, so losing one costs nothing on the other. Split DNS sends each name directly
+    # to its owner at home and to the shared WAN address everywhere else.
     "wireguard-peer.${adm.publicKey}" = {
       allowed-ips = "${adm.address}/32;${peers.hubs.fam.subnet};";
-      endpoint = "${peers.lanEndpoint}:${toString adm.port}";
+      endpoint = "${peers.hydrogenEndpointHost}:${toString adm.port}";
       persistent-keepalive = 25;
     };
 
@@ -304,7 +303,7 @@ in
     # this list; for the gateway that is a hard rule, not a preference.
     "wireguard-peer.${rtr.publicKey}" = {
       allowed-ips = "${rtr.address}/32;";
-      endpoint = "${rtr.lanAddress}:${toString rtr.port}";
+      endpoint = "${peers.routerEndpointHost}:${toString rtr.port}";
       persistent-keepalive = 25;
     };
 
@@ -336,24 +335,6 @@ in
       key = "private-key";
       file = config.sops.secrets.wg-priv-sulfur.path;
       trim = true;
-    }
-  ];
-
-  # Per-PEER, not per-interface: the two live at different LAN addresses, and probing one
-  # for both would leave the loser unreachable from the house.
-  family.wgEndpoint = [
-    {
-      interface = adm.interface;
-      inherit (adm) publicKey port;
-      lanHost = peers.lanEndpoint;          # hydrogen
-      publicHost = peers.endpointHost;
-    }
-    {
-      interface = adm.interface;
-      inherit (rtr) publicKey port;
-      lanHost = rtr.lanAddress;             # the router
-      # The router peer only has to work when away.
-      publicHost = peers.endpointHost;
     }
   ];
 

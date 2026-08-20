@@ -16,8 +16,6 @@ let
   '');
 in
 {
-  imports = [ ./wg-endpoint.nix ];
-
   # Picks up the host's sops.defaultSopsFile, which modules/family/profile.nix forces to
   # secrets/family.yaml -- the only file these machines' age key can read.
   sops.secrets.${self.secret} = { };
@@ -38,24 +36,14 @@ in
       # LAN, the router, the sibling laptops -- is simply not routable from here.
       allowedIPs = [ "${fam.address}/32" "${adm.address}/32" ];
 
-      # A bootstrap value that wg-endpoint.nix overwrites seconds after boot. Deliberately
-      # an IP literal: wg-quick resolves the endpoint while CREATING the interface, so a
-      # failed lookup aborts the unit, which then sits failed and never retries. Being
-      # merely wrong when away is harmless by comparison.
-      endpoint = "${peers.lanEndpoint}:${toString fam.port}";
+      # Public DNS follows the dynamic WAN address; the router's split-horizon record
+      # resolves this directly to hydrogen on every home VLAN.
+      endpoint = "${peers.hydrogenEndpointHost}:${toString fam.port}";
 
       # Keeps the NAT mapping alive so the hub can reach back.
       persistentKeepalive = 25;
     }];
   };
-
-  family.wgEndpoint = [{
-    interface = fam.interface;
-    inherit (fam) publicKey port;
-    lanHost = peers.lanEndpoint;
-    publicHost = peers.endpointHost;
-  }];
-
 
   # Resolve to the hub, not hydrogen's LAN address, so they work identically at home and
   # away and never depend on the router's resolver.

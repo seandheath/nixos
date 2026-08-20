@@ -10,14 +10,11 @@
 # the host's own sops.defaultSopsFile names -- family.yaml for the laptops, secrets.yaml
 # for hydrogen and sulfur; edit them with `sops secrets/<file>.yaml`.
 rec {
-  # The same name the router's own hub uses; the three hubs are told apart by port. ddclient
-  # already keeps it pointed at the current WAN address, so no extra DNS record exists to
-  # forget. It resolves to the WAN address on the LAN too -- peers at home reach hydrogen by
-  # its LAN address instead, which wg-endpoint.nix tries first.
-  endpointHost = "vpn.luckyobserver.com";
-
-  # Peers on the home network target this directly instead of bouncing off the gateway.
-  lanEndpoint = "10.0.0.10";
+  # Publicly both are DNS-only CNAMEs to the dynamic WAN record. The router provides
+  # split-horizon answers at home, so clients reach the owning device directly without
+  # hairpin NAT or an endpoint-selection service.
+  hydrogenEndpointHost = "hydrogen.luckyobserver.com";
+  routerEndpointHost = "router.luckyobserver.com";
   lanSubnet = "10.0.0.0/24";
 
   hubs = {
@@ -122,7 +119,7 @@ rec {
   #   Address     10.41.0.<n>/32
   #   AllowedIPs  <hubs.fam.address>/32, <routerMgmt.address>/32
   #   DNS         <routerMgmt.address>, 1.1.1.1
-  #   Endpoint    <endpointHost>:<hubs.fam.port>
+  #   Endpoint    <hydrogenEndpointHost>:<hubs.fam.port>
   #   PersistentKeepalive 25
   # then add its public key below and rebuild hydrogen. The second DNS server is not
   # optional -- with only the tunnel resolver listed, a phone that roams off the tunnel
