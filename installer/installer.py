@@ -402,7 +402,11 @@ def run_install(board: Board, log: Callable[[str], None]) -> None:
             return False
         if name == "secrets":
             key = TARGET / context.facts.age_key_file.lstrip("/")
-            return key.is_file() and key.stat().st_size > 0
+            host_keys = (
+                TARGET / "etc/ssh/ssh_host_ed25519_key",
+                TARGET / "etc/ssh/ssh_host_rsa_key",
+            )
+            return key.is_file() and key.stat().st_size > 0 and all(path.is_file() for path in host_keys)
         if name == "install": return (TARGET / "nix/var/nix/profiles/system").is_symlink()
         return False
     def phase(name: str, action: Callable[[], None]) -> None:

@@ -79,6 +79,11 @@ class ProfileTests(unittest.TestCase):
         self.assertIn('TARGET / "etc/ssh"', source)
         self.assertIn("ssh-keygen", source)
 
+    def test_secret_phase_requires_host_keys_on_resume(self):
+        from installer import run_install
+
+        self.assertIn("all(path.is_file() for path in host_keys)", inspect.getsource(run_install))
+
 
 if __name__ == "__main__":
     unittest.main()
