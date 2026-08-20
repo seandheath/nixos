@@ -7,10 +7,9 @@
 # The third is an independent job, not an rsync mirror: a mirror copies any damage in the
 # source and carries the same Repository ID, which collides in /root/.cache/borg.
 #
-# CLI, all as root: borg-data / borg-rootfs / borg-remote address one repo each and take
-# any borg subcommand, plus a synthetic `backup` that refreshes the pg_dumps first.
-# borg-local is not a repo -- it runs both on-machine jobs, because "back up this machine"
-# became two operations and the second is what silently does not happen.
+# CLI, all as root: `borg-cmd backup` runs every repository under one consistent
+# Minecraft checkpoint.  `borg-cmd backup --data|--remote|--rootfs` selects repositories;
+# `borg-cmd data|remote|rootfs <borg arguments>` is for raw Borg maintenance.
 #
 # Secrets in secrets/secrets.yaml: borg-passphrase (KEEP A COPY OFF-HYDROGEN -- without it
 # the backups are unrecoverable) and borg-ssh-key.
@@ -87,6 +86,26 @@ let
     + lib.optionalString (config.fleet.minecraftServers.enable or false) (mcServers "thaw")
   );
 
+  # Hold one save-off/save-on boundary over an entire group of Borg jobs.  Per-job hooks
+  # cannot coordinate concurrent units: whichever finishes first would re-enable autosave
+  # while another archive was still reading the world.
+  runBorgJobs = ''
+    ${pgRefresh}
+    ${minecraftFlush}
+    trap '${minecraftResume}' EXIT
+
+    rc=0
+    for job in "$@"; do
+      echo
+      echo "=== borg $job: archive + prune ==="
+      if ! ${pkgs.systemd}/bin/systemctl start --wait "borgbackup-job-$job.service"; then
+        echo "borg backup: $job FAILED -- continuing with the remaining repositories." >&2
+        rc=1
+      fi
+    done
+    exit "$rc"
+  '';
+
 
   # Named for the disk, not for "local" -- both this and rootRepo are on the machine.
   dataRepo = "/data/borg";
@@ -106,73 +125,85 @@ let
       postgresqlBackup-nextcloud.service postgresqlBackup-immich.service
   '';
 
-  # borg with this repo's env preset, plus a `backup` subcommand. Root only.
-  mkBorgCli = { name, repo, rsh ? null }:
-    pkgs.writeShellScriptBin "borg-${name}" ''
-      set -eu
-      export BORG_REPO=${lib.escapeShellArg repo}
-      export BORG_PASSCOMMAND=${lib.escapeShellArg passCommand}
-      ${lib.optionalString (rsh != null) "export BORG_RSH=${lib.escapeShellArg rsh}"}
-      if [ "''${1-}" = "backup" ]; then
-        ${pgRefresh}
-        echo "Running borg ${name} backup (archive + prune)..."
-        exec ${pkgs.systemd}/bin/systemctl start --wait borgbackup-job-${name}.service
-      fi
-      exec ${pkgs.borgbackup}/bin/borg "$@"
-    '';
+  # One lock covers both the scheduled service and manually selected backups.  A second
+  # invocation fails clearly rather than starting another archive with a competing
+  # save-off/save-on boundary.
+  borgFleetRunnerUnlocked = pkgs.writeShellScript "borg-cmd-run-unlocked" runBorgJobs;
+  borgFleetRunner = pkgs.writeShellScript "borg-cmd-run" ''
+    exec ${pkgs.util-linux}/bin/flock -n /run/lock/fleet-borg-backup.lock \
+      ${borgFleetRunnerUnlocked} "$@"
+  '';
 
-  # Both on-machine repos, /data then root. Sequential: they read the same ~197 GiB off the
-  # same USB spindles and each wraps its run in save-off/save-on, so run together whichever
-  # finishes first re-enables autosave while the other is still archiving. Runs the second
-  # even if the first fails -- a failing /data is the scenario the root repo exists for.
-  borgLocalCli = pkgs.writeShellScriptBin "borg-local" ''
-    set -u
+  borgFleet = pkgs.writeShellScriptBin "borg-cmd" ''
+    set -eu
 
-    if [ "$#" -gt 0 ] && [ "$1" != "backup" ]; then
-      echo "borg-local runs both on-machine backups; it is not a repo." >&2
-      echo "It was the /data repo's wrapper until 2026-08-05. For borg subcommands" >&2
-      echo "use the per-repo wrappers instead:" >&2
-      echo "  borg-data   $*   (/data/borg)" >&2
-      echo "  borg-rootfs $*   (/var/backup/borg)" >&2
-      echo "  borg-remote $*   (BorgBase, offsite)" >&2
+    usage() {
+      ${pkgs.coreutils}/bin/cat >&2 <<'EOF'
+Usage:
+  borg-cmd backup [--data] [--remote] [--rootfs]
+  borg-cmd <data|remote|rootfs> <borg command> [arguments...]
+
+Without repository flags, `backup` archives data, remote, then rootfs under one
+Minecraft checkpoint. The repository subcommands are for raw Borg maintenance.
+EOF
       exit 2
-    fi
+    }
 
-    ${pgRefresh}
-
-    rc=0
-    for job in data rootfs; do
-      echo
-      echo "=== borg $job: archive + prune ==="
-      if ! ${pkgs.systemd}/bin/systemctl start --wait "borgbackup-job-$job.service"; then
-        echo "borg-local: the $job job FAILED -- continuing with the rest." >&2
-        rc=1
-      fi
-    done
-
-    if [ "$rc" -ne 0 ]; then
-      echo "borg-local: at least one job failed; check journalctl -u borgbackup-job-*" >&2
-    fi
-    exit "$rc"
+    [ "$#" -gt 0 ] || usage
+    case "$1" in
+      backup)
+        shift
+        targets=()
+        add_target() {
+          for target in "''${targets[@]}"; do
+            [ "$target" = "$1" ] && return
+          done
+          targets+=("$1")
+        }
+        while [ "$#" -gt 0 ]; do
+          case "$1" in
+            --data) add_target data ;;
+            --remote) add_target remote ;;
+            --rootfs) add_target rootfs ;;
+            --help|-h) usage ;;
+            *) echo "borg-cmd backup: unknown flag: $1" >&2; usage ;;
+          esac
+          shift
+        done
+        [ "''${#targets[@]}" -gt 0 ] || targets=(data remote rootfs)
+        exec ${borgFleetRunner} "''${targets[@]}"
+        ;;
+      data|remote|rootfs)
+        repo="$1"
+        shift
+        [ "$#" -gt 0 ] || usage
+        export BORG_PASSCOMMAND=${lib.escapeShellArg passCommand}
+        case "$repo" in
+          data) export BORG_REPO=${lib.escapeShellArg dataRepo} ;;
+          remote)
+            export BORG_REPO=${lib.escapeShellArg remoteRepo}
+            export BORG_RSH=${lib.escapeShellArg remoteRsh}
+            ;;
+          rootfs) export BORG_REPO=${lib.escapeShellArg rootRepo} ;;
+        esac
+        exec ${pkgs.borgbackup}/bin/borg "$@"
+        ;;
+      --help|-h) usage ;;
+      *) echo "borg-cmd: unknown command: $1" >&2; usage ;;
+    esac
   '';
 in
 {
   sops.secrets.borg-passphrase = { };
   sops.secrets.borg-ssh-key = { };
 
-  environment.systemPackages = [
-    (mkBorgCli { name = "data"; repo = dataRepo; })
-    (mkBorgCli { name = "rootfs"; repo = rootRepo; })
-    (mkBorgCli { name = "remote"; repo = remoteRepo; rsh = remoteRsh; })
-    borgLocalCli
-  ];
+  environment.systemPackages = [ borgFleet ];
 
-  # Consistent Postgres dumps at 02:45, before the 03:00 Borg runs.
+  # Dumps are started and awaited by fleet-borg-backup, immediately before its archives.
   services.postgresqlBackup = {
     enable = true;
     databases = [ "nextcloud" "immich" ];
     compression = "zstd";
-    startAt = "*-*-* 02:45:00";
   };
 
   # prune.prefix is "hydrogen", not the default "hydrogen-data": this job was renamed from
@@ -186,8 +217,6 @@ in
     encryption = { mode = "repokey-blake2"; inherit passCommand; };
     compression = "zstd";
     prune = prune // { prefix = "hydrogen"; };
-    startAt = "*-*-* 03:00:00";
-    preHook = minecraftFlush;
   };
 
   services.borgbackup.jobs.remote = {
@@ -198,13 +227,10 @@ in
     environment.BORG_RSH = remoteRsh;
     compression = "zstd";
     inherit prune;
-    startAt = "*-*-* 03:00:00";
-    preHook = minecraftFlush;
   };
 
-  # 04:30, not 03:00: the other two already fire together and race over the Minecraft
-  # autosave, and a third concurrent job would widen that window and add a third reader to
-  # the same two USB spindles.
+  # Scheduled by fleet-borg-backup after the data and remote jobs.  Serializing all three
+  # keeps one consistent Minecraft checkpoint and avoids competing reads from /data.
   services.borgbackup.jobs.rootfs = {
     paths = backupPaths;
     exclude = backupExclude;
@@ -212,14 +238,17 @@ in
     encryption = { mode = "repokey-blake2"; inherit passCommand; };
     compression = "zstd";
     inherit prune;
-    startAt = "*-*-* 04:30:00";
-    preHook = minecraftFlush;
   };
 
-  # Always re-enable the world autosave, even if borg failed. See minecraftFlush.
-  systemd.services.borgbackup-job-data.serviceConfig.ExecStopPost = [ "${minecraftResume}" ];
-  systemd.services.borgbackup-job-remote.serviceConfig.ExecStopPost = [ "${minecraftResume}" ];
-  systemd.services.borgbackup-job-rootfs.serviceConfig.ExecStopPost = [ "${minecraftResume}" ];
+  systemd.services.fleet-borg-backup = {
+    description = "Run all Borg repositories from one consistent Minecraft checkpoint";
+    startAt = "03:00";
+    serviceConfig = {
+      Type = "oneshot";
+      ExecStart = "${borgFleetRunner} data remote rootfs";
+    };
+    unitConfig.RequiresMountsFor = "/data";
+  };
 
   # The data job writes to /data — don't run it before the disk is mounted.
   systemd.services.borgbackup-job-data.unitConfig.RequiresMountsFor = "/data";

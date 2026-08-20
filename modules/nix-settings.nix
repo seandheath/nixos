@@ -10,10 +10,12 @@
 
     # Binary caches (consolidated here so all substituters live in one place).
     # pebble: personal cachix.
-    substituters = [
+    # `substituters` replaces Nix's default cache list.  Add the private cache instead,
+    # so cache.nixos.org remains available for the fleet's large upstream closures.
+    extra-substituters = [
       "https://pebble.cachix.org"
     ];
-    trusted-public-keys = [
+    extra-trusted-public-keys = [
       "pebble.cachix.org-1:aTqwT2hR6lGggw/rPISRcHZctDv2iF7ewsVxf3Hq6ow="
     ];
 

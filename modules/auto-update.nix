@@ -70,6 +70,21 @@ let
     fi
   '';
 
+  # GitHub-only hosts must not switch from a placeholder hardware description.
+  upgradePreflight = pkgs.writeShellApplication {
+    name = "nixos-upgrade-preflight";
+    runtimeInputs = [ config.nix.package ];
+    text = ''
+      value="$(nix eval --raw \
+        "github:seandheath/nixos#nixosConfigurations.${config.networking.hostName}.config.fleet.hardware.isPlaceholder")"
+      if [ "$value" = true ]; then
+        echo "refusing automatic upgrade: GitHub still has placeholder hardware for ${config.networking.hostName}" >&2
+        echo "provision this machine with a real hardware configuration first" >&2
+        exit 1
+      fi
+    '';
+  };
+
   lockUpdate = pkgs.writeShellApplication {
     name = "nixos-lock-update";
     runtimeInputs = [ pkgs.git config.nix.package pkgs.openssh ];
@@ -112,6 +127,13 @@ in
     nightly nixpkgs bump of the fleet's flake.lock, gated on `nix flake check` and pushed to
     the repo every host builds. Exactly one host may own this -- a second writer is a push race
   '';
+
+  options.fleet.hardware.isPlaceholder = lib.mkOption {
+    type = lib.types.bool;
+    default = false;
+    internal = true;
+    description = "Whether this configuration still uses generated placeholder hardware.";
+  };
 
   config = lib.mkMerge [
     {

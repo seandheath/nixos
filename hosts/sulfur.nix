@@ -14,7 +14,6 @@ in
     ../modules/workstation.nix
     ../modules/virtualisation.nix
     ../modules/impermanence.nix
-    ../modules/wivrn.nix
     ../modules/fleet-vpn.nix
     ../modules/minecraft-client.nix       # the offline client (game + mods pinned), shared with hydrogen
     ../modules/minecraft-launcher.nix     # pick a player and a server; spins servers up on demand

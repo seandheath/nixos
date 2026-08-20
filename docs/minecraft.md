@@ -290,9 +290,9 @@ next server restart.
 Verify a restore at least once:
 
 ```console
-$ sudo borg-local
-$ sudo borg-data list ::<archive> | grep 'minecraft/world/region' | head
-$ sudo borg-data extract --strip-components 3 ::<archive> var/lib/minecraft/world/level.dat
+$ sudo borg-cmd backup --data --rootfs
+$ sudo borg-cmd data list ::<archive> | grep 'minecraft/world/region' | head
+$ sudo borg-cmd data extract --strip-components 3 ::<archive> var/lib/minecraft/world/level.dat
 ```
 
 Keep exactly one canonical world, on the server.

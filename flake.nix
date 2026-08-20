@@ -55,11 +55,12 @@
     let
       system = "x86_64-linux";
 
-      pkgs = import nixpkgs {
-        inherit system;
+      overlay = import ./packages;
+      nixpkgsConfig = {
         config.allowUnfree = true;
-        overlays = [ (import ./packages) ];
+        overlays = [ overlay ];
       };
+      pkgs = import nixpkgs ({ inherit system; } // nixpkgsConfig);
 
       commonModules = [
         home-manager.nixosModules.home-manager
@@ -81,7 +82,7 @@
         # Every host: hydrogen's br0 lost its slave during the 2026-08-13 nightly and
         # stayed unreachable for six hours. Defines nothing on a host with no bridges.
         ./modules/bridge-slave-restore.nix
-        { nixpkgs.overlays = [ (import ./packages) ]; }
+        { nixpkgs = nixpkgsConfig; }
         # Every host: sulfur's Ghostty sets TERM=xterm-ghostty, which nixpkgs' ncurses does
         # not carry, and an SSH session inherits it.
         ({ pkgs, ... }: { environment.systemPackages = [ pkgs.ghostty.terminfo ]; })
@@ -95,7 +96,6 @@
           home-manager.backupFileExtension = "hm-bak";
           users.users.sheath = import ./users/sheath.nix;
           users.groups.sheath = {};
-          nixpkgs.config.allowUnfree = true;
         }
       ];
 
