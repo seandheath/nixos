@@ -19,6 +19,11 @@ class ProfileTests(unittest.TestCase):
         profile.system_device = "/dev/nvme0n1"
         self.assertTrue(any("by-id" in error for error in profile.validate()))
 
+    def test_new_profile_has_no_selected_system_disk(self):
+        profile = Profile("test")
+        self.assertEqual(profile.system_device, UNSET_DEVICE)
+        self.assertIn("no system disk selected", profile.validate())
+
     def test_layout_renders_only_requested_optional_disks(self):
         profile = Profile("test", system_device="/dev/disk/by-id/nvme-test", system_encrypt=True)
         rendered = profile.to_nix()

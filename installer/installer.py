@@ -222,8 +222,6 @@ class Board:
         try:
             profile = Profile.from_fleet(self.host, fleet_disk(self.repo, self.host))
             self.facts, self.disks = facts(self.repo, self.host), list_disks()
-            if profile.system_device == UNSET_DEVICE:
-                profile.system_device = next((d.by_id for d in self.disks if d.by_id), UNSET_DEVICE)
             self.profile = profile
             source = "family" if self.facts.sops_file == "family.yaml" else "fleet"
             self.set_status("host", "ok", f"{self.host} · {source} · {'passwd after install' if self.facts.mutable_users else 'declarative passwords'}")
