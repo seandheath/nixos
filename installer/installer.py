@@ -226,7 +226,7 @@ class Board:
                 profile.system_device = next((d.by_id for d in self.disks if d.by_id), UNSET_DEVICE)
             self.profile = profile
             source = "family" if self.facts.sops_file == "family.yaml" else "fleet"
-            self.set_status("host", "ok", f"{source} · {'passwd after install' if self.facts.mutable_users else 'declarative passwords'}")
+            self.set_status("host", "ok", f"{self.host} · {source} · {'passwd after install' if self.facts.mutable_users else 'declarative passwords'}")
             self.invalidate("layout", "age key", "root password", "encryption")
             self.check_cheap()
         except (RuntimeError, OSError, KeyError, json.JSONDecodeError) as error:
@@ -532,8 +532,8 @@ class Tui:
                 height, _ = screen.getmaxyx(); self.add(screen, height - 3, 0, f"{label}: " + "  ".join((f"[{value}]" if i == index else value) for i, value in enumerate(options))); screen.refresh(); key = screen.get_wch()
                 if key == "\x1b": return None
                 if key in ("\n", curses.KEY_ENTER): return index
-                if key in (curses.KEY_LEFT, "h"): index = (index - 1) % len(options)
-                if key in (curses.KEY_RIGHT, "l"): index = (index + 1) % len(options)
+                if key in (curses.KEY_LEFT, curses.KEY_UP, "h", "k"): index = (index - 1) % len(options)
+                if key in (curses.KEY_RIGHT, curses.KEY_DOWN, "l", "j"): index = (index + 1) % len(options)
         finally:
             screen.timeout(150)
 
