@@ -23,6 +23,7 @@
     ../modules/minecraft-servers.nix      # extra worlds on demand, in rootless podman
     ../modules/minecraft-couch.nix
     ../modules/minecraft-client.nix
+    ../modules/valheim-server.nix
   ];
 
   networking.hostName = "hydrogen";
@@ -59,6 +60,8 @@
     enable = true;
     authorizedKeys = [ ];
   };
+
+  services.familyValheim.enable = true;
 
   # Static br0. Plain false, not mkDefault, to beat the generated hardware file.
   networking.useDHCP = false;
@@ -114,6 +117,7 @@
     22000                           # Syncthing
   ];
   networking.firewall.interfaces."wgadm".allowedUDPPorts = [
+    2456 2457 2458   # Valheim
     21116           # RustDesk
     22000 21027     # Syncthing sync + discovery
   ];
@@ -126,6 +130,7 @@
   # Key-only auth is what stops them, not reachability. If guests become common, the
   # remedy that file suggests is a third hub carrying only the control port.
   networking.firewall.interfaces."wgfam".allowedTCPPorts = [ 22 80 443 25565 ];
+  networking.firewall.interfaces."wgfam".allowedUDPPorts = [ 2456 2457 2458 ];
 
   # The on-demand worlds. A range rather than per-server entries: firewall ports are
   # declarative and per-interface, so a container the launcher creates at runtime on a

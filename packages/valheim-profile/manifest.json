@@ -1,0 +1,17 @@
+{
+  "name": "Hydrogen_Mostly_Vanilla",
+  "version_number": "1.0.0",
+  "website_url": "",
+  "description": "Pinned mostly-vanilla quality-of-life profile for the family Valheim server on Hydrogen.",
+  "dependencies": [
+    "denikson-BepInExPack_Valheim-5.4.2333",
+    "ValheimModding-Jotunn-2.29.2",
+    "Azumatt-AzuCraftyBoxes-1.8.15",
+    "Goldenrevolver-Quick_Stack_Store_Sort_Trash_Restock-1.4.13",
+    "MSchmoecker-MultiUserChest-0.6.1",
+    "Azumatt-AAA_Crafting-2.1.6",
+    "MainStreetGaming-MassFarming-1.12.0",
+    "Azumatt-AzuAreaRepair-1.1.6",
+    "ComfyMods-ComfyLadders-1.1.0"
+  ]
+}

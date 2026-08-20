@@ -1,4 +1,19 @@
-{ config, pkgs, ... }:{
+{ config, pkgs, ... }:
+let
+  valheimProfile = pkgs.runCommand "hydrogen-valheim-profile-1.0.0" {
+    nativeBuildInputs = [ pkgs.imagemagick pkgs.zip ];
+  } ''
+    mkdir -p "$out"
+    cp ${../packages/valheim-profile/manifest.json} manifest.json
+    cp ${../packages/valheim-profile/README.md} README.md
+    magick -size 256x256 xc:'#18251b' \
+      -fill '#d9b35f' -gravity center -pointsize 36 \
+      -font ${pkgs.dejavu_fonts}/share/fonts/truetype/DejaVuSans-Bold.ttf \
+      -annotate +0+0 Hydrogen icon.png
+    zip -9 "$out/Hydrogen-Mostly-Vanilla-1.0.0.zip" manifest.json README.md icon.png
+  '';
+in
+{
   # Proper Bluetooth HID profile for Xbox One/Series/Elite controllers.
   # Stock hid_microsoft exposes BT pads as pointer devices, causing the left
   # stick to move the cursor in games. xpadneo replaces it with a gamepad-only
@@ -42,6 +57,7 @@
   environment.systemPackages = with pkgs; [
     (heroic.override { extraPkgs = pkgs: [ pkgs.gamescope ]; })
     mumble
+    r2modman
     # protontricks resolves the prefix from the appid itself; this only adds the stale
     # wineserver/fsync cleanup, which it does not do.
     (pkgs.writeShellScriptBin "steam-winetricks" ''
@@ -52,4 +68,7 @@
       exec protontricks "$@"
     '')
   ];
+
+  environment.etc."valheim/Hydrogen-Mostly-Vanilla-1.0.0.zip".source =
+    "${valheimProfile}/Hydrogen-Mostly-Vanilla-1.0.0.zip";
 }

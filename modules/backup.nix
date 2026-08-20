@@ -28,6 +28,8 @@ let
     # after this line was written; without it a world made from the launcher is silently
     # unprotected. Not flushed like the shared world below -- see the note there.
     "/var/lib/minecraft-servers"
+    # Active Valheim saves plus Odin's hourly and clean-shutdown snapshots.
+    "/var/lib/valheim"
     # Bare git repos. No flush hook like Minecraft's: the object store is append-only and
     # a ref update is an atomic rename, so a live push cannot tear an archive.
     "/var/lib/git"
