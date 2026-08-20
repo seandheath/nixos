@@ -89,20 +89,53 @@ in
   # into this host. Bound to the failure, not to a clock: a restart re-runs the unit's own
   # teardown first, which also clears an interface a killed run left behind.
   # see CHANGELOG 2026-08-19
-  systemd.services = lib.mkMerge (map (i: {
-    "wireguard-${i}".onFailure = [ "wireguard-${i}-retry.service" ];
-    "wireguard-${i}-retry" = {
-      description = "Retry bringing up ${i} after a failed start";
-      serviceConfig = {
-        Type = "oneshot";
-        ExecStart = "${pkgs.coreutils}/bin/sleep 30";
-        ExecStartPost = "${pkgs.systemd}/bin/systemctl restart --no-block wireguard-${i}.service";
+  systemd.services = lib.mkMerge [
+    (lib.mkMerge (map (i: {
+      "wireguard-${i}".onFailure = [ "wireguard-${i}-retry.service" ];
+      "wireguard-${i}-retry" = {
+        description = "Retry bringing up ${i} after a failed start";
+        serviceConfig = {
+          Type = "oneshot";
+          ExecStart = "${pkgs.coreutils}/bin/sleep 30";
+          ExecStartPost = "${pkgs.systemd}/bin/systemctl restart --no-block wireguard-${i}.service";
+        };
+        # A wedged interface must not become a restart loop that hides the cause.
+        startLimitIntervalSec = 1800;
+        startLimitBurst = 5;
       };
-      # A wedged interface must not become a restart loop that hides the cause.
-      startLimitIntervalSec = 1800;
-      startLimitBurst = 5;
+    }) [ fam.interface adm.interface ]))
+    {
+      # A WireGuard interface can remain present while its one-shot unit still reports
+      # success but it no longer answers handshakes. Sulfur sends a keepalive every 25
+      # seconds, so its peer should never be stale for ten minutes while online. Restart
+      # only wgadm: wgfam remains available to the family devices throughout recovery.
+      wgadm-watchdog = {
+        description = "Recover a stale WireGuard admin listener";
+        after = [ "wireguard-${adm.interface}.service" ];
+        wants = [ "wireguard-${adm.interface}.service" ];
+        path = [ pkgs.coreutils pkgs.gawk pkgs.wireguard-tools pkgs.systemd ];
+        script = ''
+          last="$(wg show ${adm.interface} latest-handshakes | awk '$1 == "${peers.admin.sulfur.publicKey}" { print $2 }')"
+          now="$(date +%s)"
+          age=999999
+          if [ -n "$last" ] && [ "$last" -gt 0 ]; then age=$((now - last)); fi
+          if [ "$age" -le 600 ]; then exit 0; fi
+          echo "wgadm watchdog: Sulfur handshake is ''${age}s old; restarting ${adm.interface}" >&2
+          systemctl restart wireguard-${adm.interface}.service
+        '';
+        serviceConfig.Type = "oneshot";
+      };
+    }
+  ];
+
+  systemd.timers.wgadm-watchdog = {
+    wantedBy = [ "timers.target" ];
+    timerConfig = {
+      OnBootSec = "10min";
+      OnUnitActiveSec = "5min";
+      Unit = "wgadm-watchdog.service";
     };
-  }) [ fam.interface adm.interface ]);
+  };
 
   # Stated, not inherited: libvirtd turns this on as a side effect, so the sulfur -> laptop
   # SSH path would work by accident today and break the day libvirtd is disabled.
