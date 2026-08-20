@@ -1,6 +1,7 @@
 """Unit tests for installer decisions that do not need a live ISO."""
 
 import unittest
+import inspect
 from unittest.mock import patch
 
 from installer import Board, Profile, UNSET_DEVICE, facts, is_size, provisioning_module, shell_quote
@@ -65,6 +66,11 @@ class ProfileTests(unittest.TestCase):
         self.assertIn("builtins.pathExists ./disk.nix", module)
         self.assertIn("builtins.pathExists ./hardware.nix", module)
         self.assertIn("lib.mkForce false", module)
+
+    def test_install_command_disables_nixos_install_password_prompt(self):
+        from installer import run_install
+
+        self.assertIn("--no-root-passwd", inspect.getsource(run_install))
 
 
 if __name__ == "__main__":

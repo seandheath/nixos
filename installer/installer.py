@@ -445,7 +445,7 @@ def run_install(board: Board, log: Callable[[str], None]) -> None:
             password = TARGET / "persist/secrets/root-password"; password.parent.mkdir(parents=True, exist_ok=True); password.parent.chmod(0o700)
             if not password.exists(): password.write_text(command(["mkpasswd", "-m", "sha-512", "--stdin"], "hashing root password", input_text=context.root_password).rstrip() + "\n"); password.chmod(0o600)
     phase("partition", partition); phase("hardware", hardware); phase("config", config); phase("secrets", secrets)
-    phase("install", lambda: stream(["nixos-install", "--root", str(TARGET), "--flake", f"{TARGET}/home/sheath/nixos#{context.host}"], "nixos-install", log))
+    phase("install", lambda: stream(["nixos-install", "--root", str(TARGET), "--no-root-passwd", "--flake", f"{TARGET}/home/sheath/nixos#{context.host}"], "nixos-install", log))
     def finalize() -> None:
         try:
             stream(["nixos-enter", "--root", str(TARGET), "-c", "chown -R sheath:sheath /home/sheath"], "fixing ownership", log)
