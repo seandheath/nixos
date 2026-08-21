@@ -64,6 +64,30 @@ in
   # power-save path too; NetworkManager's setting above does not set this module option.
   boot.kernelParams = [ "iwlwifi.power_save=0" ];
 
+  # Native WireGuard resolves endpoint names when its peer units run, not when the
+  # underlying network later changes. Re-run the generated units after a real uplink
+  # activation so split DNS follows sulfur between home and away without a timer or probe.
+  networking.networkmanager.dispatcherScripts = [
+    {
+      type = "basic";
+      source = pkgs.writeShellScript "refresh-wgadm-endpoints" ''
+        set -eu
+
+        interface=$1
+        action=$2
+
+        case "$action" in
+          up|dhcp4-change)
+            case "$interface" in
+              lo|wgadm|wg0|fleet) exit 0 ;;
+            esac
+            ${pkgs.systemd}/bin/systemctl try-restart --no-block wireguard-wgadm.service
+            ;;
+        esac
+      '';
+    }
+  ];
+
   environment.systemPackages = with pkgs; [
     asusctl
     supergfxctl
@@ -301,7 +325,16 @@ in
   # Stable SSH destinations: the laptops' LAN leases change, but their family-tunnel
   # addresses do not. Hydrogen forwards only sulfur's TCP/22 traffic to these peers.
   programs.ssh.extraConfig = ''
+    # Sulfur is on the same LAN as hydrogen, whose key-only br0 listener is the recovery
+    # path specifically intended to survive a failed wgadm handshake. Keep the tunnel as
+    # an explicit diagnostic/off-LAN alias rather than making routine SSH depend on it.
     Host hydrogen
+      HostName 10.0.0.10
+      User sheath
+      IdentityFile /home/sheath/.ssh/personal
+      IdentitiesOnly yes
+
+    Host hydrogen-wg
       HostName ${adm.address}
       User sheath
       IdentityFile /home/sheath/.ssh/personal

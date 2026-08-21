@@ -16,6 +16,27 @@ Also the decision log. Rationale that would otherwise bloat a code comment lives
   finding: scripted networking is detaching its own slave, and `br0-netdev`'s
   `X-ReloadIfChanged` is the next suspect.
 
+## 2026-08-21 (SSH and Wi-Fi path repair)
+
+- **Disabled libvirt's unused SSH proxy include.** OpenSSH 10.5 rejected libvirt's
+  Nix-store-owned proxy snippet as having a bad owner, so every ordinary SSH command on
+  sulfur aborted while reading `/etc/ssh/ssh_config`, before attempting a connection.
+  `virtualisation.libvirtd.sshProxy = false` removes that global include without disabling
+  libvirt or virt-manager; direct SSH and the fleet host aliases continue unchanged.
+- **Sulfur's `hydrogen` alias now uses the LAN recovery path.** Hydrogen was healthy and
+  accepted the personal key at `10.0.0.10`, while `wgadm` had stopped handshaking after
+  sulfur boot and timed out at `10.42.0.2`. Routine administration should not depend on
+  the component the recovery listener exists to bypass; `hydrogen-wg` retains the tunnel
+  address for explicit testing and off-LAN diagnosis.
+- **The outage was the GT-AXE16000's 2.4 GHz QoS path, not routing.** Packet capture showed
+  EF-marked SSH and AF41-marked WireGuard replies leave the wired bridge but never reach
+  sulfur; the same tests on 5 GHz passed without loss. Sulfur now prefers its working 5 GHz
+  NetworkManager profile while the access-point firmware remains the repair boundary.
+- **`wgadm` endpoints refresh on uplink activation.** Native WireGuard resolves its endpoint
+  FQDNs only when the generated peer units run, so a laptop could carry a home split-DNS
+  address away or a public address home. NetworkManager now restarts the interface on a real
+  uplink `up`/DHCP change; no polling, probing, or scheduled correction.
+
 ## 2026-08-19 (codex CLI)
 
 - **`codex` 0.147.0 on sulfur.** Package only -- no declared config: it authenticates by
