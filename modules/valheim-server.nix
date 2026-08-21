@@ -57,12 +57,28 @@ let
 
   installed = pkgs.writeShellScript "valheim-installed" ''
     set -eu
+    # Type=simple runs ExecStartPost as soon as podman itself starts. Give it a short
+    # window to create the container, but do not turn a podman startup failure into the
+    # full 20-minute SteamCMD timeout.
+    for _ in $(${pkgs.coreutils}/bin/seq 1 30); do
+      ${pkgs.podman}/bin/podman container exists valheim && break
+      ${pkgs.coreutils}/bin/sleep 1
+    done
+    ${pkgs.podman}/bin/podman container exists valheim || {
+      echo "Valheim container was not created" >&2
+      exit 1
+    }
+
     # Preserve the update marker across a failed/partial SteamCMD run. Removing it only
     # after the executable appears makes the next service restart retry the update.
     for _ in $(${pkgs.coreutils}/bin/seq 1 240); do
       [ -x ${root}/server/valheim_server.x86_64 ] && {
         ${pkgs.coreutils}/bin/rm -f ${root}/update-on-next-start
         exit 0
+      }
+      [ "$(${pkgs.podman}/bin/podman inspect --format '{{.State.Running}}' valheim 2>/dev/null || true)" = true ] || {
+        echo "Valheim container exited before install/update completed" >&2
+        exit 1
       }
       ${pkgs.coreutils}/bin/sleep 5
     done
@@ -109,6 +125,9 @@ in
 
     systemd.services.valheim = {
       description = "Hydrogen family Valheim server";
+      # Rootless Podman invokes newuidmap/newgidmap by name when subordinate ID mappings
+      # contain multiple ranges; those helpers live in shadow and must be on PATH.
+      path = [ pkgs.shadow ];
       wantedBy = [ "multi-user.target" ];
       wants = [ "network-online.target" "user@${toString uid}.service" ];
       after = [ "network-online.target" "user@${toString uid}.service" ];
