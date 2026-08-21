@@ -283,7 +283,10 @@ in
     };
 
     wireguard = {
-      private-key-flags = 1; # agent-owned
+      # The key is injected from sops by ensureProfiles below. It must be system-owned:
+      # agent-owned secrets cannot satisfy an autoconnect before a desktop secret agent
+      # exists, which leaves the supposedly always-on admin tunnel down after activation.
+      private-key-flags = 0;
       mtu = 1420;
       peer-routes = true;
     };
