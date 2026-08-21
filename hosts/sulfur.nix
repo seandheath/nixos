@@ -344,7 +344,6 @@ in
     requires = [ "nm-file-secret-agent.service" ];
     after = [ "nm-file-secret-agent.service" ];
   };
-  systemd.services.nm-file-secret-agent.serviceConfig.Restart = "on-failure";
 
   # hydrogen's vhosts on the admin tunnel, under their public names so the wildcard cert
   # still matches.

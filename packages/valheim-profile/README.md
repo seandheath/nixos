@@ -5,4 +5,4 @@ repair, and ladder friction without changing combat, progression, portals, carry
 capacity, resource rates, or death penalties.
 
 Install this local modpack in r2modman, choose Valheim, then use **Start modded**. Connect
-to `10.41.0.1:2456` while the family VPN is active. The server name is `Hydrogen`.
+to `10.41.0.2:2456` while the family VPN is active. The server name is `Hydrogen`.

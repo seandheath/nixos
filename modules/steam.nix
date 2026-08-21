@@ -10,7 +10,7 @@ let
       -fill '#d9b35f' -gravity center -pointsize 36 \
       -font ${pkgs.dejavu_fonts}/share/fonts/truetype/DejaVuSans-Bold.ttf \
       -annotate +0+0 Hydrogen icon.png
-    zip -9 "$out/Hydrogen-Mostly-Vanilla-1.0.0.zip" manifest.json README.md icon.png
+    zip -9 "$out/Hydrogen-Mostly-Vanilla-1.0.0.r2z" manifest.json README.md icon.png
   '';
 in
 {
@@ -69,6 +69,6 @@ in
     '')
   ];
 
-  environment.etc."valheim/Hydrogen-Mostly-Vanilla-1.0.0.zip".source =
-    "${valheimProfile}/Hydrogen-Mostly-Vanilla-1.0.0.zip";
+  environment.etc."valheim/Hydrogen-Mostly-Vanilla-1.0.0.r2z".source =
+    "${valheimProfile}/Hydrogen-Mostly-Vanilla-1.0.0.r2z";
 }
