@@ -28,10 +28,11 @@ Also the decision log. Rationale that would otherwise bloat a code comment lives
   sulfur boot and timed out at `10.42.0.2`. Routine administration should not depend on
   the component the recovery listener exists to bypass; `hydrogen-wg` retains the tunnel
   address for explicit testing and off-LAN diagnosis.
-- **The outage was the GT-AXE16000's 2.4 GHz QoS path, not routing.** Packet capture showed
-  EF-marked SSH and AF41-marked WireGuard replies leave the wired bridge but never reach
-  sulfur; the same tests on 5 GHz passed without loss. Sulfur now prefers its working 5 GHz
-  NetworkManager profile while the access-point firmware remains the repair boundary.
+- **The outage was the GT-AXE16000's 2.4 GHz QoS path, not routing.** Merlin 3006.102.7's
+  Broadcom voice queue expired 5,689 frames while transmitting 207; packet captures showed
+  EF-marked SSH and AF41-marked WireGuard replies vanish at that radio. Upgrading the AP to
+  3006.102.8_2 eliminated marked-packet loss in both directions; sulfur still prefers 5 GHz
+  for link quality rather than correctness.
 - **`wgadm` endpoints refresh on uplink activation.** Native WireGuard resolves its endpoint
   FQDNs only when the generated peer units run, so a laptop could carry a home split-DNS
   address away or a public address home. NetworkManager now restarts the interface on a real
