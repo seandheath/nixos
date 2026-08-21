@@ -160,6 +160,7 @@
 
       packages.${system} = {
         inherit (pkgs)
+          codex-container
           ghidra-reva
           imjtool
           installer

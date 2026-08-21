@@ -12,6 +12,7 @@
     ./opencode.nix
     ./qwen-code.nix
     ./re-container.nix
+    ./codex-container.nix
     ./mullvad.nix
   ];
 

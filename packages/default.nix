@@ -5,6 +5,7 @@
 # The Minecraft payload files are absent on purpose -- they are data attrsets or take extra
 # arguments, and are imported directly where used.
 final: prev: {
+  codex-container = import ./codex-container.nix { pkgs = final; };
   ghidra-reva = import ./ghidra-reva.nix { pkgs = final; };
   imjtool = import ./imjtool.nix { pkgs = final; };
   installer = import ./installer.nix { pkgs = final; };

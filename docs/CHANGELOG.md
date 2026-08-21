@@ -16,6 +16,14 @@ Also the decision log. Rationale that would otherwise bloat a code comment lives
   finding: scripted networking is detaching its own slave, and `br0-netdev`'s
   `X-ReloadIfChanged` is the next suspect.
 
+## 2026-08-21 (isolated Codex)
+
+- **`ccodex` runs Codex `--yolo` inside rootless Podman.** Only the current working tree and
+  a dedicated `ccodex-home` volume are writable; the host home, Codex credentials, SSH/GPG
+  agents and other projects are not mounted. The host Nix store is read-only and the daemon
+  socket remains available, so `nix develop`, builds and flake checks work as they do in
+  `cclaude`. The container keeps its own login; use the device-code choice on first launch.
+
 ## 2026-08-21 (SSH and Wi-Fi path repair)
 
 - **Disabled libvirt's unused SSH proxy include.** OpenSSH 10.5 rejected libvirt's
