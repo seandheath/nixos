@@ -125,9 +125,10 @@ in
 
     systemd.services.valheim = {
       description = "Hydrogen family Valheim server";
-      # Rootless Podman invokes newuidmap/newgidmap by name when subordinate ID mappings
-      # contain multiple ranges; those helpers live in shadow and must be on PATH.
-      path = [ pkgs.shadow ];
+      # Rootless Podman needs the privileged NixOS newuidmap/newgidmap wrappers for
+      # subordinate ID mappings. The unwrapped shadow binaries in the store cannot write
+      # uid_map/gid_map even when they are on PATH.
+      path = [ "/run/wrappers" ];
       wantedBy = [ "multi-user.target" ];
       wants = [ "network-online.target" "user@${toString uid}.service" ];
       after = [ "network-online.target" "user@${toString uid}.service" ];
