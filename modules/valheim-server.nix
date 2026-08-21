@@ -13,16 +13,59 @@ let
   image = "docker.io/mbround18/valheim@sha256:61998cbb2980d2b563879a06d504e8487922cd54735bde7bbaaa4f7eb7f5e583";
 
   serverMods = [
-    "ValheimModding-Jotunn-2.29.2"
-    "Azumatt-AzuCraftyBoxes-1.8.15"
-    "Goldenrevolver-Quick_Stack_Store_Sort_Trash_Restock-1.4.13"
-    "MSchmoecker-MultiUserChest-0.6.1"
-    "Azumatt-AAA_Crafting-2.1.6"
-    "Azumatt-AzuAreaRepair-1.1.6"
-    # Server-only. Keep only if the forced-save/restart smoke test is clean.
     "Smoothbrain-SmoothSave-1.0.5"
+    "R1NS3-SkipSleep-1.0.5"
   ];
   mods = lib.concatStringsSep "\n" serverMods;
+
+  skipSleepConfig = pkgs.writeText "SkipSleep.cfg" ''
+    [General]
+
+    ## Threshold of ratio of players that need to be sleeping, must be > 0
+    # Setting type: Double
+    # Default value: 0.5
+    ratio = 0.5
+
+    ## Show a continuous message of the amount of players currently sleeping (if > 0)
+    # Setting type: Boolean
+    # Default value: true
+    showMessage = true
+  '';
+
+  migrateVanillaClients = pkgs.writeShellScript "valheim-migrate-vanilla-clients-v1" ''
+    set -eu
+
+    migration_dir=${root}/.migrations
+    marker="$migration_dir/vanilla-clients-v1"
+    plugins=${root}/server/BepInEx/plugins
+
+    if [ ! -e "$marker" ]; then
+      # Thunderstore packages are normally unpacked into one top-level directory.
+      # Include the exact DLL names as well for older/manual flat installations.
+      ${pkgs.coreutils}/bin/rm -rf \
+        "$plugins/ValheimModding-Jotunn" \
+        "$plugins/Azumatt-AzuCraftyBoxes" \
+        "$plugins/Goldenrevolver-Quick_Stack_Store_Sort_Trash_Restock" \
+        "$plugins/MSchmoecker-MultiUserChest" \
+        "$plugins/Azumatt-AAA_Crafting" \
+        "$plugins/MainStreetGaming-MassFarming" \
+        "$plugins/Azumatt-AzuAreaRepair" \
+        "$plugins/ComfyMods-ComfyLadders" \
+        "$plugins/Jotunn.dll" \
+        "$plugins/AzuCraftyBoxes.dll" \
+        "$plugins/Quick_Stack_Store_Sort_Trash_Restock.dll" \
+        "$plugins/MultiUserChest.dll" \
+        "$plugins/AAA_Crafting.dll" \
+        "$plugins/MassFarming.dll" \
+        "$plugins/AzuAreaRepair.dll" \
+        "$plugins/ComfyLadders.dll"
+      ${pkgs.coreutils}/bin/mkdir -p "$migration_dir"
+      ${pkgs.coreutils}/bin/touch "$marker"
+    fi
+
+    ${pkgs.coreutils}/bin/install -D -m 0644 ${skipSleepConfig} \
+      ${root}/server/BepInEx/config/SkipSleep.cfg
+  '';
 
   start = pkgs.writeShellScript "valheim-start" ''
     set -eu
@@ -139,7 +182,10 @@ in
         Group = "valheim";
         Environment = "XDG_RUNTIME_DIR=${runtimeDir}";
         LoadCredential = "password:${config.sops.secrets.valheim-server-password.path}";
-        ExecStartPre = "-${pkgs.podman}/bin/podman rm -f valheim";
+        ExecStartPre = [
+          migrateVanillaClients
+          "-${pkgs.podman}/bin/podman rm -f valheim"
+        ];
         ExecStart = start;
         ExecStartPost = installed;
         ExecStop = "${pkgs.podman}/bin/podman stop --time 180 valheim";
