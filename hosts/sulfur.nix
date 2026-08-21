@@ -219,18 +219,6 @@ in
     };
   };
 
-  # The tunnels are NetworkManager profiles, not wg-quick interfaces: NM manages WireGuard
-  # devices either way, and NM-as-spectator offers a GNOME toggle that flushes the tunnel
-  # from under a unit that goes on reporting success. See CHANGELOG 2026-08-09.
-  #
-  # DO NOT EDIT these in the GNOME UI -- toggling is safe and is the point, but an edit
-  # makes NM copy the connection to /etc as ad-hoc, and you end up with two competing
-  # profiles for one interface. Private keys stay in sops: private-key-flags = 1 marks them
-  # agent-owned and nm-file-secret-agent hands them over on demand.
-  #
-  # Peer sections must be ONE attribute name containing a literal dot -- pkgs.formats.ini
-  # is two levels deep, so the peer key belongs in the section name.
-
   # wg0: break-glass path to the whole home LAN, for when wgadm or hydrogen's sops decrypt
   # is what broke. Recovery access that depends on the thing being recovered is not
   # recovery access. Manual: `nmcli connection up wg0`.
@@ -269,65 +257,33 @@ in
 
 
 
-  # wgadm: the only way into hydrogen's services. wgfam's subnet is in allowed-ips because
-  # sulfur administers the kids' laptops over SSH, which hydrogen forwards and nothing else.
+  # wgadm is always-on infrastructure, owned by systemd just like Hydrogen's two hubs.
+  # Keeping it out of NetworkManager avoids an interactive secret-agent dependency and
+  # prevents desktop connection reloads from replacing the live interface's key or routes.
   sops.secrets.${peers.admin.sulfur.secret} = { };
-
-  networking.networkmanager.ensureProfiles.profiles.${adm.interface} = {
-    connection = {
-      id = adm.interface;
-      uuid = "e34208d7-8dd2-4274-bbed-520d43fd7994";
-      type = "wireguard";
-      interface-name = adm.interface;
-      autoconnect = true; # the everyday tunnel: up at boot, up always
-    };
-
-    wireguard = {
-      private-key-flags = 1; # served by nm-file-secret-agent from sops below
-      mtu = 1420;
-      peer-routes = true;
-    };
-
-    # Two peers on one interface: hydrogen and the router are peers of sulfur, not of each
-    # other, so losing one costs nothing on the other. Split DNS sends each name directly
-    # to its owner at home and to the shared WAN address everywhere else.
-    "wireguard-peer.${adm.publicKey}" = {
-      allowed-ips = "${adm.address}/32;${peers.hubs.fam.subnet};";
-      endpoint = "${peers.hydrogenEndpointHost}:${toString adm.port}";
-      persistent-keepalive = 25;
-    };
-
-    # The router at its TUNNEL address, never 10.0.0.1. NM installs a route per allowed-ips
-    # entry, so listing the LAN gateway here routes this machine's own gateway and resolver
-    # into the tunnel and kills all connectivity. Any address needed off-tunnel stays off
-    # this list; for the gateway that is a hard rule, not a preference.
-    "wireguard-peer.${rtr.publicKey}" = {
-      allowed-ips = "${rtr.address}/32;";
-      endpoint = "${peers.routerEndpointHost}:${toString rtr.port}";
-      persistent-keepalive = 25;
-    };
-
-    ipv4 = {
-      # /32 plus explicit host routes, so nothing can shadow the local network the way a
-      # /24 would -- no route-metric needed, unlike wg0.
-      method = "manual";
-      address1 = "${peers.admin.sulfur.address}/32";
-      never-default = true;
-    };
-    ipv6.method = "disabled";
+  networking.wireguard.interfaces.${adm.interface} = {
+    ips = [ "${peers.admin.sulfur.address}/32" ];
+    privateKeyFile = config.sops.secrets.${peers.admin.sulfur.secret}.path;
+    mtu = 1420;
+    peers = [
+      {
+        inherit (adm) publicKey;
+        allowedIPs = [ "${adm.address}/32" peers.hubs.fam.subnet ];
+        endpoint = "${peers.hydrogenEndpointHost}:${toString adm.port}";
+        persistentKeepalive = 25;
+      }
+      {
+        inherit (rtr) publicKey;
+        allowedIPs = [ "${rtr.address}/32" ];
+        endpoint = "${peers.routerEndpointHost}:${toString rtr.port}";
+        persistentKeepalive = 25;
+      }
+    ];
   };
 
-  # Keys handed to NM over D-Bus rather than written into any connection file. trim strips
-  # the trailing newline sops leaves on the value.
+  # The manual break-glass profile remains a NetworkManager toggle. Its key is handed to
+  # NM over D-Bus rather than written into a connection file.
   networking.networkmanager.ensureProfiles.secrets.entries = [
-    {
-      matchId = adm.interface;
-      matchType = "wireguard";
-      matchSetting = "wireguard";
-      key = "private-key";
-      file = config.sops.secrets.${peers.admin.sulfur.secret}.path;
-      trim = true;
-    }
     {
       matchId = "wg0";
       matchType = "wireguard";
@@ -337,13 +293,6 @@ in
       trim = true;
     }
   ];
-
-  # The profiles refer to agent-owned keys. Create/reload them only after the system
-  # secret agent is running, so autoconnect never races NetworkManager's secret request.
-  systemd.services.NetworkManager-ensure-profiles = {
-    requires = [ "nm-file-secret-agent.service" ];
-    after = [ "nm-file-secret-agent.service" ];
-  };
 
   # hydrogen's vhosts on the admin tunnel, under their public names so the wildcard cert
   # still matches.

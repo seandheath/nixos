@@ -20,10 +20,10 @@ in
   # secrets/family.yaml -- the only file these machines' age key can read.
   sops.secrets.${self.secret} = { };
 
-  networking.wg-quick.interfaces.${fam.interface} = {
+  networking.wireguard.interfaces.${fam.interface} = {
     # /32, not /24: host address plus host routes means nothing here can shadow the local
     # network, so no table = "off" and hand-built metric, unlike sulfur's wg0.
-    address = [ "${self.address}/32" ];
+    ips = [ "${self.address}/32" ];
     privateKeyFile = config.sops.secrets.${self.secret}.path;
 
     peers = [{
