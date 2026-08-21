@@ -283,10 +283,7 @@ in
     };
 
     wireguard = {
-      # The key is injected from sops by ensureProfiles below. It must be system-owned:
-      # agent-owned secrets cannot satisfy an autoconnect before a desktop secret agent
-      # exists, which leaves the supposedly always-on admin tunnel down after activation.
-      private-key-flags = 0;
+      private-key-flags = 1; # served by nm-file-secret-agent from sops below
       mtu = 1420;
       peer-routes = true;
     };
@@ -340,6 +337,13 @@ in
       trim = true;
     }
   ];
+
+  # The profiles refer to agent-owned keys. Create/reload them only after the system
+  # secret agent is running, so autoconnect never races NetworkManager's secret request.
+  systemd.services.NetworkManager-ensure-profiles = {
+    requires = [ "nm-file-secret-agent.service" ];
+    after = [ "nm-file-secret-agent.service" ];
+  };
 
   # hydrogen's vhosts on the admin tunnel, under their public names so the wildcard cert
   # still matches.

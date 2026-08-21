@@ -4,7 +4,7 @@
 #
 # The router's own hub is deliberately not retired -- it still reaches the LAN, so a broken
 # wgadm config does not cost access to the box. It gets no path to the services.
-{ config, lib, pkgs, ... }:
+{ config, lib, ... }:
 let
   peers = import ./peers.nix;
   fam = peers.hubs.fam;
@@ -83,26 +83,6 @@ in
       peers = map mkPeer (lib.attrValues peers.admin);
     };
   };
-
-  # The generated units are Type=oneshot + RemainAfterExit, so a failed start leaves no
-  # interface and nothing ever retries it. On wgadm that is the only administrative path
-  # into this host. Bound to the failure, not to a clock: a restart re-runs the unit's own
-  # teardown first, which also clears an interface a killed run left behind.
-  # see CHANGELOG 2026-08-19
-  systemd.services = lib.mkMerge (map (i: {
-    "wireguard-${i}".onFailure = [ "wireguard-${i}-retry.service" ];
-    "wireguard-${i}-retry" = {
-      description = "Retry bringing up ${i} after a failed start";
-      serviceConfig = {
-        Type = "oneshot";
-        ExecStart = "${pkgs.coreutils}/bin/sleep 30";
-        ExecStartPost = "${pkgs.systemd}/bin/systemctl restart --no-block wireguard-${i}.service";
-      };
-      # A wedged interface must not become a restart loop that hides the cause.
-      startLimitIntervalSec = 1800;
-      startLimitBurst = 5;
-    };
-  }) [ fam.interface adm.interface ]);
 
   # Stated, not inherited: libvirtd turns this on as a side effect, so the sulfur -> laptop
   # SSH path would work by accident today and break the day libvirtd is disabled.
