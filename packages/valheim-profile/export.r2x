@@ -1,0 +1,29 @@
+profileName: Hydrogen Mostly Vanilla
+mods:
+  - name: denikson-BepInExPack_Valheim
+    version: { major: 5, minor: 4, patch: 2333 }
+    enabled: true
+  - name: ValheimModding-Jotunn
+    version: { major: 2, minor: 29, patch: 2 }
+    enabled: true
+  - name: Azumatt-AzuCraftyBoxes
+    version: { major: 1, minor: 8, patch: 15 }
+    enabled: true
+  - name: Goldenrevolver-Quick_Stack_Store_Sort_Trash_Restock
+    version: { major: 1, minor: 4, patch: 13 }
+    enabled: true
+  - name: MSchmoecker-MultiUserChest
+    version: { major: 0, minor: 6, patch: 1 }
+    enabled: true
+  - name: Azumatt-AAA_Crafting
+    version: { major: 2, minor: 1, patch: 6 }
+    enabled: true
+  - name: MainStreetGaming-MassFarming
+    version: { major: 1, minor: 12, patch: 0 }
+    enabled: true
+  - name: Azumatt-AzuAreaRepair
+    version: { major: 1, minor: 1, patch: 6 }
+    enabled: true
+  - name: ComfyMods-ComfyLadders
+    version: { major: 1, minor: 1, patch: 0 }
+    enabled: true
