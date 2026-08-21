@@ -39,7 +39,7 @@ let
     exec ${pkgs.podman}/bin/podman run --name valheim --replace --pull=missing \
       --security-opt=no-new-privileges --cap-drop=all \
       --userns=keep-id:uid=111,gid=1000 \
-      --publish 10.41.0.1:2456-2458:2456-2458/udp \
+      --publish 10.41.0.2:2456-2458:2456-2458/udp \
       --publish 10.42.0.2:2456-2458:2456-2458/udp \
       --volume ${root}/saves:/home/steam/.config/unity3d/IronGate/Valheim:rw \
       --volume ${root}/server:/home/steam/valheim:rw \
