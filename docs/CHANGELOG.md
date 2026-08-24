@@ -18,11 +18,19 @@ Also the decision log. Rationale that would otherwise bloat a code comment lives
 
 ## 2026-08-21 (isolated Codex)
 
-- **`ccodex` runs Codex `--yolo` inside rootless Podman.** Only the current working tree and
-  a dedicated `ccodex-home` volume are writable; the host home, Codex credentials, SSH/GPG
-  agents and other projects are not mounted. The host Nix store is read-only and the daemon
-  socket remains available, so `nix develop`, builds and flake checks work as they do in
-  `cclaude`. The container keeps its own login; use the device-code choice on first launch.
+- **`ccodex` runs Codex `--yolo` inside rootless Podman.** The current working tree, a dedicated
+  `ccodex-home` volume, and the host `~/.codex` directory are writable; SSH/GPG agents, the rest
+  of the host home, and other projects are not mounted. Sharing `~/.codex` makes login, settings,
+  plugins, and conversations immediately available to both `codex` and `ccodex`, at the explicit
+  cost of exposing those credentials and files to the yolo agent. `ccodex login` runs on the host
+  so its browser can reach the localhost callback. The bind mounts preserve the absolute host
+  paths of both `~/.codex` and the current project because Codex's thread database and project
+  trust records are path-sensitive. Podman assigns each invocation a unique container name, so a
+  stale or concurrent session for the same project cannot block startup. The launcher supervises
+  the container ID and uses Ctrl+C as the Podman detach key, then stops and removes the container
+  on exit, detach, hangup, or termination. Thus Ctrl+C exits `ccodex` instead of merely interrupting
+  the current Codex turn. The host Nix store is read-only and the daemon socket remains available,
+  so `nix develop`, builds and flake checks work as they do in `cclaude`.
 
 ## 2026-08-21 (SSH and Wi-Fi path repair)
 

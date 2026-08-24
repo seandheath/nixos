@@ -1,9 +1,9 @@
 { pkgs, ... }:
 
 # `ccodex`: Codex with --yolo inside a rootless Podman boundary. The agent can write the
-# current project and its own named home volume, but cannot see the host home, Codex config,
-# credentials, SSH/GPG agents, or other working trees. Network access is intentionally left
-# available for model calls and dependency downloads, without forwarding host-local ports.
+# current project, its own named home volume, and the host Codex directory, but cannot see the
+# rest of the host home, SSH/GPG agents, or other working trees. Network access is intentionally
+# left available for model calls and dependency downloads, without forwarding host-local ports.
 let
   image = pkgs.codex-container;
   runtime = image.runtime;
@@ -21,6 +21,13 @@ let
     # Keep the commands hidden by the host /nix/store mount alive across garbage collection:
     # ${runtime}
 
+    # The shared Codex home keeps auth, settings, plugins, and conversations identical inside
+    # and outside the container. Run explicit login commands on the host so their localhost
+    # browser callback does not terminate inside the container's network namespace.
+    if [[ "''${1:-}" == login ]]; then
+      exec ${pkgs.codex}/bin/codex "$@"
+    fi
+
     if ! ${podman} image exists ${imageName} 2>/dev/null; then
       printf 'ccodex: image not found, loading...\n' >&2
       ${ccodex-build}/bin/ccodex-build >&2
@@ -32,10 +39,21 @@ let
     fi
 
     project_dir="$(pwd)"
-    project_name="$(basename "$project_dir" | tr -c 'a-zA-Z0-9_.\n-' '-')"
+    codex_home="$HOME/.codex"
 
-    # Author identity only. Authentication helpers, SSH agents and the host Codex home stay
-    # outside the container; `codex login --device-auth` stores a separate login in the volume.
+    mkdir -p "$codex_home"
+    resume=false
+    for arg in "$@"; do
+      [[ "$arg" == resume ]] && resume=true
+    done
+    codex_args=(--yolo)
+    if $resume; then
+      # Resume in the project that ccodex was launched from; an explicit -C still takes
+      # precedence if the user intentionally chooses another mounted path.
+      codex_args+=(-c 'tui.resume_cwd="current"')
+    fi
+
+    # Author identity only. Authentication helpers and SSH agents stay outside the container.
     gitconfig_args=()
     if [[ -f "$HOME/.gitconfig" ]]; then
       gitconfig_args=(-v "$HOME/.gitconfig:/run/gitconfig:ro" -e GIT_CONFIG_GLOBAL=/run/gitconfig)
@@ -43,8 +61,22 @@ let
       gitconfig_args=(-v "$HOME/.config/git/config:/run/gitconfig:ro" -e GIT_CONFIG_GLOBAL=/run/gitconfig)
     fi
 
-    exec ${podman} run -it --rm \
-      --name "ccodex-''${project_name}" \
+    container_id=""
+    cleanup() {
+      local status=$?
+      trap - EXIT INT HUP TERM
+      if [[ -n "$container_id" ]]; then
+        ${podman} stop --ignore --time 2 "$container_id" >/dev/null 2>&1 || true
+        ${podman} rm --ignore "$container_id" >/dev/null 2>&1 || true
+      fi
+      exit "$status"
+    }
+    trap cleanup EXIT
+    trap 'exit 130' INT
+    trap 'exit 129' HUP
+    trap 'exit 143' TERM
+
+    container_id="$(${podman} create -it \
       --userns=keep-id \
       --cap-drop=ALL \
       --security-opt no-new-privileges:true \
@@ -52,20 +84,28 @@ let
       --read-only \
       --tmpfs /tmp:rw,nosuid,nodev,size=2g,mode=1777 \
       -v ccodex-home:/home/codex:rw,U \
-      -v "''${project_dir}:/''${project_name}:rw" \
+      -v "''${codex_home}:''${codex_home}:rw" \
+      -v "''${project_dir}:''${project_dir}:rw" \
       -v /nix/store:/nix/store:ro \
       -v /nix/var/nix/daemon-socket:/nix/var/nix/daemon-socket \
       -v /nix/var/nix/profiles:/nix/var/nix/profiles:ro \
       --network=pasta \
       -e HOME=/home/codex \
+      -e CODEX_HOME="''${codex_home}" \
       -e USER=codex \
       -e NIX_REMOTE=daemon \
       -e TERM="''${TERM:-xterm-256color}" \
       -e COLORTERM="''${COLORTERM:-truecolor}" \
       "''${gitconfig_args[@]}" \
-      -w "/''${project_name}" \
+      -w "''${project_dir}" \
       ${imageName} \
-      /bin/codex --yolo "$@"
+      /bin/codex "''${codex_args[@]}" "$@")"
+
+    set +e
+    ${podman} start -a -i --detach-keys=ctrl-c --sig-proxy=false "$container_id"
+    status=$?
+    set -e
+    exit "$status"
   '';
 in
 {
