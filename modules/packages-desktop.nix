@@ -54,6 +54,7 @@
     kicad
 
     # Note-taking and productivity
+    marktext
     obsidian
     xournalpp
 
