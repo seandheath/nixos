@@ -63,9 +63,9 @@ let
     # files, into the sops tmpfs for the rendered secrets — and podman needs the resolved
     # target, not the link.
     config_args=()
-    qwen_settings="$(readlink -f "$HOME/.qwen/settings.json" 2>/dev/null || true)"
+    qwen_settings="$(readlink -f "$HOME/.qwen/re-settings.json" 2>/dev/null || true)"
     qwen_context="$(readlink -f "$HOME/.qwen/QWEN.md" 2>/dev/null || true)"
-    oc_config="$(readlink -f "$HOME/.config/opencode/opencode.json" 2>/dev/null || true)"
+    oc_config="$(readlink -f "$HOME/.config/opencode/opencode-re.json" 2>/dev/null || true)"
     oc_prompt="$(readlink -f "$HOME/.config/opencode/re-instructions.md" 2>/dev/null || true)"
     oc_datasheet_skill_file="$(readlink -f "$HOME/.config/opencode/skills/datasheet-reference/SKILL.md" 2>/dev/null || true)"
     oc_datasheet_skill=""

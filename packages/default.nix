@@ -28,6 +28,8 @@ final: prev: {
   minecraft-menu = import ./minecraft-menu { pkgs = final; };
   minecraft-server-image = import ./minecraft-server-image.nix { pkgs = final; };
   minecraft-server-ctl = import ./minecraft-server-ctl.nix { pkgs = final; };
+  porkbun-domain-search-mcp = import ./porkbun-domain-search-mcp.nix { pkgs = final; };
+  porkbun-mcp-domain-search = import ./porkbun-mcp-domain-search.nix { pkgs = final; };
   qwen-code = import ./qwen-code.nix { pkgs = final; };
   reference-download = import ./reference-download.nix { pkgs = final; };
   re-container = import ./re-container.nix { pkgs = final; };

@@ -6,6 +6,43 @@
 # an RE session.
 let
   vllm = import ./vllm-endpoint.nix;
+  settings = {
+    # The MIGRATED shape, not what upstream's docs show: modelProviders.<id> is a bare
+    # array and the SDK protocol comes from the separate providerProtocol map.
+    modelProviders.vllm = [{
+      id = "$OPENWEBUI_MODEL";
+      baseUrl = "$OPENWEBUI_URL";
+      envKey = "OPENWEBUI_API_KEY";
+      generationConfig = {
+        contextWindowSize = vllm.contextWindow;
+        samplingParams.max_tokens = vllm.maxOutput;
+      };
+    }];
+    providerProtocol.vllm = "openai";
+
+    security.auth.selectedType = "openai";
+    model.name = "$OPENWEBUI_MODEL";
+    context.fileName = "QWEN.md";
+
+    mcpServers = {
+      # `httpUrl` selects StreamableHTTPClientTransport; ReVa does not serve SSE.
+      reva.httpUrl = "http://localhost:8080/mcp/message";
+      porkbun = {
+        command = "porkbun-domain-search-mcp";
+        includeTools = [ "ping" "check_domain" "get_pricing" ];
+        trust = true;
+      };
+    };
+
+    # The MCP binary exposes only these three read-only calls, so trusting its tools cannot
+    # register domains, spend credit, inspect the account, or alter DNS.
+    permissions.allow = [ "run_shell_command(python3 -c *)" ];
+  };
+
+  # The container launchers are RE-specific and deliberately receive no registrar secret.
+  reSettings = settings // {
+    mcpServers = builtins.removeAttrs settings.mcpServers [ "porkbun" ];
+  };
 in
 {
   environment.systemPackages = [ pkgs.qwen-code ];
@@ -25,46 +62,11 @@ in
   # survive that rewrite unresolved and are read from the sops-rendered .env below.
   home-manager.users.sheath.home.file.".qwen/settings.json" = {
     force = true;
-    text = builtins.toJSON {
-      # The MIGRATED shape, not what upstream's docs show: modelProviders.<id> is a bare
-      # array (the documented { protocol, models } wrapper is silently dropped) and the SDK
-      # protocol comes from the separate providerProtocol map below -- without it the models
-      # are ignored as "not a built-in protocol".
-      modelProviders.vllm = [{
-        id = "$OPENWEBUI_MODEL";
-        baseUrl = "$OPENWEBUI_URL";
-        # Names the env var holding the key, not the key: a reference by design.
-        envKey = "OPENWEBUI_API_KEY";
-        # Belongs on the model entry; under top-level `model` it is accepted and ignored.
-        generationConfig = {
-          # qwen-code compacts against this, so above the server's real limit invites
-          # context overflow mid-task.
-          contextWindowSize = vllm.contextWindow;
-          samplingParams = {
-            max_tokens = vllm.maxOutput;
-          };
-        };
-      }];
-      providerProtocol.vllm = "openai";
+    text = builtins.toJSON settings;
+  };
 
-      security.auth.selectedType = "openai";
-      model.name = "$OPENWEBUI_MODEL";
-
-      # Default, stated explicitly: this is the QWEN.md written above.
-      context.fileName = "QWEN.md";
-
-      # `httpUrl` selects StreamableHTTPClientTransport; plain `url` would select SSE, which
-      # ReVa does not serve. Path is /mcp/message, and it responds only while Ghidra has a
-      # program open.
-      mcpServers.reva.httpUrl = "http://localhost:8080/mcp/message";
-
-      # Pre-approve exactly the arithmetic escape hatch QWEN.md tells the model to use:
-      # instructing it to shell out is useless if every call stops for confirmation. The
-      # pattern covers `python3 -c 'import struct; ...'` -- do not narrow it without
-      # re-testing that. Must be spelled run_shell_command; the documented Bash(...) alias
-      # does not match in the approval path.
-      permissions.allow = [ "run_shell_command(python3 -c *)" ];
-    };
+  home-manager.users.sheath.home.file.".qwen/re-settings.json" = {
+    text = builtins.toJSON reSettings;
   };
 
   # Rendered into the one file qwen-code reads but never writes. Sub-module so `config` is

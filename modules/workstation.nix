@@ -18,6 +18,12 @@
 
   # Programs
   programs.firefox.enable = true;
+  environment.systemPackages = [ pkgs.porkbun-domain-search-mcp ];
+
+  # The launcher reads these at MCP process startup; no client config or Nix store path
+  # contains either credential.
+  sops.secrets.porkbun-api-key.owner = "sheath";
+  sops.secrets.porkbun-secret-api-key.owner = "sheath";
 
   
   # Ships 54-cynthion.rules; TAG+="uaccess" grants the active session user access, so no
@@ -56,7 +62,12 @@
       settings="$HOME/.claude/settings.json"
       mkdir -p "$(dirname "$settings")"
       [ -s "$settings" ] || echo '{}' > "$settings"
-      ${pkgs.jq}/bin/jq '.permissions.allow = ((.permissions.allow // []) + ["mcp__ReVa"] | unique)' \
+      ${pkgs.jq}/bin/jq '.permissions.allow = ((.permissions.allow // []) + [
+        "mcp__ReVa",
+        "mcp__porkbun__ping",
+        "mcp__porkbun__check_domain",
+        "mcp__porkbun__get_pricing"
+      ] | unique)' \
         "$settings" > "$settings.tmp" && mv "$settings.tmp" "$settings"
     '';
   }) ];

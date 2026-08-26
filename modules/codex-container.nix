@@ -1,9 +1,9 @@
 { pkgs, ... }:
 
 # `ccodex`: Codex with --yolo inside a rootless Podman boundary. The agent can write the
-# current project, its own named home volume, and the host Codex directory, but cannot see the
-# rest of the host home, SSH/GPG agents, or other working trees. Network access is intentionally
-# left available for model calls and dependency downloads, without forwarding host-local ports.
+# current project, its own named home volume, the host Codex directory, and only the two
+# Porkbun credential files required by its read-only MCP server. The rest of the host home,
+# SSH/GPG agents, and other working trees remain hidden; network access stays available.
 let
   image = pkgs.codex-container;
   runtime = image.runtime;
@@ -86,6 +86,8 @@ let
       -v ccodex-home:/home/codex:rw,U \
       -v "''${codex_home}:''${codex_home}:rw" \
       -v "''${project_dir}:''${project_dir}:rw" \
+      -v /run/secrets/porkbun-api-key:/run/secrets/porkbun-api-key:ro \
+      -v /run/secrets/porkbun-secret-api-key:/run/secrets/porkbun-secret-api-key:ro \
       -v /nix/store:/nix/store:ro \
       -v /nix/var/nix/daemon-socket:/nix/var/nix/daemon-socket \
       -v /nix/var/nix/profiles:/nix/var/nix/profiles:ro \

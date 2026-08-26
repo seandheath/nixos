@@ -2,9 +2,8 @@
 
 # Runtime image for `ccodex` (see modules/codex-container.nix). Codex runs with its own
 # sandbox disabled, so Podman is the security boundary: only the current project, the host
-# Codex directory, and a dedicated home volume are writable. The host Nix store is mounted
-# over the image's store at runtime so `nix develop` and `nix build` can use the host daemon,
-# just as in cclaude.
+# Codex directory, and a dedicated home volume are writable. The launcher also supplies two
+# read-only Porkbun secret files; the host Nix store and daemon keep Nix workflows available.
 let
   homeDir = "/home/codex";
   uid = 1000;

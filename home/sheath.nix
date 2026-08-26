@@ -19,6 +19,8 @@ let
   # key, which by design cannot decrypt secrets/secrets.yaml (see .sops.yaml), so the
   # openwebui-* secrets below would fail activation there.
   enablePi = workstation;
+  claude = inputs.cclaude.packages.x86_64-linux.default;
+  porkbunMcp = "${pkgs.porkbun-domain-search-mcp}/bin/porkbun-domain-search-mcp";
 in
 {
   imports = [
@@ -77,7 +79,7 @@ in
   };
 
   home.packages = [
-    inputs.cclaude.packages.x86_64-linux.default
+    claude
     inputs.cclaude.packages.x86_64-linux.cclaude-build
     inputs.cclaude.packages.x86_64-linux.cclaude-update
     inputs.cclaude.packages.x86_64-linux.cclaude-shell
@@ -85,6 +87,26 @@ in
   ] ++ lib.optionals enablePi [
     inputs.pi-flake.packages.x86_64-linux.default
   ];
+
+  # Both clients own mutable user configuration, so register the declarative command only
+  # when it differs. Their MCP processes load credentials from the SOPS-backed launcher.
+  home.activation.porkbunMcpClients = lib.mkIf workstation
+    (lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+      porkbun_command=${lib.escapeShellArg porkbunMcp}
+
+      codex_config="$(${pkgs.codex}/bin/codex mcp get porkbun 2>/dev/null || true)"
+      if [[ "$codex_config" != *"$porkbun_command"* ]]; then
+        run ${pkgs.codex}/bin/codex mcp remove porkbun >/dev/null 2>&1 || true
+        run ${pkgs.codex}/bin/codex mcp add porkbun -- "$porkbun_command"
+      fi
+
+      claude_config="$(${claude}/bin/claude mcp get porkbun 2>/dev/null || true)"
+      if [[ "$claude_config" != *"$porkbun_command"* ]]; then
+        run ${claude}/bin/claude mcp remove porkbun --scope user >/dev/null 2>&1 || true
+        run ${claude}/bin/claude mcp add --scope user porkbun -- "$porkbun_command"
+      fi
+    '');
+
   home.username = "sheath";
   home.homeDirectory = "/home/sheath";
   home.sessionPath = [

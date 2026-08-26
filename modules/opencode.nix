@@ -18,26 +18,18 @@ in
     force = true;
   };
 
-  # Available to the host OpenCode. The container launcher mounts this same resolved tree,
-  # so both clients use one canonical copy and load it only when the workflow is relevant.
+  # Available to host and container OpenCode from one canonical copy.
   home-manager.users.sheath.xdg.configFile."opencode/skills/datasheet-reference" = {
     source = ../skills/datasheet-reference;
     recursive = true;
     force = true;
   };
 
-  # One sops template rather than a plain configFile: all three identifying details of the
-  # endpoint are secrets, and nothing model-identifying may land in the public flake or the
-  # store. Imported as a sub-module so `config` here is home-manager's -- sops.placeholder
-  # exists only inside its own evaluation.
-  home-manager.users.sheath.imports = [ ({ config, lib, ... }: {
-    # Re-declared rather than leaning on home/sheath.nix's pi block, so this stands alone if
-    # pi is dropped; identical sops.secrets definitions merge.
-    sops.secrets = lib.genAttrs vllm.secretNames (_: { });
-
-    sops.templates."opencode.json" = {
-      path = "${config.home.homeDirectory}/.config/opencode/opencode.json";
-      content = builtins.toJSON {
+  # The host config includes domain search; the RE-container copy omits it so registrar
+  # credentials never enter a general-purpose agent sandbox with unrestricted outbound net.
+  home-manager.users.sheath.imports = [ ({ config, lib, ... }:
+    let
+      baseConfig = {
         "$schema" = "https://opencode.ai/config.json";
 
         # The served model is not in models.dev, so the SDK and the capabilities have to be
@@ -99,6 +91,35 @@ in
           permission.websearch = "allow";
         };
       };
-    };
-  }) ];
+
+      hostConfig = baseConfig // {
+        mcp = baseConfig.mcp // {
+          porkbun = {
+            type = "local";
+            command = [ "porkbun-domain-search-mcp" ];
+            enabled = true;
+          };
+        };
+        permission = {
+          porkbun_ping = "allow";
+          porkbun_check_domain = "allow";
+          porkbun_get_pricing = "allow";
+        };
+      };
+    in {
+      # Re-declared rather than leaning on home/sheath.nix's pi block, so this stands alone
+      # if pi is dropped; identical sops.secrets definitions merge.
+      sops.secrets = lib.genAttrs vllm.secretNames (_: { });
+
+      sops.templates."opencode.json" = {
+        path = "${config.home.homeDirectory}/.config/opencode/opencode.json";
+        content = builtins.toJSON hostConfig;
+      };
+
+      sops.templates."opencode-re.json" = {
+        path = "${config.home.homeDirectory}/.config/opencode/opencode-re.json";
+        content = builtins.toJSON baseConfig;
+      };
+    }
+  ) ];
 }

@@ -16,6 +16,14 @@ Also the decision log. Rationale that would otherwise bloat a code comment lives
   finding: scripted networking is detaching its own slave, and `br0-netdev`'s
   `X-ReloadIfChanged` is the next suspect.
 
+## 2026-08-26 (read-only Porkbun domain search)
+
+- **Codex, Claude Code, OpenCode, and Qwen Code can query Porkbun.** The pinned MCP build
+  exposes only credential validation, availability, and pricing; registration, account, and
+  DNS tools do not exist in its tool surface. SOPS supplies a dedicated key at process start.
+- **RE containers omit Porkbun; `ccodex` includes it.** The RE agents do not need registrar
+  access, while the general Codex container receives only the two required secret files.
+
 ## 2026-08-21 (isolated Codex)
 
 - **`ccodex` runs Codex `--yolo` inside rootless Podman.** The current working tree, a dedicated
