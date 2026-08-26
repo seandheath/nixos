@@ -16,6 +16,12 @@ Also the decision log. Rationale that would otherwise bloat a code comment lives
   finding: scripted networking is detaching its own slave, and `br0-netdev`'s
   `X-ReloadIfChanged` is the next suspect.
 
+## 2026-08-26 (Hydrogen Git SSH identity)
+
+- **`hydrogen-git` explicitly selects the authorized personal key.** The restricted `git`
+  account authorizes that key, while OpenSSH's default `id_ed25519` is a different identity;
+  without `IdentityFile` and `IdentitiesOnly`, pushes failed before reaching `git-shell`.
+
 ## 2026-08-26 (read-only Porkbun domain search)
 
 - **Codex, Claude Code, OpenCode, and Qwen Code can query Porkbun.** The pinned MCP build

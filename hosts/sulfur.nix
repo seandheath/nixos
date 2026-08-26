@@ -357,6 +357,8 @@ in
     Host hydrogen-git
       HostName ${adm.address}
       User git
+      IdentityFile /home/sheath/.ssh/personal
+      IdentitiesOnly yes
   '' + lib.concatStrings (lib.mapAttrsToList (name: peer: ''
     Host ${name}
       HostName ${peer.address}
