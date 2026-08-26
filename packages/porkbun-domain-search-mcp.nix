@@ -7,6 +7,13 @@ pkgs.writeShellApplication {
   text = ''
     api_key_file=/run/secrets/porkbun-api-key
     secret_key_file=/run/secrets/porkbun-secret-api-key
+    ca_bundle=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt
+
+    # Codex intentionally gives stdio MCP children a minimal environment. In the ccodex
+    # image that strips the only CA-store hint, so Node reports every HTTPS request as the
+    # unhelpful `fetch failed`. Make TLS independent of the launching client's policy.
+    export SSL_CERT_FILE="''${SSL_CERT_FILE:-$ca_bundle}"
+    export NODE_EXTRA_CA_CERTS="''${NODE_EXTRA_CA_CERTS:-$ca_bundle}"
 
     if [[ -z "''${PORKBUN_API_KEY:-}" ]]; then
       [[ -r "$api_key_file" ]] || {
