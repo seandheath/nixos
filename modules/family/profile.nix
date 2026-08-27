@@ -32,18 +32,6 @@ in
     ./vpn-peer.nix
   ];
 
-  options.family.minecraft = lib.mkOption {
-    type = lib.types.bool;
-    default = false;
-    description = ''
-      Ship the pinned Minecraft client. Off since 2026-08-07 until an install is known
-      good: the payload is ~500 MiB of fixed-output derivations fetched from Mojang and
-      Modrinth, and a laptop that cannot complete that fails the whole nixos-install.
-      Install without it, then push from sulfur with `nixos-rebuild --target-host`, which
-      copies the paths over SSH and never contacts Mojang.
-    '';
-  };
-
   options.family.enable = lib.mkOption {
     type = lib.types.bool;
     default = false;
@@ -105,17 +93,14 @@ in
       nextcloud-client
     ];
 
-    # Gated here rather than by a conditional import -- the module system forbids reading
-    # `config` from `imports`. Harmless: with enable = false nothing references the
-    # derivation, so the 500 MiB payload never enters the closure.
     services.minecraftClient = {
-      enable = config.family.minecraft;
+      enable = true;
       playerName = self.minecraftName;
       server = "mc.luckyobserver.com:25565";
     };
 
     services.minecraftLauncher = {
-      enable = config.family.minecraft;
+      enable = true;
       controlKeyFile = config.sops.secrets."minecraft-control-${username}".path;
     };
     sops.secrets."minecraft-control-${username}" = {

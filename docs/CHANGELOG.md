@@ -16,6 +16,11 @@ Also the decision log. Rationale that would otherwise bloat a code comment lives
   finding: scripted networking is detaching its own slave, and `br0-netdev`'s
   `X-ReloadIfChanged` is the next suspect.
 
+## 2026-08-27 (family Minecraft clients)
+
+- **All four family laptops now ship the pinned Minecraft client and world chooser.** Their
+  shared profile supplies each existing player identity and restricted world-control key.
+
 ## 2026-08-26 (Hydrogen Git SSH identity)
 
 - **`hydrogen-git` explicitly selects the authorized personal key.** The restricted `git`
