@@ -16,14 +16,6 @@ Also the decision log. Rationale that would otherwise bloat a code comment lives
   finding: scripted networking is detaching its own slave, and `br0-netdev`'s
   `X-ReloadIfChanged` is the next suspect.
 
-## 2026-08-27 (Sulfur WireGuard return traffic)
-
-- **`wgadm` now listens on fixed UDP port 51824, allowed only on sulfur's Wi-Fi interface.**
-  Hydrogen and the router both returned valid handshakes, but sulfur's firewall classified
-  each response as a new inbound flow and rejected it. Pinning and admitting the one
-  authenticated WireGuard socket restores Valheim, web-service, and admin tunnel traffic
-  without opening an ephemeral UDP range.
-
 ## 2026-08-26 (Hydrogen Git SSH identity)
 
 - **`hydrogen-git` explicitly selects the authorized personal key.** The restricted `git`

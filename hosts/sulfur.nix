@@ -5,7 +5,6 @@ let
   peers = import ../modules/family/peers.nix;
   adm = peers.hubs.adm;
   rtr = peers.routerMgmt;
-  wgadmListenPort = 51824;
 in
 {
   imports = [
@@ -289,10 +288,6 @@ in
   networking.wireguard.interfaces.${adm.interface} = {
     ips = [ "${peers.admin.sulfur.address}/32" ];
     privateKeyFile = config.sops.secrets.${peers.admin.sulfur.secret}.path;
-    # Return handshakes were reaching sulfur but conntrack classified them as new inbound
-    # UDP, so the default firewall rejected both peers' replies. A stable port lets the
-    # firewall grant exactly the WireGuard socket instead of opening an ephemeral range.
-    listenPort = wgadmListenPort;
     mtu = 1420;
     peers = [
       {
@@ -309,7 +304,6 @@ in
       }
     ];
   };
-  networking.firewall.interfaces."wlo1".allowedUDPPorts = [ wgadmListenPort ];
 
   # The manual break-glass profile remains a NetworkManager toggle. Its key is handed to
   # NM over D-Bus rather than written into a connection file.
