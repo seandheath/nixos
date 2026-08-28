@@ -66,7 +66,7 @@ rec {
 
     sheath-phone = {
       address = "10.42.0.4";
-      publicKey = "3IB2mSQy5JlTNb/JR2717gzNHAoiqACLgIZBiIlGlHE=";
+      publicKey = "T1JupspOSEWuBKZrPuwSWy7Hdo9vu84grjU3f7jEQmQ=";
     };
   };
 
