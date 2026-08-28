@@ -20,6 +20,7 @@ in
     ../modules/scanner.nix
     ../modules/ollama.nix
     ../modules/backup.nix
+    ../modules/proton-workspace.nix
     ../modules/git-server.nix
     ../modules/fleet-vpn.nix
     ../modules/family/vpn-hub.nix
