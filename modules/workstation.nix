@@ -1,4 +1,18 @@
-{ config, pkgs, lib, ... }: {
+{ config, pkgs, lib, ... }:
+
+let
+  cynthionUdevRules = pkgs.writeTextFile {
+    name = "cynthion-cable-udev-rules";
+    destination = "/lib/udev/rules.d/60-cynthion-cable.rules";
+    text = ''
+      SUBSYSTEM=="usb", ATTR{idVendor}=="1d50", ATTR{idProduct}=="615b", TAG+="uaccess"
+      SUBSYSTEM=="usb", ATTR{idVendor}=="1d50", ATTR{idProduct}=="615c", TAG+="uaccess"
+      SUBSYSTEM=="usb", ATTR{idVendor}=="1209", ATTR{idProduct}=="0010", TAG+="uaccess"
+      SUBSYSTEM=="usb", ATTR{idVendor}=="1209", ATTR{idProduct}=="0001", TAG+="uaccess"
+    '';
+  };
+in
+{
   imports = [
     ./gnome.nix
     ./nix-ld.nix
@@ -25,10 +39,9 @@
   sops.secrets.porkbun-api-key.owner = "sheath";
   sops.secrets.porkbun-secret-api-key.owner = "sheath";
 
-  
-  # Ships 54-cynthion.rules; TAG+="uaccess" grants the active session user access, so no
-  # plugdev group is needed.
-  services.udev.packages = [ pkgs.cynthion ];
+  # Grant the active session user access to Cynthion's bootloader, Apollo, and analyzer
+  # USB identities without requiring a plugdev group.
+  services.udev.packages = [ cynthionUdevRules ];
 
   # Avahi for network printer discovery (.local hostname resolution)
   services.avahi = {

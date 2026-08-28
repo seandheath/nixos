@@ -157,6 +157,10 @@ in
   fleet.accounts.rootPassword = "sops";
   fleet.accounts.sudoNoPassword = true;
 
+  systemd.tmpfiles.rules = [
+    "d /data/games 0755 sheath sheath -"
+  ];
+
   environment.systemPackages = with pkgs; [
     rustdesk-flutter
     rustup firefox git curl wget htop tree ripgrep srm

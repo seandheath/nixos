@@ -16,6 +16,13 @@ Also the decision log. Rationale that would otherwise bloat a code comment lives
   finding: scripted networking is detaching its own slave, and `br0-netdev`'s
   `X-ReloadIfChanged` is the next suspect.
 
+## 2026-08-28 (game asset storage and Cynthion access)
+
+- **Hydrogen provides `/data/games` for user-owned, non-DRM game assets.** The directory
+  lives on the large data filesystem and is writable by `sheath`.
+- **Workstations grant session access to every Cynthion USB identity.** Minimal local udev
+  rules replace the upstream package's incomplete device coverage.
+
 ## 2026-08-27 (family Minecraft clients)
 
 - **All four family laptops now ship the pinned Minecraft client and world chooser.** Their
