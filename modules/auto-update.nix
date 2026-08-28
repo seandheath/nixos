@@ -128,13 +128,6 @@ in
     the repo every host builds. Exactly one host may own this -- a second writer is a push race
   '';
 
-  options.fleet.hardware.isPlaceholder = lib.mkOption {
-    type = lib.types.bool;
-    default = false;
-    internal = true;
-    description = "Whether this configuration still uses generated placeholder hardware.";
-  };
-
   config = lib.mkMerge [
     {
       system.autoUpgrade = {

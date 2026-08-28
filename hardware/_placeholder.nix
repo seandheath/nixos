@@ -6,9 +6,13 @@
 {
   imports = [ (modulesPath + "/installer/scan/not-detected.nix") ];
 
+  # A machine-local generated hardware module forces this back to false. Keep the checked-in
+  # family-host placeholders visible to the installer's target-config gate until then.
+  fleet.hardware.isPlaceholder = true;
+
   # Every host rebuilds from the repo (modules/auto-update.nix), so an installed machine
   # still on the placeholder switches to these dummy filesystems and dies at the next
-  # boot. Once disk-config/<host>.nix exists, disko owns the mounts and both the dummies
+  # boot. Once provisioning/<host>/disk.nix exists, disko owns the mounts and both the dummies
   # and the warning go away.
   warnings = lib.optional (!config.fleet.disk.enable) ''
     ${config.networking.hostName}: hardware/${config.networking.hostName}.nix is still the

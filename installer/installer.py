@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
 import curses
 import json
 import os
@@ -374,6 +375,20 @@ def age_decrypt(source: Path, destination: Path, passphrase: str) -> None:
 def shell_quote(value: str) -> str: return "'" + value.replace("'", "'\\''") + "'"
 
 
+@contextmanager
+def luks_key(passphrase: str):
+    """Expose the selected passphrase only while a Disko script needs it."""
+    key = SCRATCH / "luks.key"
+    if passphrase:
+        SCRATCH.mkdir(mode=0o700, exist_ok=True)
+        key.write_text(passphrase)
+        key.chmod(0o600)
+    try:
+        yield
+    finally:
+        key.unlink(missing_ok=True)
+
+
 def provisioning_module() -> str:
     """The local overlay that combines generated disk and hardware facts."""
     return """{ lib, ... }:
@@ -383,6 +398,39 @@ def provisioning_module() -> str:
   fleet.hardware.isPlaceholder = lib.mkIf (builtins.pathExists ./hardware.nix) (lib.mkForce false);
 }
 """
+
+
+def validate_target_config(repo: Path, host: str, profile: Profile) -> None:
+    """Reject a target flake that lost the generated disk or hardware modules."""
+    apply = """c: {
+  diskEnabled = c.fleet.disk.enable;
+  placeholder = c.fleet.hardware.isPlaceholder;
+  root = { inherit (c.fileSystems."/") device fsType; };
+  boot = { inherit (c.fileSystems."/boot") device fsType; };
+  home = { inherit (c.fileSystems."/home") device fsType; };
+  luks = builtins.mapAttrs (_: d: { inherit (d) device keyFile; }) c.boot.initrd.luks.devices;
+}"""
+    value = json.loads(nix(repo, ["eval", "--json", f"{local_flake(repo)}#nixosConfigurations.{host}.config", "--apply", apply], "validating the target configuration"))
+    expected_root_type = "tmpfs" if profile.root_mode == "tmpfs" else "btrfs"
+    expected_root_device = "/dev/mapper/cryptroot" if profile.system_encrypt else "/dev/disk/by-partlabel/disk-system-root"
+    expected_home_device = (
+        expected_root_device if not profile.home_device
+        else "/dev/mapper/crypthome" if profile.home_encrypt
+        else "/dev/disk/by-partlabel/disk-home-home"
+    )
+    errors = []
+    if not value["diskEnabled"]: errors.append("fleet.disk is disabled")
+    if value["placeholder"]: errors.append("generated hardware is still marked as a placeholder")
+    if value["root"]["fsType"] != expected_root_type: errors.append(f"/ is {value['root']['fsType']}, expected {expected_root_type}")
+    if profile.root_mode != "tmpfs" and value["root"]["device"] != expected_root_device: errors.append(f"/ uses {value['root']['device']}, expected {expected_root_device}")
+    if value["boot"] != {"device": "/dev/disk/by-partlabel/disk-system-ESP", "fsType": "vfat"}: errors.append("/boot is not Disko's system ESP")
+    if value["home"]["device"] != expected_home_device: errors.append(f"/home uses {value['home']['device']}, expected {expected_home_device}")
+    for name, enabled in (("cryptroot", profile.system_encrypt), ("crypthome", bool(profile.home_device and profile.home_encrypt))):
+        luks = value["luks"].get(name)
+        backing = f"/dev/disk/by-partlabel/disk-{'system-root' if name == 'cryptroot' else 'home-home'}"
+        if enabled and (not luks or luks["device"] != backing or luks["keyFile"] is not None): errors.append(f"{name} will not prompt for the expected partition at boot")
+        if not enabled and luks: errors.append(f"unexpected boot-time LUKS device {name}")
+    if errors: raise RuntimeError("target configuration is not bootable: " + "; ".join(errors))
 
 
 def stream(args: list[str], what: str, log: Callable[[str], None], input_text: str | None = None) -> None:
@@ -435,10 +483,8 @@ def run_install(board: Board, log: Callable[[str], None]) -> None:
         log(f"== {name}"); action(); mark(name)
         if name == "install": mark("install-local-provisioning")
     def partition() -> None:
-        if context.luks_passphrase:
-            SCRATCH.mkdir(mode=0o700, exist_ok=True); key = SCRATCH / "luks.key"; key.write_text(context.luks_passphrase); key.chmod(0o600)
-        try: stream([context.disko, "--mode", "destroy,format,mount", "--yes-wipe-all-disks", "--flake", f"{local_flake(context.repo)}#{context.host}"], "disko", log)
-        finally: (SCRATCH / "luks.key").unlink(missing_ok=True)
+        with luks_key(context.luks_passphrase):
+            stream([context.disko, "--mode", "destroy,format,mount", "--yes-wipe-all-disks", "--flake", f"{local_flake(context.repo)}#{context.host}"], "disko", log)
     def hardware() -> None:
         dest = TARGET / "persist/nixos-install/hardware.nix"
         if dest.is_file() and dest.stat().st_size > 0: log("local hardware configuration already exists; leaving it alone"); return
@@ -458,6 +504,8 @@ def run_install(board: Board, log: Callable[[str], None]) -> None:
         provision.mkdir(parents=True, exist_ok=True)
         for name in ("default.nix", "disk.nix", "hardware.nix"):
             shutil.copyfile(persistent / name, provision / name)
+        validate_target_config(dest, context.host, context.profile)
+        log("validated generated disk and hardware modules in the target flake")
     def secrets() -> None:
         destination = TARGET / context.facts.age_key_file.lstrip("/"); destination.parent.mkdir(parents=True, exist_ok=True); age_decrypt(context.repo / context.facts.age_key_source, destination, context.age_passphrase); destination.chmod(0o600)
         ssh_dir = TARGET / "etc/ssh"
@@ -653,7 +701,10 @@ class Tui:
     def remount(self) -> None:
         if not self.board.disko: self.board.check("disko")
         if self.board.disko:
-            try: command([self.board.disko, "--mode", "mount", "--flake", f"{local_flake(self.board.repo)}#{self.board.host}"], "mounting target"); self.message = "target mounted"
+            try:
+                with luks_key(self.board.luks_passphrase):
+                    command([self.board.disko, "--mode", "mount", "--flake", f"{local_flake(self.board.repo)}#{self.board.host}"], "mounting target")
+                self.message = "target mounted"
             except RuntimeError as error: self.message = str(error)
 
     def start_install(self, screen: curses.window) -> None:

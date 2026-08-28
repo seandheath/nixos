@@ -16,6 +16,24 @@ Also the decision log. Rationale that would otherwise bloat a code comment lives
   finding: scripted networking is detaching its own slave, and `br0-netdev`'s
   `X-ReloadIfChanged` is the next suspect.
 
+## 2026-08-28 (gentlemenpupil install preflight)
+
+- **Family hosts evaluate again before a disk is touched.** `fleet.hardware.isPlaceholder`
+  was declared in both provisioning and auto-update modules, so the selected host failed
+  module evaluation before Disko could validate its layout. Provisioning now owns the option;
+  the checked-in placeholder sets it and generated machine-local hardware clears it.
+- **The bootstrap and target both use explicit `path:` flakes.** A Git flake filters
+  untracked files, but the installer deliberately generates its disk and hardware modules
+  locally. The bootstrap now also includes working-tree installer fixes, which matters when
+  repairing an install from the live ISO before a commit exists.
+- **`nixos-install` is gated on the assembled target configuration.** After copying the
+  generated modules, the installer evaluates the exact target flake and checks its root,
+  home, ESP, placeholder state and boot-time LUKS devices. It refuses to install a generation
+  that fell back to the placeholder filesystems or retained the format-time LUKS key.
+- **Encrypted resume supplies Disko's key file while mounting.** Disko's generated mount
+  script must reopen LUKS after an ISO reboot. The dashboard's `m` path now creates the same
+  mode-0600 scratch key used during formatting and removes it immediately afterward.
+
 ## 2026-08-28 (game asset storage and Cynthion access)
 
 - **Hydrogen provides `/data/games` for user-owned, non-DRM game assets.** The directory

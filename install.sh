@@ -32,4 +32,4 @@ echo "install.sh: building the installer (later runs are cached)"
 
 # The ISO ships with flakes off, and every nix call below needs them.
 exec nix --extra-experimental-features "nix-command flakes" \
-    run "${REPO}#installer" -- --repo "${REPO}" "$@"
+    run "path:${REPO}#installer" -- --repo "${REPO}" "$@"

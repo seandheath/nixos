@@ -1,11 +1,14 @@
 """Unit tests for installer decisions that do not need a live ISO."""
 
+import json
+import tempfile
 import unittest
 import inspect
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from installer import Board, Profile, UNSET_DEVICE, child_env, facts, is_size, local_flake, provisioning_module, shell_quote
+from installer import Board, Profile, UNSET_DEVICE, child_env, facts, is_size, local_flake, luks_key, provisioning_module, shell_quote, validate_target_config
 
 
 class ProfileTests(unittest.TestCase):
@@ -36,8 +39,47 @@ class ProfileTests(unittest.TestCase):
     def test_shell_quote_handles_single_quotes(self):
         self.assertEqual(shell_quote("a'b"), "'a'\\''b'")
 
+    def test_luks_key_exists_only_while_disko_runs(self):
+        with tempfile.TemporaryDirectory() as directory, patch("installer.SCRATCH", Path(directory)):
+            key = Path(directory) / "luks.key"
+            with luks_key("secret"):
+                self.assertEqual(key.read_text(), "secret")
+                self.assertEqual(key.stat().st_mode & 0o777, 0o600)
+            self.assertFalse(key.exists())
+
     def test_local_flake_keeps_untracked_provisioning_files(self):
         self.assertEqual(local_flake("/mnt/home/sheath/nixos"), "path:/mnt/home/sheath/nixos")
+
+    def test_bootstrap_keeps_working_tree_fixes(self):
+        install_sh = Path(__file__).resolve().parent.parent / "install.sh"
+        self.assertIn('run "path:${REPO}#installer"', install_sh.read_text())
+
+    def test_target_config_accepts_generated_encrypted_layout(self):
+        profile = Profile("test", system_device="/dev/disk/by-id/test", system_encrypt=True)
+        value = {
+            "diskEnabled": True,
+            "placeholder": False,
+            "root": {"device": "/dev/mapper/cryptroot", "fsType": "btrfs"},
+            "boot": {"device": "/dev/disk/by-partlabel/disk-system-ESP", "fsType": "vfat"},
+            "home": {"device": "/dev/mapper/cryptroot", "fsType": "btrfs"},
+            "luks": {"cryptroot": {"device": "/dev/disk/by-partlabel/disk-system-root", "keyFile": None}},
+        }
+        with patch("installer.nix", return_value=json.dumps(value)):
+            validate_target_config(Path("/target"), "test", profile)
+
+    def test_target_config_rejects_placeholder_filesystems(self):
+        profile = Profile("test", system_device="/dev/disk/by-id/test")
+        value = {
+            "diskEnabled": False,
+            "placeholder": True,
+            "root": {"device": "/dev/disk/by-label/nixos", "fsType": "ext4"},
+            "boot": {"device": "/dev/disk/by-label/BOOT", "fsType": "vfat"},
+            "home": {"device": "none", "fsType": "tmpfs"},
+            "luks": {},
+        }
+        with patch("installer.nix", return_value=json.dumps(value)):
+            with self.assertRaisesRegex(RuntimeError, "not bootable"):
+                validate_target_config(Path("/target"), "test", profile)
 
     def test_root_child_environment_uses_root_home(self):
         with patch("installer.os.geteuid", return_value=0), patch("installer.pwd.getpwuid", return_value=SimpleNamespace(pw_dir="/root")), patch.dict("installer.os.environ", {"HOME": "/home/nixos", "XDG_CACHE_HOME": "/home/nixos/.cache"}, clear=True):
