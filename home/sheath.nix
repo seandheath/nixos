@@ -19,7 +19,7 @@ let
   # key, which by design cannot decrypt secrets/secrets.yaml (see .sops.yaml), so the
   # openwebui-* secrets below would fail activation there.
   enablePi = workstation;
-  claude = inputs.cclaude.packages.x86_64-linux.default;
+  cclaude = inputs.cclaude.packages.x86_64-linux.default;
   porkbunMcp = "${pkgs.porkbun-domain-search-mcp}/bin/porkbun-domain-search-mcp";
 in
 {
@@ -79,7 +79,7 @@ in
   };
 
   home.packages = [
-    claude
+    cclaude
     inputs.cclaude.packages.x86_64-linux.cclaude-build
     inputs.cclaude.packages.x86_64-linux.cclaude-update
     inputs.cclaude.packages.x86_64-linux.cclaude-shell
@@ -88,8 +88,12 @@ in
     inputs.pi-flake.packages.x86_64-linux.default
   ];
 
-  # Both clients own mutable user configuration, so register the declarative command only
-  # when it differs. Their MCP processes load credentials from the SOPS-backed launcher.
+  # Both native clients own mutable user configuration, so register the declarative command
+  # only when it differs. Their MCP processes load credentials from the SOPS-backed launcher.
+  # Claude is installed by its upstream installer under ~/.local, not by the cclaude flake:
+  # cclaude is a Podman wrapper with only bin/cclaude and an isolated config volume. Keep
+  # the native registration optional so a fresh machine without that installer can still
+  # activate Home Manager.
   home.activation.porkbunMcpClients = lib.mkIf workstation
     (lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       porkbun_command=${lib.escapeShellArg porkbunMcp}
@@ -100,10 +104,13 @@ in
         run ${pkgs.codex}/bin/codex mcp add porkbun -- "$porkbun_command"
       fi
 
-      claude_config="$(${claude}/bin/claude mcp get porkbun 2>/dev/null || true)"
-      if [[ "$claude_config" != *"$porkbun_command"* ]]; then
-        run ${claude}/bin/claude mcp remove porkbun --scope user >/dev/null 2>&1 || true
-        run ${claude}/bin/claude mcp add --scope user porkbun -- "$porkbun_command"
+      claude_bin="$HOME/.local/bin/claude"
+      if [[ -x "$claude_bin" ]]; then
+        claude_config="$("$claude_bin" mcp get porkbun 2>/dev/null || true)"
+        if [[ "$claude_config" != *"$porkbun_command"* ]]; then
+          run "$claude_bin" mcp remove porkbun --scope user >/dev/null 2>&1 || true
+          run "$claude_bin" mcp add --scope user porkbun -- "$porkbun_command"
+        fi
       fi
     '');
 
