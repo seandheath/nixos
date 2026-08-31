@@ -1,0 +1,18 @@
+diff --git a/src/ai_marketplace_monitor/webui/static/app.js b/src/ai_marketplace_monitor/webui/static/app.js
+index a8f6428..2d586b6 100644
+--- a/src/ai_marketplace_monitor/webui/static/app.js
++++ b/src/ai_marketplace_monitor/webui/static/app.js
+@@ -542,6 +542,13 @@
+       const res = await api("/api/monitor/restart", { method: "POST" });
+       const data = await res.json().catch(() => ({}));
+       if (res.ok) {
++        // The restart endpoint touches config.toml. Refresh the optimistic-lock mtime
++        // without replacing unsaved editor content, or the next Save falsely conflicts.
++        const files = await (await api("/api/config/files")).json();
++        if (files.files.length) {
++          state.baseMtime = files.files[0].mtime;
++          $("#mtime").textContent = "mtime " + new Date(state.baseMtime * 1000).toLocaleString();
++        }
+         setEditorStatus("▶ Waking monitor — searching all items now…", "ok");
+       } else {
+         setEditorStatus("▶ Failed: " + (data.detail || "unknown"), "err");
