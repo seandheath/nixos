@@ -42,6 +42,7 @@
     gcc
     parallel
     zstd
+    android-tools
 
     # Reverse engineering
     # NSA SRE suite; wrapper pins its own JDK, no system java needed. Provides

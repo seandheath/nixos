@@ -2,6 +2,7 @@
 { config, pkgs, lib, ... }:
 let
   peers = import ../modules/family/peers.nix;
+  adm = peers.hubs.adm;
 in
 {
   imports = [
@@ -148,6 +149,14 @@ in
     # shared with laptops the kids hold. see CHANGELOG 2026-08-19
     settings.PasswordAuthentication = false;
     settings.PermitRootLogin = "no";
+  };
+
+  # The monitor itself stays on loopback; nginx gives it the fleet wildcard certificate.
+  # Unlike the other web apps, its config editor and live browser are administrative, so
+  # nginx rejects clients from wgfam even though that interface can reach HTTPS generally.
+  fleet.vhosts.marketplace = {
+    port = 8467;
+    allowedCIDRs = [ adm.subnet ];
   };
 
   # The console is the recovery path here, per the br0 note above.

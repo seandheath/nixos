@@ -167,6 +167,7 @@ rec {
     "immich.luckyobserver.com"
     "paper.luckyobserver.com"
     "calibre.luckyobserver.com"
+    "marketplace.luckyobserver.com"
     "mc.luckyobserver.com"
   ];
 }

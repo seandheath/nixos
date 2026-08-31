@@ -26,6 +26,11 @@ in
           type = lib.types.nullOr lib.types.str;
           default = null;
         };
+        allowedCIDRs = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          default = [ ];
+          description = "Optional client networks allowed to use this vhost.";
+        };
       };
     });
   };
@@ -63,6 +68,9 @@ in
           proxyWebsockets = true;
           extraConfig = ''
             client_max_body_size ${v.maxBody};
+          '' + lib.optionalString (v.allowedCIDRs != [ ]) ''
+            ${lib.concatMapStringsSep "\n" (cidr: "allow ${cidr};") v.allowedCIDRs}
+            deny all;
           '' + lib.optionalString (v.readTimeout != null) ''
             proxy_read_timeout ${v.readTimeout};
           '';
