@@ -5,6 +5,8 @@
 let
   vllm = import ./vllm-endpoint.nix;
   stateDir = "/var/lib/ai-marketplace-monitor";
+  talkRelayPort = 8468;
+  talkRelayUser = "ai-marketplace-talk-relay";
 
   # Keep the Web UI override matched to the exact source revision labeled on the pinned
   # container image. Upstream's restart endpoint touches config.toml, but its frontend
@@ -36,6 +38,123 @@ let
         logging.getLogger(logger_name).setLevel(logging.WARNING)
   '';
 
+  # ai-marketplace-monitor already knows how to send ntfy-compatible webhooks. This
+  # small adapter keeps that upstream integration and turns each webhook into a signed
+  # message from a response-only bot in the private Nextcloud Talk conversation.
+  talkRelay = pkgs.writeTextFile {
+    name = "ai-marketplace-monitor-talk-relay";
+    executable = true;
+    text = ''
+      #!${pkgs.python3}/bin/python3
+      import hashlib
+      import hmac
+      import ipaddress
+      import json
+      import os
+      import secrets
+      import sys
+      import urllib.error
+      import urllib.request
+      from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+      from pathlib import Path
+      from urllib.parse import urlsplit
+
+      LISTEN_PORT = int(os.environ.get("LISTEN_PORT", "${toString talkRelayPort}"))
+      NEXTCLOUD_URL = os.environ["NEXTCLOUD_URL"].rstrip("/")
+      BOT_SECRET = Path(os.environ["BOT_SECRET_FILE"]).read_text().strip().encode()
+      ROOM_TOKEN = Path(os.environ["ROOM_TOKEN_FILE"]).read_text().strip()
+      PODMAN_NETWORK = ipaddress.ip_network("10.88.0.0/16")
+      MAX_REQUEST_BYTES = 64 * 1024
+      MAX_MESSAGE_CHARS = 24_000
+
+      if len(BOT_SECRET) < 40 or not ROOM_TOKEN:
+          raise RuntimeError("invalid Talk bot credentials")
+
+      class Handler(BaseHTTPRequestHandler):
+          server_version = "MarketplaceTalkRelay/1"
+
+          def log_message(self, _format, *args):
+              # Never log notification bodies or headers: listing descriptions can
+              # contain arbitrary content and the request is otherwise self-contained.
+              print(f"request from {self.client_address[0]}: {args[1]}", file=sys.stderr)
+
+          def send_empty(self, status):
+              self.send_response(status)
+              self.send_header("Content-Length", "0")
+              self.end_headers()
+
+          def do_GET(self):
+              if urlsplit(self.path).path == "/healthz":
+                  self.send_empty(200)
+              else:
+                  self.send_empty(404)
+
+          def do_POST(self):
+              try:
+                  source = ipaddress.ip_address(self.client_address[0])
+              except ValueError:
+                  self.send_empty(403)
+                  return
+              if not (source.is_loopback or source in PODMAN_NETWORK):
+                  self.send_empty(403)
+                  return
+              if urlsplit(self.path).path != "/marketplace":
+                  self.send_empty(404)
+                  return
+
+              try:
+                  length = int(self.headers.get("Content-Length", ""))
+              except ValueError:
+                  self.send_empty(400)
+                  return
+              if length < 1 or length > MAX_REQUEST_BYTES:
+                  self.send_empty(413)
+                  return
+
+              body = self.rfile.read(length).decode("utf-8", errors="replace").strip()
+              title = self.headers.get("Title", "Marketplace alert").strip()
+              title = title[:300] or "Marketplace alert"
+              message = f"**{title}**\n\n{body}"[:MAX_MESSAGE_CHARS]
+
+              random_seed = secrets.token_hex(32)
+              signature = hmac.new(
+                  BOT_SECRET,
+                  (random_seed + message).encode(),
+                  hashlib.sha256,
+              ).hexdigest()
+              payload = json.dumps({"message": message}).encode()
+              request = urllib.request.Request(
+                  f"{NEXTCLOUD_URL}/ocs/v2.php/apps/spreed/api/v1/bot/{ROOM_TOKEN}/message",
+                  data=payload,
+                  method="POST",
+                  headers={
+                      "Accept": "application/json",
+                      "Content-Type": "application/json",
+                      "OCS-APIRequest": "true",
+                      "X-Nextcloud-Talk-Bot-Random": random_seed,
+                      "X-Nextcloud-Talk-Bot-Signature": signature,
+                  },
+              )
+              try:
+                  with urllib.request.urlopen(request, timeout=20) as response:
+                      if response.status != 201:
+                          raise RuntimeError(f"unexpected Talk status {response.status}")
+              except urllib.error.HTTPError as error:
+                  print(f"Talk API returned HTTP {error.code}", file=sys.stderr)
+                  self.send_empty(502)
+                  return
+              except Exception as error:
+                  print(f"Talk API request failed: {type(error).__name__}", file=sys.stderr)
+                  self.send_empty(502)
+                  return
+
+              self.send_empty(204)
+
+      server = ThreadingHTTPServer(("0.0.0.0", LISTEN_PORT), Handler)
+      server.serve_forever()
+    '';
+  };
+
   # tmpfiles copies this only when config.toml does not exist. Once seeded, the web UI owns
   # the live file in stateDir, so a rebuild cannot erase searches added interactively.
   initialConfig = pkgs.writeText "ai-marketplace-monitor-config.toml" ''
@@ -61,6 +180,9 @@ let
     ai = "qwen"
 
     [user.me]
+    ntfy_server = "http://host.containers.internal:${toString talkRelayPort}"
+    ntfy_topic = "marketplace"
+    message_format = "markdown"
   '';
 in
 {
@@ -88,9 +210,28 @@ in
     };
   };
 
-  sops.secrets = lib.genAttrs (
-    vllm.secretNames ++ [ "aimm-facebook-username" "aimm-facebook-password" ]
-  ) (_: { });
+  users.groups.${talkRelayUser} = { };
+  users.users.${talkRelayUser} = {
+    isSystemUser = true;
+    group = talkRelayUser;
+  };
+
+  sops.secrets =
+    lib.genAttrs (
+      vllm.secretNames ++ [ "aimm-facebook-username" "aimm-facebook-password" ]
+    ) (_: { })
+    // {
+      "aimm-nextcloud-talk-bot-secret" = {
+        owner = talkRelayUser;
+        group = talkRelayUser;
+        mode = "0400";
+      };
+      "aimm-nextcloud-talk-room-token" = {
+        owner = talkRelayUser;
+        group = talkRelayUser;
+        mode = "0400";
+      };
+    };
 
   # The container is rootful and the file remains in sops' tmpfs; Podman reads it at
   # startup and passes values as environment variables without copying them to the store.
@@ -111,10 +252,52 @@ in
     "C ${stateDir}/config.toml 0600 root root - ${initialConfig}"
   ];
 
+  # The listener binds on all local addresses so it can start before podman0 exists. The
+  # firewall only opens it on podman0, and the handler independently rejects callers
+  # outside Podman's default rootful subnet.
+  networking.firewall.interfaces."podman0".allowedTCPPorts = [ talkRelayPort ];
+
+  systemd.services.ai-marketplace-monitor-talk-relay = {
+    description = "AI Marketplace Monitor to Nextcloud Talk relay";
+    wantedBy = [ "multi-user.target" ];
+    wants = [ "network-online.target" ];
+    after = [ "network-online.target" ];
+    serviceConfig = {
+      User = talkRelayUser;
+      Group = talkRelayUser;
+      ExecStart = "${talkRelay}";
+      Environment = [
+        "LISTEN_PORT=${toString talkRelayPort}"
+        "NEXTCLOUD_URL=https://nc.luckyobserver.com"
+        "BOT_SECRET_FILE=${config.sops.secrets."aimm-nextcloud-talk-bot-secret".path}"
+        "ROOM_TOKEN_FILE=${config.sops.secrets."aimm-nextcloud-talk-room-token".path}"
+      ];
+      Restart = "on-failure";
+      RestartSec = "5s";
+
+      NoNewPrivileges = true;
+      PrivateDevices = true;
+      PrivateTmp = true;
+      ProtectHome = true;
+      ProtectSystem = "strict";
+      ProtectKernelLogs = true;
+      ProtectKernelModules = true;
+      ProtectKernelTunables = true;
+      ProtectControlGroups = true;
+      RestrictAddressFamilies = [ "AF_INET" "AF_INET6" ];
+      RestrictNamespaces = true;
+      RestrictRealtime = true;
+      LockPersonality = true;
+      MemoryDenyWriteExecute = true;
+      CapabilityBoundingSet = "";
+    };
+  };
+
   systemd.services.podman-ai-marketplace-monitor = {
     # sops-nix renders secrets in the activation script on this host (rather than via a
     # systemd unit), so they are already present before switched services are restarted.
-    after = [ "systemd-tmpfiles-setup.service" ];
+    requires = [ "ai-marketplace-monitor-talk-relay.service" ];
+    after = [ "systemd-tmpfiles-setup.service" "ai-marketplace-monitor-talk-relay.service" ];
     unitConfig.RequiresMountsFor = stateDir;
     # Migrate the first deployed seed without touching credentials entered directly by a
     # user. Upstream's Web UI treated these exact placeholders literally instead of
@@ -127,6 +310,19 @@ in
           -e '/^[[:space:]]*username = "''${FACEBOOK_USERNAME}"[[:space:]]*$/d' \
           -e '/^[[:space:]]*password = "''${FACEBOOK_PASSWORD}"[[:space:]]*$/d' \
           ${stateDir}/config.toml
+      fi
+
+      # The live config is intentionally Web-UI-managed, so add the Talk notifier once
+      # for hosts seeded before this integration existed and leave later user edits alone.
+      if ! test -e ${stateDir}/.nextcloud-talk-alerts-v1; then
+        if ${pkgs.gnugrep}/bin/grep -Fxq '[user.me]' ${stateDir}/config.toml \
+          && ! ${pkgs.gnugrep}/bin/grep -Eq '^[[:space:]]*ntfy_server[[:space:]]*=' ${stateDir}/config.toml; then
+          ${pkgs.gnused}/bin/sed -i '/^\[user\.me\]$/a\
+ntfy_server = "http://host.containers.internal:${toString talkRelayPort}"\
+ntfy_topic = "marketplace"\
+message_format = "markdown"' ${stateDir}/config.toml
+        fi
+        touch ${stateDir}/.nextcloud-talk-alerts-v1
       fi
 
       # Earlier upstream DEBUG logs serialized scheduled-job arguments, including the
