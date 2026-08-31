@@ -12,8 +12,8 @@ let
     # Seeded by NixOS on first deployment. Manage this file through the web UI afterward.
 
     [marketplace.facebook]
-    username = "''${FACEBOOK_USERNAME}"
-    password = "''${FACEBOOK_PASSWORD}"
+    # Credentials intentionally come from FACEBOOK_USERNAME/FACEBOOK_PASSWORD. The
+    # upstream Web UI auth parser uses that fallback only when these fields are absent.
     search_city = "houston"
 
     [ai.qwen]
@@ -81,5 +81,14 @@ in
     # systemd unit), so they are already present before switched services are restarted.
     after = [ "systemd-tmpfiles-setup.service" ];
     unitConfig.RequiresMountsFor = stateDir;
+    # Migrate the first deployed seed without touching credentials entered directly by a
+    # user. Upstream's Web UI treated these exact placeholders literally instead of
+    # expanding them, which made the real Facebook credentials fail Web UI authentication.
+    preStart = ''
+      ${pkgs.gnused}/bin/sed -i \
+        -e '/^[[:space:]]*username = "''${FACEBOOK_USERNAME}"[[:space:]]*$/d' \
+        -e '/^[[:space:]]*password = "''${FACEBOOK_PASSWORD}"[[:space:]]*$/d' \
+        ${stateDir}/config.toml
+    '';
   };
 }
