@@ -46,10 +46,6 @@ let
     # (authoritative once created, so anyone added from the couch exists only here) plus
     # each player's options.txt and Controlify bindings. The world is server-side.
     "${home}/.local/share/minecraft-couch"
-
-    # Pull-only Proton Drive mirror. proton-drive-mirror refreshes it immediately before
-    # each Borg run; Borg's retention supplies history after a cloud-side edit or deletion.
-    "${home}/GroundedGadgets"
   ];
 
   backupExclude = [ ];
@@ -95,7 +91,6 @@ let
   # cannot coordinate concurrent units: whichever finishes first would re-enable autosave
   # while another archive was still reading the world.
   runBorgJobs = ''
-    ${protonDriveRefresh}
     ${pgRefresh}
     ${minecraftFlush}
     trap '${minecraftResume}' EXIT
@@ -129,16 +124,6 @@ let
     echo "Refreshing PostgreSQL dumps (nextcloud, immich)..."
     ${pkgs.systemd}/bin/systemctl start --wait \
       postgresqlBackup-nextcloud.service postgresqlBackup-immich.service
-  '';
-
-  # hydrogen never pushes this mirror back to Proton Drive. A missing rclone login makes
-  # the service a successful no-op; a real refresh failure is loud but must not suppress
-  # backups of all the unrelated service data already present on disk.
-  protonDriveRefresh = ''
-    echo "Refreshing the GroundedGadgets Proton Drive mirror..."
-    if ! ${pkgs.systemd}/bin/systemctl start --wait proton-drive-mirror.service; then
-      echo "Proton Drive refresh FAILED -- backing up the previous local mirror." >&2
-    fi
   '';
 
   # One lock covers both the scheduled service and manually selected backups.  A second

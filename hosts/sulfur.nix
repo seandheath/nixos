@@ -12,7 +12,6 @@ in
     ../modules/steam.nix
     ../modules/cemu.nix
     ../modules/workstation.nix
-    ../modules/proton-workspace.nix
     ../modules/virtualisation.nix
     ../modules/impermanence.nix
     ../modules/fleet-vpn.nix

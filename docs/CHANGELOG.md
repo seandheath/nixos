@@ -26,6 +26,14 @@ Also the decision log. Rationale that would otherwise bloat a code comment lives
   retain it according to their normal retention policy, while Nextcloud's data and database
   remain covered by the service-data and PostgreSQL backups.
 
+## 2026-08-31 (Proton Drive sync retirement)
+
+- **Removed the rclone Proton Drive workflow.** Sulfur no longer runs the bidirectional
+  sync timer, and hydrogen no longer maintains or backs up a pull-only `GroundedGadgets`
+  mirror. Existing local and Proton Drive data are not deleted.
+- **Proton Mail and Proton Pass remain installed on sulfur.** They now live with the other
+  desktop applications rather than in a module whose remaining purpose was Drive sync.
+
 ## 2026-08-28 (gentlemenpupil install preflight)
 
 - **Family hosts evaluate again before a disk is touched.** `fleet.hardware.isPlaceholder`
