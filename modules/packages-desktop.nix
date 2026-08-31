@@ -20,6 +20,7 @@
     signal-desktop
     discord
     thunderbird
+    nextcloud-client
 
     # Remote access
     rustdesk-flutter   # RustDesk client for hydrogen (host); LAN direct-IP

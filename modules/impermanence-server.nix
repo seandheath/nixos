@@ -4,7 +4,7 @@
 #
 # To make root truly ephemeral later: add a boot.initrd.systemd unit restoring @root from
 # @root-blank, import the impermanence module, and write a complete
-# environment.persistence."/persist" list -- postgresql, acme, syncthing, calibre-web,
+# environment.persistence."/persist" list -- postgresql, acme, nextcloud, calibre-web,
 # redis, immich, /etc/ssh, /var/lib/nixos, /etc/machine-id.
 { config, lib, pkgs, ... }:
 {

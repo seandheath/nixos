@@ -21,7 +21,6 @@ let
     "/data/immich"             # media moved off root SSD to the big /data disk
     "/var/lib/paperless"
     "/var/lib/calibre-web"
-    "/var/lib/syncthing"       # synced folders + config.xml (device keys/IDs) + index DB
     "/var/lib/minecraft"       # the world (see minecraftFlush below) + server.properties
 
     # The on-demand worlds, one directory per server. The parent covers servers created

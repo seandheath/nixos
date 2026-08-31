@@ -8,7 +8,6 @@ in
     ../hardware/hydrogen.nix
     ../modules/gnome.nix
     ../modules/audio.nix
-    ../modules/syncthing.nix
     ../modules/nix-ld.nix
     ../modules/core.nix
     ../modules/impermanence-server.nix
@@ -120,15 +119,13 @@ in
     80 443
     25565                           # Minecraft
     21115 21116 21117 21118 21119   # RustDesk
-    22000                           # Syncthing
   ];
   networking.firewall.interfaces."wgadm".allowedUDPPorts = [
     2456 2457 2458   # Valheim
     21116           # RustDesk
-    22000 21027     # Syncthing sync + discovery
   ];
 
-  # Note what is absent: RustDesk, Syncthing.
+  # Note what is absent: RustDesk.
   #
   # 22 is here so the kids' launchers can reach the on-demand server control channel, which
   # is SSH behind a forced command (modules/minecraft-servers.nix). Consequence, per the
@@ -249,8 +246,4 @@ in
   # moving branch name pins nothing -- production, stable and latest all crossed the 590
   # boundary on the same day and this card lost its driver. See CHANGELOG 2026-08-13.
   hardware.nvidia.package = config.boot.kernelPackages.nvidiaPackages.legacy_580;
-
-  # GUI on localhost; reach it with ssh -L 8384:localhost:8384. The sync ports are in the
-  # wgadm list above, so sulfur syncs over the tunnel and nothing else reaches the daemon.
-  services.syncthing.openDefaultPorts = false;
 }

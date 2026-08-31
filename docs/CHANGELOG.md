@@ -16,6 +16,16 @@ Also the decision log. Rationale that would otherwise bloat a code comment lives
   finding: scripted networking is detaching its own slave, and `br0-netdev`'s
   `X-ReloadIfChanged` is the next suspect.
 
+## 2026-08-31 (Syncthing retirement)
+
+- **Nextcloud replaces Syncthing for file synchronization.** Hydrogen and sulfur no longer
+  run Syncthing, and hydrogen no longer exposes its sync or discovery ports on the admin
+  tunnel. Sulfur and every family laptop have the Nextcloud desktop client; account login
+  and local sync-folder selection remain per user.
+- **Syncthing's inactive server state leaves the live backup set.** Existing Borg archives
+  retain it according to their normal retention policy, while Nextcloud's data and database
+  remain covered by the service-data and PostgreSQL backups.
+
 ## 2026-08-28 (gentlemenpupil install preflight)
 
 - **Family hosts evaluate again before a disk is touched.** `fleet.hardware.isPlaceholder`
@@ -33,6 +43,12 @@ Also the decision log. Rationale that would otherwise bloat a code comment lives
 - **Encrypted resume supplies Disko's key file while mounting.** Disko's generated mount
   script must reopen LUKS after an ISO reboot. The dashboard's `m` path now creates the same
   mode-0600 scratch key used during formatting and removes it immediately afterward.
+
+## 2026-08-28 (Nextcloud desktop clients)
+
+- **Sulfur now installs `nextcloud-client`; all four family laptops already receive it from
+  their shared profile.** The package is system-wide on each desktop, while account setup and
+  sync-directory selection remain per user in the client.
 
 ## 2026-08-28 (game asset storage and Cynthion access)
 

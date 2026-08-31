@@ -3,8 +3,8 @@
 # appears exactly once. Also read by install.sh via `nix eval --file`.
 #
 # Two hubs rather than one interface with source-address rules: they carry different
-# authority, and that should be visible in `iptables -S`. wgadm reaches sshd, RustDesk and
-# Syncthing; wgfam reaches a web server and a game port.
+# authority, and that should be visible in `iptables -S`. wgadm reaches administrative
+# services; wgfam reaches web services and game ports.
 #
 # Public keys are not secret. The private halves live in sops under `secret`, in the file
 # the host's own sops.defaultSopsFile names -- family.yaml for the laptops, secrets.yaml
@@ -29,7 +29,7 @@ rec {
       secret = "wg-priv-wgfam-hub";
     };
 
-    # Admin tunnel: sulfur only. SSH, RustDesk, Syncthing, plus the web services.
+    # Admin tunnel: sulfur only. SSH, RustDesk, plus the web services.
     adm = {
       interface = "wgadm";
       port = 51822;
@@ -54,8 +54,8 @@ rec {
     secret = "wg-priv-sulfur-adm";   # sulfur reuses its wgadm key for this peer
   };
 
-  # wgadm peers -- sheath's own devices only, because wgadm reaches sshd, RustDesk and
-  # Syncthing. Anyone else's phone goes on wgfam under `mobile`. Only entries with a
+  # wgadm peers -- sheath's own devices only, because wgadm reaches sshd and RustDesk.
+  # Anyone else's phone goes on wgfam under `mobile`. Only entries with a
   # `secret` are NixOS hosts; a phone carries its key on the device.
   admin = {
     sulfur = {

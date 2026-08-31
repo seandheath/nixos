@@ -18,7 +18,6 @@ in
     ./nix-ld.nix
     ./sops.nix
     ./dconf.nix
-    ./syncthing.nix
     ./audio.nix
     ./bluetooth.nix
     ./printing.nix
