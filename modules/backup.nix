@@ -32,6 +32,8 @@ let
     # Bare git repos. No flush hook like Minecraft's: the object store is append-only and
     # a ref update is an atomic rename, so a live push cannot tear an archive.
     "/var/lib/git"
+    # Mutable web-managed searches, browser login state, cache, and logs.
+    "/var/lib/ai-marketplace-monitor"
 
     # The postgresql subdirectory, NOT /var/backup -- widening it to the parent sweeps the
     # rootfs repo into every job, so each backup would archive a copy of the backups.

@@ -19,6 +19,7 @@ in
     ../modules/paperless.nix
     ../modules/scanner.nix
     ../modules/ollama.nix
+    ../modules/ai-marketplace-monitor.nix
     ../modules/backup.nix
     ../modules/git-server.nix
     ../modules/fleet-vpn.nix
