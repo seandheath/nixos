@@ -41,6 +41,14 @@ in
   config = {
     family.enable = true;
     fleet.provisioning.enable = true;
+    # Keep wgfam until the remote validation checklist passes.  The Headscale
+    # tag preserves the family-vs-admin boundary during that overlap.
+    fleet.tailscaleClient = {
+      enable = true;
+      tags = [ "tag:family" ];
+      authKeyFile = config.sops.secrets."tailscale-auth-${hostName}".path;
+    };
+    sops.secrets."tailscale-auth-${hostName}" = { };
     system.stateVersion = "25.11";
 
     # These machines leave the house and are not disk-encrypted, so they carry the FAMILY

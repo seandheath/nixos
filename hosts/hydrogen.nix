@@ -35,6 +35,16 @@ in
   system.stateVersion = "25.11";
 
   fleet.bootGenerations = 20;
+  fleet.tailscaleClient = {
+    enable = true;
+    tags = [ "tag:server" ];
+    authKeyFile = config.sops.secrets.tailscale-auth-hydrogen.path;
+    # Headscale policy, not interface membership, distinguishes admin and family
+    # clients.  The old WireGuard interface-scoped rules remain during migration.
+    allowedTCPPorts = [ 22 80 443 25565 21115 21116 21117 21118 21119 ];
+    allowedUDPPorts = [ 2456 2457 2458 21116 ];
+  };
+  sops.secrets.tailscale-auth-hydrogen = { };
   # For diagnosing the transient btrfs csum failures; RAM is the prime suspect.
   boot.loader.systemd-boot.memtest86.enable = true;
 
@@ -111,6 +121,24 @@ in
   # internet. Every other service stays wgadm-scoped. see CHANGELOG 2026-08-19
   networking.firewall.interfaces."br0".allowedTCPPorts = [ 22 ];
 
+  # Subnet-routed clients are SNATed to the router's LAN address.  Admit only
+  # that source to the ordinary home services; do not make them reachable to
+  # every unauthenticated device on home Wi-Fi.  marketplace remains wgadm-only
+  # because its nginx vhost has a separate administrative source ACL.
+  networking.firewall.extraCommands = lib.mkAfter ''
+    iptables -N tailscale-lan-input 2>/dev/null || true
+    iptables -F tailscale-lan-input
+    iptables -A tailscale-lan-input -s 10.0.0.1 -p tcp -m multiport --dports 80,443,25565:25575 -j ACCEPT
+    iptables -A tailscale-lan-input -s 10.0.0.1 -p udp -m multiport --dports 2456:2458 -j ACCEPT
+    iptables -A tailscale-lan-input -j RETURN
+    iptables -C nixos-fw -j tailscale-lan-input 2>/dev/null || iptables -I nixos-fw 1 -j tailscale-lan-input
+  '';
+  networking.firewall.extraStopCommands = lib.mkAfter ''
+    iptables -D nixos-fw -j tailscale-lan-input 2>/dev/null || true
+    iptables -F tailscale-lan-input 2>/dev/null || true
+    iptables -X tailscale-lan-input 2>/dev/null || true
+  '';
+
   # br0 carries nothing, so a wgadm failure leaves no remote way in and recovery is the
   # physical console. That is survivable only because this is a laptop with a working
   # panel, GDM autologins sheath, and sheath has NOPASSWD sudo. Do not remove any of the
@@ -157,7 +185,10 @@ in
   # nginx rejects clients from wgfam even though that interface can reach HTTPS generally.
   fleet.vhosts.marketplace = {
     port = 8467;
-    allowedCIDRs = [ adm.subnet ];
+    # wgadm remains during migration.  Tailscale clients reach this vhost on
+    # hydrogen's direct tail address; Headscale policy permits admins but not
+    # tag:family to reach that address.
+    allowedCIDRs = [ adm.subnet "100.64.0.0/10" ];
   };
 
   # The console is the recovery path here, per the br0 note above.

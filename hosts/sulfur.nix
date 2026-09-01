@@ -35,6 +35,17 @@ in
   };
 
   fleet.bootGenerations = 20;
+  # Runs alongside wgadm/wg0 during migration.  Enrollment is deliberately a
+  # separate secret-bearing step; see docs/headscale.md.
+  fleet.tailscaleClient = {
+    enable = true;
+    tags = [ "tag:admin" ];
+    authKeyFile = config.sops.secrets.tailscale-auth-sulfur.path;
+  };
+  sops.secrets.tailscale-auth-sulfur = { };
+
+  # sulfur wipes its root subvolume at boot, so the node key must live on /persist.
+  environment.persistence."/persist".directories = [ "/var/lib/tailscale" ];
   # Not sops: the age key lives under /home, which is exactly what has not mounted when
   # root recovery is needed.
   fleet.accounts.rootPassword = "persist";
@@ -318,9 +329,11 @@ in
     }
   ];
 
-  # hydrogen's vhosts on the admin tunnel, under their public names so the wildcard cert
-  # still matches.
-  networking.hosts.${adm.address} = peers.serviceNames;
+  # During migration, ordinary service names use the Tailscale-advertised LAN
+  # route. marketplace remains deliberately administrative and wgadm-only.
+  networking.hosts."10.0.0.10" =
+    lib.remove "marketplace.luckyobserver.com" peers.serviceNames;
+  networking.hosts."100.64.0.3" = [ "marketplace.luckyobserver.com" ];
 
   # Stable SSH destinations: the laptops' LAN leases change, but their family-tunnel
   # addresses do not. Hydrogen forwards only sulfur's TCP/22 traffic to these peers.

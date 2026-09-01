@@ -76,6 +76,9 @@
         ./modules/boot-efi.nix
         ./modules/locale.nix
         ./modules/auto-update.nix
+        # Inert until a host declares its tailnet role.  tailscaled owns its
+        # interface, so it needs none of wg-unmanaged's NetworkManager hacks.
+        ./modules/tailscale-client.nix
         # Every host: NetworkManager will flush a WireGuard interface it thinks it owns,
         # and the hosts that most need protecting are the ones nobody is watching.
         ./modules/wg-unmanaged.nix
