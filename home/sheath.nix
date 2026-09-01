@@ -31,6 +31,7 @@ in
     inputs.nix-index-database.homeModules.nix-index
   ] ++ lib.optionals workstation [
     ./ghostty.nix
+    ./ssh.nix
     ./vscode.nix
     ./monitors.nix
   ];

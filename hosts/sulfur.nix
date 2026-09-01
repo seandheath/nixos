@@ -231,48 +231,5 @@ in
     lib.remove "marketplace.luckyobserver.com" devices.serviceNames;
   networking.hosts."100.64.0.3" = [ "marketplace.luckyobserver.com" ];
 
-  # Stable SSH destinations use Headscale MagicDNS. The LAN aliases remain for
-  # local recovery when the control plane is unavailable.
-  programs.ssh.extraConfig = ''
-    Host hydrogen
-      HostName hydrogen.tail.luckyobserver.com
-      User sheath
-      IdentityFile /home/sheath/.ssh/personal
-      IdentitiesOnly yes
-
-    Host hydrogen-lan
-      HostName 10.0.0.10
-      User sheath
-      IdentityFile /home/sheath/.ssh/personal
-      IdentitiesOnly yes
-
-    Host router nixrouter
-      HostName router.tail.luckyobserver.com
-      User admin
-      IdentityFile /home/sheath/.ssh/personal
-      IdentitiesOnly yes
-      IPQoS none
-
-    Host router-lan
-      HostName 10.0.0.1
-      User admin
-      IdentityFile /home/sheath/.ssh/personal
-      IdentitiesOnly yes
-      IPQoS none
-
-    Host hydrogen-git
-      HostName hydrogen.tail.luckyobserver.com
-      User git
-      IdentityFile /home/sheath/.ssh/personal
-      IdentitiesOnly yes
-  '' + lib.concatStrings (lib.mapAttrsToList (name: peer: ''
-    Host ${name}
-      HostName ${name}.tail.luckyobserver.com
-      User sheath
-      IdentityFile /home/sheath/.ssh/personal
-      IdentitiesOnly yes
-  '') devices.family);
-
-
   system.stateVersion = "25.11";
 }
