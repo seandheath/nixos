@@ -2,9 +2,7 @@
 { lib, pkgs, config, ... }:
 
 let
-  peers = import ../modules/family/peers.nix;
-  adm = peers.hubs.adm;
-  rtr = peers.routerMgmt;
+  devices = import ../modules/family/devices.nix;
 in
 {
   imports = [
@@ -14,12 +12,11 @@ in
     ../modules/workstation.nix
     ../modules/virtualisation.nix
     ../modules/impermanence.nix
-    ../modules/fleet-vpn.nix
     ../modules/minecraft-client.nix       # the offline client (game + mods pinned), shared with hydrogen
     ../modules/minecraft-launcher.nix     # pick a player and a server; spins servers up on demand
   ];
 
-  # Reached by name over wgadm; networking.hosts below resolves it. See docs/minecraft.md.
+  # Reached through the home subnet route; networking.hosts below resolves it.
   services.minecraftClient = {
     enable = true;
     playerName = "LuckyObserver";
@@ -35,8 +32,6 @@ in
   };
 
   fleet.bootGenerations = 20;
-  # Runs alongside wgadm/wg0 during migration.  Enrollment is deliberately a
-  # separate secret-bearing step; see docs/headscale.md.
   fleet.tailscaleClient = {
     enable = true;
     tags = [ "tag:admin" ];
@@ -74,30 +69,6 @@ in
   # triple-digit latency even after NetworkManager re-associated. Disable its independent
   # power-save path too; NetworkManager's setting above does not set this module option.
   boot.kernelParams = [ "iwlwifi.power_save=0" ];
-
-  # Native WireGuard resolves endpoint names when its peer units run, not when the
-  # underlying network later changes. Re-run the generated units after a real uplink
-  # activation so split DNS follows sulfur between home and away without a timer or probe.
-  networking.networkmanager.dispatcherScripts = [
-    {
-      type = "basic";
-      source = pkgs.writeShellScript "refresh-wgadm-endpoints" ''
-        set -eu
-
-        interface=$1
-        action=$2
-
-        case "$action" in
-          up|dhcp4-change)
-            case "$interface" in
-              lo|wgadm|wg0|fleet) exit 0 ;;
-            esac
-            ${pkgs.systemd}/bin/systemctl try-restart --no-block wireguard-wgadm.service
-            ;;
-        esac
-      '';
-    }
-  ];
 
   environment.systemPackages = with pkgs; [
     asusctl
@@ -254,131 +225,53 @@ in
     };
   };
 
-  # wg0: break-glass path to the whole home LAN, for when wgadm or hydrogen's sops decrypt
-  # is what broke. Recovery access that depends on the thing being recovered is not
-  # recovery access. Manual: `nmcli connection up wg0`.
-  sops.secrets.wg-priv-sulfur = { };
-
-  networking.networkmanager.ensureProfiles.profiles.wg0 = {
-    connection = {
-      id = "wg0";
-      uuid = "3e85818d-68f1-4d86-ba79-94df12d8412d"; # pinned, or NM invents one per boot
-      type = "wireguard";
-      interface-name = "wg0";
-      autoconnect = false;
-    };
-
-    wireguard = {
-      private-key-flags = 1; # agent-owned
-      mtu = 1420;
-      peer-routes = true;
-    };
-
-    "wireguard-peer.ILwElzleBCCQ8vrGGiV2gUY0B33IHB456MQtgT2ZUTE=" = {
-      allowed-ips = "10.0.0.0/24;10.40.0.0/24;";
-      endpoint = "${peers.routerEndpointHost}:51820";
-      persistent-keepalive = 25;
-    };
-
-    ipv4 = {
-      method = "manual";
-      address1 = "10.40.0.3/24";
-      # Below the Wi-Fi route (600), so being on the LAN beats tunnelling to reach it.
-      route-metric = 1000;
-      never-default = true;
-    };
-    ipv6.method = "disabled";
-  };
-
-
-
-  # wgadm is always-on infrastructure, owned by systemd just like Hydrogen's two hubs.
-  # Keeping it out of NetworkManager avoids an interactive secret-agent dependency and
-  # prevents desktop connection reloads from replacing the live interface's key or routes.
-  sops.secrets.${peers.admin.sulfur.secret} = { };
-  networking.wireguard.interfaces.${adm.interface} = {
-    ips = [ "${peers.admin.sulfur.address}/32" ];
-    privateKeyFile = config.sops.secrets.${peers.admin.sulfur.secret}.path;
-    mtu = 1420;
-    peers = [
-      {
-        inherit (adm) publicKey;
-        allowedIPs = [ "${adm.address}/32" peers.hubs.fam.subnet ];
-        endpoint = "${peers.hydrogenEndpointHost}:${toString adm.port}";
-        persistentKeepalive = 25;
-      }
-      {
-        inherit (rtr) publicKey;
-        allowedIPs = [ "${rtr.address}/32" ];
-        endpoint = "${peers.routerEndpointHost}:${toString rtr.port}";
-        persistentKeepalive = 25;
-      }
-    ];
-  };
-
-  # The manual break-glass profile remains a NetworkManager toggle. Its key is handed to
-  # NM over D-Bus rather than written into a connection file.
-  networking.networkmanager.ensureProfiles.secrets.entries = [
-    {
-      matchId = "wg0";
-      matchType = "wireguard";
-      matchSetting = "wireguard";
-      key = "private-key";
-      file = config.sops.secrets.wg-priv-sulfur.path;
-      trim = true;
-    }
-  ];
-
-  # During migration, ordinary service names use the Tailscale-advertised LAN
-  # route. marketplace remains deliberately administrative and wgadm-only.
+  # Ordinary services use the advertised LAN route. Marketplace is reached on
+  # hydrogen's direct tail address so Headscale can enforce its admin-only ACL.
   networking.hosts."10.0.0.10" =
-    lib.remove "marketplace.luckyobserver.com" peers.serviceNames;
+    lib.remove "marketplace.luckyobserver.com" devices.serviceNames;
   networking.hosts."100.64.0.3" = [ "marketplace.luckyobserver.com" ];
 
-  # Stable SSH destinations: the laptops' LAN leases change, but their family-tunnel
-  # addresses do not. Hydrogen forwards only sulfur's TCP/22 traffic to these peers.
+  # Stable SSH destinations use Headscale MagicDNS. The LAN aliases remain for
+  # local recovery when the control plane is unavailable.
   programs.ssh.extraConfig = ''
-    # Sulfur is on the same LAN as hydrogen, whose key-only br0 listener is the recovery
-    # path specifically intended to survive a failed wgadm handshake. Keep the tunnel as
-    # an explicit diagnostic/off-LAN alias rather than making routine SSH depend on it.
     Host hydrogen
+      HostName hydrogen.tail.luckyobserver.com
+      User sheath
+      IdentityFile /home/sheath/.ssh/personal
+      IdentitiesOnly yes
+
+    Host hydrogen-lan
       HostName 10.0.0.10
       User sheath
       IdentityFile /home/sheath/.ssh/personal
       IdentitiesOnly yes
 
-    Host hydrogen-wg
-      HostName ${adm.address}
-      User sheath
-      IdentityFile /home/sheath/.ssh/personal
-      IdentitiesOnly yes
-
     Host router nixrouter
-      HostName ${rtr.address}
+      HostName router.tail.luckyobserver.com
       User admin
       IdentityFile /home/sheath/.ssh/personal
       IdentitiesOnly yes
       IPQoS none
 
     Host router-lan
-      HostName ${rtr.lanAddress}
+      HostName 10.0.0.1
       User admin
       IdentityFile /home/sheath/.ssh/personal
       IdentitiesOnly yes
       IPQoS none
 
     Host hydrogen-git
-      HostName ${adm.address}
+      HostName hydrogen.tail.luckyobserver.com
       User git
       IdentityFile /home/sheath/.ssh/personal
       IdentitiesOnly yes
   '' + lib.concatStrings (lib.mapAttrsToList (name: peer: ''
     Host ${name}
-      HostName ${peer.address}
+      HostName ${name}.tail.luckyobserver.com
       User sheath
       IdentityFile /home/sheath/.ssh/personal
       IdentitiesOnly yes
-  '') peers.family);
+  '') devices.family);
 
 
   system.stateVersion = "25.11";

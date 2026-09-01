@@ -1,13 +1,13 @@
 # Valheim on Hydrogen
 
-The private server is `Hydrogen`, its world is `family`, and it listens only on the family
-and admin WireGuard interfaces. Family clients connect to `10.41.0.2:2456`; sulfur can
-also test `10.42.0.2:2456`. It is deliberately absent from the public server list.
+The private server is `Hydrogen`, its world is `family`, and it is reachable through the
+approved home subnet route at `10.0.0.10:2456`. It is deliberately absent from the public
+server list.
 
 ## Client setup
 
 Launch Valheim normally through Steam with no client mods, then connect to
-`10.41.0.2:2456` while the family VPN is active.
+`10.0.0.10:2456` while Tailscale is connected.
 
 ## Server operations
 

@@ -1,7 +1,7 @@
 # nginx + one wildcard cert for every internal service name.
 { config, lib, ... }:
 let
-  peers = import ./family/peers.nix;
+  devices = import ./family/devices.nix;
   domain = "luckyobserver.com";
   cfg = config.fleet.vhosts;
 in
@@ -78,13 +78,13 @@ in
       })) cfg;
     };
 
-    # The clients resolve these names from peers.serviceNames (networking.hosts on the
-    # NixOS hosts, the router for phones), so a vhost that is not in that list is
+    # Clients resolve these stable names through Headscale or the router, so a vhost
+    # that is not in the shared list is
     # unreachable by name and nothing else would say so.
     assertions = lib.mapAttrsToList (sub: _: {
-      assertion = lib.elem "${sub}.${domain}" peers.serviceNames;
+      assertion = lib.elem "${sub}.${domain}" devices.serviceNames;
       message = ''
-        fleet.vhosts."${sub}" has no matching entry in modules/family/peers.nix
+        fleet.vhosts."${sub}" has no matching entry in modules/family/devices.nix
         serviceNames, so clients cannot resolve ${sub}.${domain}.
       '';
     }) cfg;

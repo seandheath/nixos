@@ -76,12 +76,8 @@
         ./modules/boot-efi.nix
         ./modules/locale.nix
         ./modules/auto-update.nix
-        # Inert until a host declares its tailnet role.  tailscaled owns its
-        # interface, so it needs none of wg-unmanaged's NetworkManager hacks.
+        # Inert until a host declares its tailnet role.
         ./modules/tailscale-client.nix
-        # Every host: NetworkManager will flush a WireGuard interface it thinks it owns,
-        # and the hosts that most need protecting are the ones nobody is watching.
-        ./modules/wg-unmanaged.nix
         # Every host: hydrogen's br0 lost its slave during the 2026-08-13 nightly and
         # stayed unreachable for six hours. Defines nothing on a host with no bridges.
         ./modules/bridge-slave-restore.nix
@@ -120,9 +116,9 @@
           ++ diskConfigFor hostName ++ extraModules ++ commonModules;
       };
 
-      # The kids' laptops. modules/family/profile.nix derives the username, WireGuard peer
-      # address, sops key names and Minecraft handle from the hostname via
-      # modules/family/peers.nix, so a host declares only its hostname and hardware.
+      # The kids' laptops. modules/family/profile.nix derives the username, secret names,
+      # and Minecraft handle from modules/family/devices.nix, so a host declares only its
+      # hostname and hardware.
       # Value is the host's hardware-model modules, the seam mkHost has as extraModules.
       familyHosts = {
         gentlemenpupil = [ ./modules/oryp10.nix ]; # System76 Oryx Pro 10, ex-osmium

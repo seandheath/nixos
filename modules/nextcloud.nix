@@ -1,5 +1,5 @@
 { config, pkgs, lib, ... }:
-# Nextcloud on hydrogen, reachable only over WireGuard/LAN at https://nc.luckyobserver.com.
+# Nextcloud on hydrogen, reachable through the home tailnet at https://nc.luckyobserver.com.
 # The nextcloud module generates its own nginx vhost on `hostName`; we attach the
 # wildcard *.luckyobserver.com cert (defined in reverse-proxy.nix) to it below.
 {

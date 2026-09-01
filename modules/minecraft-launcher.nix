@@ -53,7 +53,7 @@ in
       default = "mc.luckyobserver.com";
       description = ''
         Where "on hydrogen" servers are reached, and the SSH host the control channel
-        talks to. Resolves over the family tunnel; see modules/family/peers.nix.
+        talks to. Resolves through Headscale DNS and the home subnet route.
       '';
     };
 

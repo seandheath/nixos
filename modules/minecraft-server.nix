@@ -9,8 +9,8 @@
 # Fabric API's registry sync has nothing to reject a vanilla client over.
 #
 # SECURITY: online-mode=false means NO identity verification -- anything reaching 25565 may
-# claim any username, and a whitelist matches on unauthenticated names. The network boundary
-# is the authentication boundary, and it is hydrogen's WireGuard interfaces, not the LAN.
+# claim any username, and a whitelist matches on unauthenticated names. Headscale policy
+# and hydrogen's firewall are therefore the authentication boundary.
 # Residual risk, accepted: one child can log in as a sibling.
 let
   datapacks = import ../packages/minecraft-datapacks.nix { inherit pkgs; };
@@ -69,7 +69,7 @@ in
       motd = "hydrogen";
 
       # server-ip deliberately UNSET: binding one address breaks either loopback (couch) or
-      # the tunnel. Interface scoping is the firewall's job.
+      # local and subnet-routed clients. Interface scoping is the firewall's job.
     };
   };
 

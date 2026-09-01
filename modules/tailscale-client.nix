@@ -1,6 +1,5 @@
 # Reusable Headscale-managed Tailscale client.  No NetworkManager profile or
-# WireGuard endpoint refresh is needed: tailscaled owns tailscale0 and follows
-# the host's changing uplinks itself.
+# tailscaled owns tailscale0 and follows the host's changing uplinks itself.
 { config, lib, pkgs, ... }:
 let
   cfg = config.fleet.tailscaleClient;

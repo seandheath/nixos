@@ -1,5 +1,5 @@
 { config, lib, ... }:
-# calibre-web ebook library, reachable only over WireGuard/LAN at
+# calibre-web ebook library, reachable through the home tailnet at
 # https://calibre.luckyobserver.com.
 #
 # NOTE: calibre-web requires an existing Calibre library (metadata.db) at

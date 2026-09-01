@@ -1,5 +1,5 @@
 { config, lib, ... }:
-# paperless-ngx document management, reachable only over WireGuard/LAN at
+# paperless-ngx document management, reachable through the home tailnet at
 # https://paper.luckyobserver.com. Documents dropped into the consume dir
 # (<dataDir>/consume) or uploaded via the web UI are OCR'd and indexed.
 # scanbd button-driven scanning from the MFC-L2707DW is deferred (out of scope).

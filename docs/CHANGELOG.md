@@ -16,6 +16,18 @@ Also the decision log. Rationale that would otherwise bloat a code comment lives
   finding: scripted networking is detaching its own slave, and `br0-netdev`'s
   `X-ReloadIfChanged` is the next suspect.
 
+## 2026-09-01 (fleet tunnel retirement)
+
+- **Headscale/Tailscale is now the sole fleet remote-access network.** Sulfur, hydrogen,
+  and the family profile use persistent tailscaled identities, Headscale DNS, and the
+  router's approved `10.0.0.0/24` subnet route without selecting an exit node.
+- **Removed the legacy tunnel implementation and credentials.** The fleet, admin, family,
+  and break-glass modules and profiles are gone, along with endpoint refresh hooks,
+  interface firewall rules, peer addresses, and every encrypted legacy private key.
+- **Marketplace is administrative by policy.** It resolves to hydrogen's direct tail
+  address; Headscale permits administrators and denies `tag:family` before nginx's
+  Tailscale-source ACL.
+
 ## 2026-08-31 (Syncthing retirement)
 
 - **Nextcloud replaces Syncthing for file synchronization.** Hydrogen and sulfur no longer

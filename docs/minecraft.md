@@ -73,14 +73,13 @@ it performs **no identity verification**. Anything that reaches 25565 may claim 
 username, and a whitelist matches on names that are themselves unauthenticated.
 **Reachability is the authentication boundary.**
 
-- `openFirewall = false`; 25565 is opened only on hydrogen's WireGuard interfaces:
-  `wgfam` (10.41.0.0/24, port 51821) for the kids' devices, `wgadm` (10.42.0.0/24, port
-  51822) for sulfur.
-- **Not `br0`.** Couch clients are unaffected — they connect over 127.0.0.1, and `server-ip`
-  is unset so the server listens everywhere and interface scoping does the work.
-- The router forwards 51820, 51821 and 51822/udp only.
+- `openFirewall = false`; tagged family clients reach 25565 through the router's
+  approved `10.0.0.0/24` subnet route.
+- Hydrogen admits that subnet-routed traffic only from the router's SNAT address.
+  Couch clients connect over 127.0.0.1.
+- Headscale policy, rather than a public port forward, controls reachability.
 
-Re-verify after any router change. From cellular, and from home wifi with WireGuard **off**:
+Re-verify after any router or ACL change. From a device outside the tailnet:
 
 ```console
 $ nc -vz <wan-address> 25565     # must fail

@@ -1,4 +1,4 @@
-# Private bare git repositories on hydrogen, served by sshd over WireGuard.
+# Private bare git repositories on hydrogen, served by sshd over Tailscale.
 #
 # No daemon, no database, no web surface: the `git` account's shell IS git-shell, so a key
 # that reaches sshd can run git-upload-pack and git-receive-pack and nothing else. The

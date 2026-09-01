@@ -1,6 +1,6 @@
 # The kids' laptop profile -- what modules/workstation.nix is for sheath's machines. A host
-# that imports this declares only its hostname; username, peer address, sops key names and
-# Minecraft handle all follow from it via modules/family/peers.nix.
+# that imports this declares only its hostname; username and Minecraft handle follow from
+# modules/family/devices.nix.
 #
 # NOT workstation.nix, for three reasons that would each break: packages-desktop.nix is an
 # adult desktop and a large closure to build four times; opencode/qwen-code decrypt secrets
@@ -8,15 +8,14 @@
 # resolves to nothing for any other user.
 { config, lib, pkgs, ... }:
 let
-  peers = import ./peers.nix;
+  devices = import ./devices.nix;
   hostName = config.networking.hostName;
-  self = peers.family.${hostName} or (throw ''
-    modules/family/profile.nix: no entry for host "${hostName}" in modules/family/peers.nix.
+  self = devices.family.${hostName} or (throw ''
+    modules/family/profile.nix: no entry for host "${hostName}" in modules/family/devices.nix.
   '');
 
   # username == hostName == the sops key prefix == the Minecraft handle, lowercased.
-  # One string, everywhere. Its secrets are `wg-priv-<username>` (in peers.nix) and
-  # `<username>-password-hash` (below), both in secrets/family.yaml.
+  # One string, everywhere. Its password and enrollment secrets are in family.yaml.
   username = hostName;
 in
 {
@@ -29,7 +28,6 @@ in
     ../steam.nix
     ../minecraft-client.nix
     ../minecraft-launcher.nix
-    ./vpn-peer.nix
   ];
 
   options.family.enable = lib.mkOption {
@@ -41,8 +39,6 @@ in
   config = {
     family.enable = true;
     fleet.provisioning.enable = true;
-    # Keep wgfam until the remote validation checklist passes.  The Headscale
-    # tag preserves the family-vs-admin boundary during that overlap.
     fleet.tailscaleClient = {
       enable = true;
       tags = [ "tag:family" ];
@@ -79,8 +75,7 @@ in
     fleet.accounts.sudoNoPassword = true;
 
     # Key-only, unlike hydrogen: these accounts have child-chosen passwords and the machines
-    # sit on untrusted networks. Reachable from the LAN and from sulfur over the family
-    # tunnel, where hydrogen forwards port 22 and nothing else.
+    # sit on untrusted networks. Headscale policy permits administrative access.
     services.openssh = {
       enable = true;
       settings = {

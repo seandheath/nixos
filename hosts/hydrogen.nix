@@ -1,8 +1,7 @@
 # hydrogen: the 24/7 server. Services, backups, and the couch Minecraft box.
 { config, pkgs, lib, ... }:
 let
-  peers = import ../modules/family/peers.nix;
-  adm = peers.hubs.adm;
+  devices = import ../modules/family/devices.nix;
 in
 {
   imports = [
@@ -22,8 +21,6 @@ in
     ../modules/ai-marketplace-monitor.nix
     ../modules/backup.nix
     ../modules/git-server.nix
-    ../modules/fleet-vpn.nix
-    ../modules/family/vpn-hub.nix
     ../modules/minecraft-server.nix
     ../modules/minecraft-servers.nix      # extra worlds on demand, in rootless podman
     ../modules/minecraft-couch.nix
@@ -39,8 +36,7 @@ in
     enable = true;
     tags = [ "tag:server" ];
     authKeyFile = config.sops.secrets.tailscale-auth-hydrogen.path;
-    # Headscale policy, not interface membership, distinguishes admin and family
-    # clients.  The old WireGuard interface-scoped rules remain during migration.
+    # Headscale policy distinguishes administrative and family clients.
     allowedTCPPorts = [ 22 80 443 25565 21115 21116 21117 21118 21119 ];
     allowedUDPPorts = [ 2456 2457 2458 21116 ];
   };
@@ -58,10 +54,8 @@ in
     archiveDir = "/var/lib/minecraft-archive";
   };
 
-  # Private git remotes, bare repos owned by the `git` account. No new port: sshd already
-  # answers on wgadm and wgfam, so the kids' laptops can reach the account too and only
-  # key-only auth keeps them out -- the same trade already made for the Minecraft control
-  # channel below.
+  # Private git remotes, bare repos owned by the `git` account. Headscale policy and
+  # key-only SSH protect the control channel.
   fleet.gitServer.enable = true;
 
   # The fleet's flake.lock is bumped and gated here, on the only host that is always up.
@@ -74,7 +68,7 @@ in
     enable = true;
     authorizedKeys =
       [ "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILxJG3+Zq8fSH/PG8cL3g1WQikuWE7U9XZCRsaSE9DgN minecraft-control-sulfur" ]
-      ++ map (peer: peer.minecraftControlPublicKey) (builtins.attrValues peers.family);
+      ++ map (device: device.minecraftControlPublicKey) (builtins.attrValues devices.family);
   };
 
   services.familyValheim.enable = true;
@@ -98,33 +92,24 @@ in
   # the DNS source. See CHANGELOG 2026-08-13.
   networking.networkmanager.enable = lib.mkForce false;
 
-  # THE ACCESS BOUNDARY -- read before changing any port.
-  #
-  # Every service is reachable only over WireGuard; being on the home wifi grants nothing,
-  # not even sshd. minecraft-server runs online-mode=false and verifies no identity, so
-  # whatever reaches 25565 may claim to be any child.
-  #   wgadm (10.42.0.0/24, :51822)  sulfur -- full administrative access
-  #   wgfam (10.41.0.0/24, :51821)  family devices -- web + Minecraft only
-  # Only those two listen ports face the internet. Re-verify from off-tunnel after any
-  # router change.
+  # THE ACCESS BOUNDARY -- read before changing any port. Headscale policy grants
+  # admins direct access and limits family devices to the home service ports. The
+  # LAN firewall admits subnet-routed traffic only from the router's SNAT address.
   networking.firewall.enable = true;
-  networking.firewall.allowedTCPPorts = [ ];   # every service port is interface-scoped below
-  networking.firewall.allowedUDPPorts = [ 51821 51822 ];
+  networking.firewall.allowedTCPPorts = [ ];
+  networking.firewall.allowedUDPPorts = [ ];
 
-  # openFirewall defaults true and adds 22 to the GLOBAL list, which no interface-scoped
-  # rule can subtract from. 22 appears only in the wgadm list below.
+  # Keep firewall ownership explicit; 22 is available on br0 for recovery and on
+  # tailscale0 through fleet.tailscaleClient above.
   services.openssh.openFirewall = false;
 
-  # sshd on the LAN, key-only, as the backup path. br0 used to carry nothing, which meant a
-  # wgadm failure left no remote way in at all -- that cost a trip to the console on
-  # 2026-08-19. The router does not forward 22, so this widens reach to the house, not the
-  # internet. Every other service stays wgadm-scoped. see CHANGELOG 2026-08-19
+  # sshd on the LAN, key-only, remains the recovery path if Tailscale is unavailable.
+  # The router does not forward 22, so this widens reach to the house, not the Internet.
   networking.firewall.interfaces."br0".allowedTCPPorts = [ 22 ];
 
-  # Subnet-routed clients are SNATed to the router's LAN address.  Admit only
-  # that source to the ordinary home services; do not make them reachable to
-  # every unauthenticated device on home Wi-Fi.  marketplace remains wgadm-only
-  # because its nginx vhost has a separate administrative source ACL.
+  # Subnet-routed clients are SNATed to the router's LAN address. Admit only
+  # that source to ordinary home services; Marketplace instead uses hydrogen's
+  # direct tail address so policy can keep it administrative.
   networking.firewall.extraCommands = lib.mkAfter ''
     iptables -N tailscale-lan-input 2>/dev/null || true
     iptables -F tailscale-lan-input
@@ -139,56 +124,20 @@ in
     iptables -X tailscale-lan-input 2>/dev/null || true
   '';
 
-  # br0 carries nothing, so a wgadm failure leaves no remote way in and recovery is the
-  # physical console. That is survivable only because this is a laptop with a working
-  # panel, GDM autologins sheath, and sheath has NOPASSWD sudo. Do not remove any of the
-  # three without restoring a network path first.
-  networking.firewall.interfaces."wgadm".allowedTCPPorts = [
-    22
-    80 443
-    25565                           # Minecraft
-    21115 21116 21117 21118 21119   # RustDesk
-  ];
-  networking.firewall.interfaces."wgadm".allowedUDPPorts = [
-    2456 2457 2458   # Valheim
-    21116           # RustDesk
-  ];
-
-  # Note what is absent: RustDesk.
-  #
-  # 22 is here so the kids' launchers can reach the on-demand server control channel, which
-  # is SSH behind a forced command (modules/minecraft-servers.nix). Consequence, per the
-  # guest note in modules/family/peers.nix: a guest key on wgfam can now reach sshd too.
-  # Key-only auth is what stops them, not reachability. If guests become common, the
-  # remedy that file suggests is a third hub carrying only the control port.
-  networking.firewall.interfaces."wgfam".allowedTCPPorts = [ 22 80 443 25565 ];
-  networking.firewall.interfaces."wgfam".allowedUDPPorts = [ 2456 2457 2458 ];
-
-  # The on-demand worlds. A range rather than per-server entries: firewall ports are
-  # declarative and per-interface, so a container the launcher creates at runtime on a
-  # fresh port would otherwise be unreachable until the next rebuild. 25565 stays the
-  # shared world.
-  networking.firewall.interfaces."wgfam".allowedTCPPortRanges = [ { from = 25566; to = 25575; } ];
-  networking.firewall.interfaces."wgadm".allowedTCPPortRanges = [ { from = 25566; to = 25575; } ];
-
   services.openssh = {
     enable = true;
-    # Key-only, because 22 now faces the LAN as well as wgadm. A password prompt on the
-    # house network is what the wgadm boundary existed to prevent, and sheath's hash is
-    # shared with laptops the kids hold. see CHANGELOG 2026-08-19
+    # Key-only because 22 also remains reachable from the home LAN as a recovery path.
     settings.PasswordAuthentication = false;
     settings.PermitRootLogin = "no";
   };
 
   # The monitor itself stays on loopback; nginx gives it the fleet wildcard certificate.
-  # Unlike the other web apps, its config editor and live browser are administrative, so
-  # nginx rejects clients from wgfam even though that interface can reach HTTPS generally.
+  # Unlike the other web apps, its config editor and live browser are administrative.
   fleet.vhosts.marketplace = {
     port = 8467;
-    # wgadm remains during migration.  Tailscale clients reach this vhost on
-    # hydrogen's direct tail address; Headscale policy permits admins but not
-    # tag:family to reach that address.
-    allowedCIDRs = [ adm.subnet "100.64.0.0/10" ];
+    # Tailscale clients reach this vhost on hydrogen's direct tail address;
+    # Headscale policy permits admins but not tag:family.
+    allowedCIDRs = [ "100.64.0.0/10" ];
   };
 
   # The console is the recovery path here, per the br0 note above.
@@ -235,7 +184,7 @@ in
 
   # RustDesk host, in the autologin session so it has the Wayland/DBus/portal environment
   # screen capture needs. Unattended password and direct-IP are set once in the app.
-  # Direct-IP is the wgadm address 10.42.0.1, not the LAN one.
+  # Direct tail access is permitted only to administrative clients by Headscale policy.
   systemd.user.services.rustdesk = {
     description = "RustDesk remote-desktop host";
     partOf = [ "graphical-session.target" ];

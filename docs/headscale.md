@@ -1,8 +1,4 @@
-# Headscale/Tailscale migration
-
-The home tailnet is intentionally deployed alongside `wg0`, `wgmgt`, `wgadm`,
-`wgfam`, and `fleet` first.  Do not remove those tunnels until the remote tests
-at the end of this document pass.
+# Headscale/Tailscale home network
 
 ## Architecture
 
@@ -19,13 +15,13 @@ at the end of this document pass.
 
 The policy auto-approves `10.0.0.0/24` only for `tag:subnet-router`.
 Untagged personal devices and `tag:admin` have general tailnet/LAN access.
-`tag:family` retains the narrower service access it had on `wgfam`.
+`tag:family` has access only to the declared home service ports.
 
 ## Initial server deployment
 
 1. In public DNS, create a DNS-only A record for
-   `headscale.luckyobserver.com`.  ddclient will keep it and
-   `vpn.luckyobserver.com` synchronized with the router's changing WAN IP.
+   `headscale.luckyobserver.com`. ddclient keeps it synchronized with the
+   router's changing WAN IP.
 2. Forward no new ports to an internal host.  The router itself accepts TCP 80
    (ACME HTTP-01 and HTTPS redirect), TCP 443 (Headscale), and Tailscale's UDP
    transport on its WAN interface.
@@ -85,9 +81,9 @@ sudo tailscale up \
 Approve the printed registration request with the Headscale CLI.  The NixOS
 module reapplies `--accept-routes=true` and `--exit-node=` after rebuilds.
 
-## Validation and retirement gate
+## Validation
 
-Run these checks from outside the home network before deleting WireGuard:
+Run these checks from outside the home network:
 
 1. `tailscale status` is `Running` after enrollment, reboot, suspend/resume,
    and switching Wi-Fi networks.
@@ -109,8 +105,5 @@ Run these checks from outside the home network before deleting WireGuard:
 7. Rebuild router and client.  Neither asks for enrollment again, and no auth
    key appears in `git grep` or the Nix store.
 
-Only after every check passes should a follow-up remove `fleet-vpn.nix`,
-`wg-unmanaged.nix`, the `wgadm`/`wgfam` modules and peers, sulfur's endpoint
-dispatcher and manual profiles, router port forwards/pinholes/listeners, and
-WireGuard-only firewall/RPF rules.  Review the router management recovery path
-separately before retiring `wgmgt`.
+The old fleet tunnels have been retired. `/var/lib/tailscale` is the durable
+identity that must remain persisted on machines with ephemeral roots.

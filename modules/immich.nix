@@ -1,5 +1,5 @@
 { config, lib, ... }:
-# Immich photo/video server, reachable only over WireGuard/LAN at
+# Immich photo/video server, reachable through the home tailnet at
 # https://immich.luckyobserver.com. The 25.11 module provisions its own PostgreSQL
 # (with the pgvector/vectorchord extension) and Redis automatically.
 {
