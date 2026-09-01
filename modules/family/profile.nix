@@ -89,7 +89,7 @@ in
 
     environment.systemPackages = with pkgs; [
       vscodium
-      libreoffice-fresh
+      libreoffice-stable
       google-chrome
       klavaro          # touch-typing tutor: structured courses, adaptivity, games
       keepassxc        # database lives in Nextcloud, synced by the client below

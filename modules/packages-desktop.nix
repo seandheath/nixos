@@ -113,7 +113,7 @@
     gst_all_1.gst-libav
 
     # Office suite
-    libreoffice-fresh
+    libreoffice-stable
 
     # Web browser
     google-chrome
