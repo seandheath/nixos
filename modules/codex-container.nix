@@ -1,10 +1,10 @@
-{ pkgs, ... }:
+{ pkgs, lib, ... }:
 
 # `ccodex`: Codex with --yolo inside a rootless Podman boundary. The agent can write the
 # current project, its own named home volume, the host Codex directory, and only the two
 # Porkbun credential files required by its read-only MCP server. The rest of the host home,
 # SSH/GPG agents, and other working trees remain hidden; network access stays available.
-# `--allow-usb` opt-in mounts the host USB bus for peripheral development.
+# `--allow-usb` and `--ynab` opt into peripheral and financial-data access respectively.
 let
   image = pkgs.codex-container;
   runtime = image.runtime;
@@ -23,10 +23,13 @@ let
     # ${runtime}
 
     allow_usb=false
+    enable_ynab=false
     forwarded_args=()
     for arg in "$@"; do
       if [[ "$arg" == --allow-usb ]]; then
         allow_usb=true
+      elif [[ "$arg" == --ynab ]]; then
+        enable_ynab=true
       else
         forwarded_args+=("$arg")
       fi
@@ -42,6 +45,15 @@ let
       # Mount the bus directory so devices that reconnect or re-enumerate remain visible.
       # keep-groups preserves access granted through host udev groups as well as ACLs.
       usb_args=(-v /dev/bus/usb:/dev/bus/usb:rw --group-add=keep-groups)
+    fi
+
+    ynab_args=()
+    if $enable_ynab; then
+      if [[ ! -s /run/secrets/ynab-api-token ]]; then
+        printf '%s\n' 'ccodex: --ynab requested, but /run/secrets/ynab-api-token is unavailable or empty' >&2
+        exit 1
+      fi
+      ynab_args=(-v /run/secrets/ynab-api-token:/run/secrets/ynab-api-token:ro)
     fi
 
     codex_home="$HOME/.codex"
@@ -91,6 +103,9 @@ let
       [[ "$arg" == resume ]] && resume=true
     done
     codex_args=(--yolo)
+    if $enable_ynab; then
+      codex_args+=(-c ${lib.escapeShellArg "mcp_servers.ynab.command=\"${pkgs.ynab-mcp-server}/bin/ynab-mcp-server\""})
+    fi
     if $resume; then
       # Resume in the project that ccodex was launched from; an explicit -C still takes
       # precedence if the user intentionally chooses another mounted path.
@@ -128,6 +143,7 @@ let
       --read-only \
       --tmpfs /tmp:rw,nosuid,nodev,size=2g,mode=1777 \
       "''${usb_args[@]}" \
+      "''${ynab_args[@]}" \
       -v ccodex-home:/home/codex:rw,U \
       -v "''${codex_home}:''${codex_home}:rw" \
       -v "''${project_dir}:''${project_dir}:rw" \

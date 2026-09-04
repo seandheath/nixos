@@ -33,10 +33,11 @@ in
   programs.firefox.enable = true;
   environment.systemPackages = [ pkgs.porkbun-domain-search-mcp ];
 
-  # The launcher reads these at MCP process startup; no client config or Nix store path
-  # contains either credential.
+  # MCP launchers read these at process startup; no client config or Nix store path contains
+  # credentials.
   sops.secrets.porkbun-api-key.owner = "sheath";
   sops.secrets.porkbun-secret-api-key.owner = "sheath";
+  sops.secrets.ynab-api-token.owner = "sheath";
 
   # Grant the active session user access to Cynthion's bootloader, Apollo, and analyzer
   # USB identities without requiring a plugdev group.

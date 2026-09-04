@@ -33,6 +33,8 @@ final: prev: {
   qwen-code = import ./qwen-code.nix { pkgs = final; };
   reference-download = import ./reference-download.nix { pkgs = final; };
   re-container = import ./re-container.nix { pkgs = final; };
+  ynab-mcp-server = import ./ynab-mcp-server.nix { pkgs = final; };
+  ynab-mcp-tools = import ./ynab-mcp-tools.nix { pkgs = final; };
 
   # Not a derivation: an attrset of { pythonWithDbus, script, package }, because the
   # systemd unit needs the interpreter and the script separately.

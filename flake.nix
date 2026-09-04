@@ -171,6 +171,8 @@
           qwen-code
           reference-download
           re-container
+          ynab-mcp-server
+          ynab-mcp-tools
           ;
       };
 

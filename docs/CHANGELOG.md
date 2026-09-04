@@ -16,6 +16,12 @@ Also the decision log. Rationale that would otherwise bloat a code comment lives
   finding: scripted networking is detaching its own slave, and `br0-netdev`'s
   `X-ReloadIfChanged` is the next suspect.
 
+## 2026-09-04 (opt-in YNAB MCP access)
+
+- **`cclaude --ynab` and `ccodex --ynab` expose YNAB only for that session.** The launchers
+  mount the SOPS-managed API token and add the pinned `rgarcia/ynab-mcp-server`; sessions
+  without the flag receive neither the credential nor the financial tools.
+
 ## 2026-09-04 (opt-in USB access for ccodex)
 
 - **`ccodex --allow-usb` exposes the host USB bus to the container.** The launcher bind-mounts

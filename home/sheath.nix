@@ -19,7 +19,11 @@ let
   # key, which by design cannot decrypt secrets/secrets.yaml (see .sops.yaml), so the
   # openwebui-* secrets below would fail activation there.
   enablePi = workstation;
-  cclaude = inputs.cclaude.packages.x86_64-linux.default;
+  cclaudePackages = inputs.cclaude.packages.x86_64-linux;
+  cclaude = import ../packages/cclaude.nix {
+    inherit pkgs;
+    upstream = cclaudePackages;
+  };
   porkbunMcp = "${pkgs.porkbun-domain-search-mcp}/bin/porkbun-domain-search-mcp";
 in
 {
@@ -82,10 +86,10 @@ in
   home.packages = [
     pkgs.uv
     cclaude
-    inputs.cclaude.packages.x86_64-linux.cclaude-build
-    inputs.cclaude.packages.x86_64-linux.cclaude-update
-    inputs.cclaude.packages.x86_64-linux.cclaude-shell
-    inputs.cclaude.packages.x86_64-linux.cclaude-setup
+    cclaudePackages.cclaude-build
+    cclaudePackages.cclaude-update
+    cclaudePackages.cclaude-shell
+    cclaudePackages.cclaude-setup
   ] ++ lib.optionals enablePi [
     inputs.pi-flake.packages.x86_64-linux.default
   ];
