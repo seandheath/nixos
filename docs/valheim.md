@@ -1,13 +1,13 @@
 # Valheim on Hydrogen
 
-The private server is `Hydrogen`, its world is `family`, and it is reachable through the
-approved home subnet route at `10.0.0.10:2456`. It is deliberately absent from the public
+The private server is `Hydrogen`, its world is `family`, and it is reachable directly over
+Tailscale at `valheim.luckyobserver.com:2456`. It is deliberately absent from the public
 server list.
 
 ## Client setup
 
 Launch Valheim normally through Steam with no client mods, then connect to
-`10.0.0.10:2456` while Tailscale is connected.
+`valheim.luckyobserver.com:2456` while Tailscale is connected.
 
 ## Server operations
 

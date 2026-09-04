@@ -16,7 +16,7 @@ in
     ../modules/minecraft-launcher.nix     # pick a player and a server; spins servers up on demand
   ];
 
-  # Reached through the home subnet route; networking.hosts below resolves it.
+  # Resolved below to hydrogen's direct tail address.
   services.minecraftClient = {
     enable = true;
     playerName = "LuckyObserver";
@@ -35,6 +35,8 @@ in
   fleet.tailscaleClient = {
     enable = true;
     tags = [ "tag:admin" ];
+    acceptRoutes = false;
+    operatorUser = "sheath";
     authKeyFile = config.sops.secrets.tailscale-auth-sulfur.path;
   };
   sops.secrets.tailscale-auth-sulfur = { };
@@ -225,11 +227,8 @@ in
     };
   };
 
-  # Ordinary services use the advertised LAN route. Marketplace is reached on
-  # hydrogen's direct tail address so Headscale can enforce its admin-only ACL.
-  networking.hosts."10.0.0.10" =
-    lib.remove "marketplace.luckyobserver.com" devices.serviceNames;
-  networking.hosts."100.64.0.3" = [ "marketplace.luckyobserver.com" ];
+  # Every hydrogen service uses its native tail address, at home and away.
+  networking.hosts.${devices.hydrogen.tailAddress} = devices.serviceNames;
 
   system.stateVersion = "25.11";
 }

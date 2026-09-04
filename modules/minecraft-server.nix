@@ -69,7 +69,7 @@ in
       motd = "hydrogen";
 
       # server-ip deliberately UNSET: binding one address breaks either loopback (couch) or
-      # local and subnet-routed clients. Interface scoping is the firewall's job.
+      # tailnet clients. Interface scoping is the firewall's job.
     };
   };
 

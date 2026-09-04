@@ -82,7 +82,7 @@ let
     exec ${pkgs.podman}/bin/podman run --name valheim --replace --pull=missing \
       --security-opt=no-new-privileges --cap-drop=all \
       --userns=keep-id:uid=111,gid=1000 \
-      --publish 10.0.0.10:2456-2458:2456-2458/udp \
+      --publish ${cfg.listenAddress}:2456-2458:2456-2458/udp \
       --volume ${root}/saves:/home/steam/.config/unity3d/IronGate/Valheim:rw \
       --volume ${root}/server:/home/steam/valheim:rw \
       --volume ${root}/backups:/home/steam/backups:rw \
@@ -137,8 +137,15 @@ let
   '';
 in
 {
-  options.services.familyValheim.enable =
-    lib.mkEnableOption "the private, mostly-vanilla family Valheim server";
+  options.services.familyValheim = {
+    enable = lib.mkEnableOption "the private, mostly-vanilla family Valheim server";
+
+    listenAddress = lib.mkOption {
+      type = lib.types.str;
+      default = "127.0.0.1";
+      description = "Host address on which to publish the Valheim UDP ports.";
+    };
+  };
 
   config = lib.mkIf cfg.enable {
     virtualisation.podman.enable = true;
@@ -173,8 +180,17 @@ in
       # uid_map/gid_map even when they are on PATH.
       path = [ "/run/wrappers" ];
       wantedBy = [ "multi-user.target" ];
-      wants = [ "network-online.target" "user@${toString uid}.service" ];
-      after = [ "network-online.target" "user@${toString uid}.service" ];
+      wants = [
+        "network-online.target"
+        "tailscaled.service"
+        "tailscale-configure.service"
+        "user@${toString uid}.service"
+      ];
+      after = [
+        "network-online.target"
+        "tailscale-configure.service"
+        "user@${toString uid}.service"
+      ];
       serviceConfig = {
         Type = "simple";
         User = "valheim";

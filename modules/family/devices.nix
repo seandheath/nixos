@@ -1,5 +1,10 @@
 # Non-secret metadata shared by the family laptop profile and hydrogen's game services.
 {
+  hydrogen = {
+    tailAddress = "100.64.0.3";
+    tailName = "hydrogen.tail.luckyobserver.com";
+  };
+
   family = {
     gentlemenpupil = {
       minecraftName = "GentlemenPupil";
@@ -26,5 +31,6 @@
     "calibre.luckyobserver.com"
     "marketplace.luckyobserver.com"
     "mc.luckyobserver.com"
+    "valheim.luckyobserver.com"
   ];
 }

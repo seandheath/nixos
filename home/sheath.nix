@@ -80,6 +80,7 @@ in
   };
 
   home.packages = [
+    pkgs.uv
     cclaude
     inputs.cclaude.packages.x86_64-linux.cclaude-build
     inputs.cclaude.packages.x86_64-linux.cclaude-update
@@ -88,6 +89,24 @@ in
   ] ++ lib.optionals enablePi [
     inputs.pi-flake.packages.x86_64-linux.default
   ];
+
+  # Tailscale's Linux tray is a separate per-user process.  GNOME's AppIndicator
+  # extension is enabled by modules/gnome.nix; start the tray with sheath's graphical
+  # session rather than relying on `tailscale configure systray`, whose generated
+  # desktop-file installation is imperative and requires desktop-file-utils in PATH.
+  systemd.user.services.tailscale-systray = lib.mkIf workstation {
+    Unit = {
+      Description = "Tailscale system tray";
+      PartOf = [ "graphical-session.target" ];
+      After = [ "graphical-session.target" ];
+    };
+    Service = {
+      ExecStart = "${osConfig.services.tailscale.package}/bin/tailscale systray";
+      Restart = "on-failure";
+      RestartSec = 5;
+    };
+    Install.WantedBy = [ "graphical-session.target" ];
+  };
 
   # Both native clients own mutable user configuration, so register the declarative command
   # only when it differs. Their MCP processes load credentials from the SOPS-backed launcher.

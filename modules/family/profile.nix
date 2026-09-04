@@ -41,6 +41,7 @@ in
     fleet.provisioning.enable = true;
     fleet.tailscaleClient = {
       enable = true;
+      acceptRoutes = false;
       tags = [ "tag:family" ];
       authKeyFile = config.sops.secrets."tailscale-auth-${hostName}".path;
     };

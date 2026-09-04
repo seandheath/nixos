@@ -4,10 +4,11 @@
 # current project, its own named home volume, the host Codex directory, and only the two
 # Porkbun credential files required by its read-only MCP server. The rest of the host home,
 # SSH/GPG agents, and other working trees remain hidden; network access stays available.
+# `--allow-usb` opt-in mounts the host USB bus for peripheral development.
 let
   image = pkgs.codex-container;
   runtime = image.runtime;
-  imageName = "localhost/ccodex:latest";
+  imageName = "localhost/ccodex:${image.imageTag}";
   podman = "${pkgs.podman}/bin/podman";
 
   ccodex-build = pkgs.writeShellScriptBin "ccodex-build" ''
@@ -21,11 +22,53 @@ let
     # Keep the commands hidden by the host /nix/store mount alive across garbage collection:
     # ${runtime}
 
+    allow_usb=false
+    forwarded_args=()
+    for arg in "$@"; do
+      if [[ "$arg" == --allow-usb ]]; then
+        allow_usb=true
+      else
+        forwarded_args+=("$arg")
+      fi
+    done
+    set -- "''${forwarded_args[@]}"
+
+    usb_args=()
+    if $allow_usb; then
+      if [[ ! -d /dev/bus/usb ]]; then
+        printf '%s\n' 'ccodex: --allow-usb requested, but /dev/bus/usb is unavailable' >&2
+        exit 1
+      fi
+      # Mount the bus directory so devices that reconnect or re-enumerate remain visible.
+      # keep-groups preserves access granted through host udev groups as well as ACLs.
+      usb_args=(-v /dev/bus/usb:/dev/bus/usb:rw --group-add=keep-groups)
+    fi
+
+    codex_home="$HOME/.codex"
+    installed_codex="$codex_home/bin/codex"
+    mkdir -p "$codex_home"
+
     # The shared Codex home keeps auth, settings, plugins, and conversations identical inside
     # and outside the container. Run explicit login commands on the host so their localhost
     # browser callback does not terminate inside the container's network namespace.
     if [[ "''${1:-}" == login ]]; then
       exec ${pkgs.codex}/bin/codex "$@"
+    fi
+
+    # Install the standalone CLI into the shared, writable Codex home. The Nix package remains
+    # the reproducible fallback, while this lets `ccodex update` track upstream releases without
+    # attempting to modify the immutable container image.
+    if [[ "''${1:-}" == update ]]; then
+      printf 'ccodex: installing the latest standalone Codex CLI...\n' >&2
+      ${pkgs.curl}/bin/curl -fsSL https://chatgpt.com/codex/install.sh \
+        | PATH="$codex_home/bin:$PATH" \
+          CODEX_HOME="$codex_home" \
+          CODEX_INSTALL_DIR="$codex_home/bin" \
+          CODEX_NON_INTERACTIVE=1 \
+          ${pkgs.bash}/bin/bash
+      printf 'ccodex: now using ' >&2
+      "$installed_codex" --version
+      exit 0
     fi
 
     if ! ${podman} image exists ${imageName} 2>/dev/null; then
@@ -39,9 +82,10 @@ let
     fi
 
     project_dir="$(pwd)"
-    codex_home="$HOME/.codex"
-
-    mkdir -p "$codex_home"
+    codex_command=/bin/codex
+    if [[ -x "$installed_codex" ]]; then
+      codex_command="$installed_codex"
+    fi
     resume=false
     for arg in "$@"; do
       [[ "$arg" == resume ]] && resume=true
@@ -83,6 +127,7 @@ let
       --security-opt label=disable \
       --read-only \
       --tmpfs /tmp:rw,nosuid,nodev,size=2g,mode=1777 \
+      "''${usb_args[@]}" \
       -v ccodex-home:/home/codex:rw,U \
       -v "''${codex_home}:''${codex_home}:rw" \
       -v "''${project_dir}:''${project_dir}:rw" \
@@ -101,7 +146,7 @@ let
       "''${gitconfig_args[@]}" \
       -w "''${project_dir}" \
       ${imageName} \
-      /bin/codex "''${codex_args[@]}" "$@")"
+      "$codex_command" "''${codex_args[@]}" "$@")"
 
     set +e
     ${podman} start -a -i --detach-keys=ctrl-c --sig-proxy=false "$container_id"

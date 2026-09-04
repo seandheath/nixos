@@ -195,7 +195,7 @@ in
       autoStart = true;
 
       # nginx is the only network entry point; it terminates TLS and restricts the vhost
-      # to the administrative tailnet policy. Loopback also avoids bypassing that ACL.
+      # to direct tailnet sources. Loopback also avoids bypassing that boundary.
       ports = [ "127.0.0.1:8467:8467" ];
       volumes = [
         "${stateDir}:/root/.ai-marketplace-monitor"

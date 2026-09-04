@@ -53,10 +53,15 @@ let
       passwdEtc
     ];
   };
+
+  # A stable `latest` tag lets Podman silently keep an older image after a NixOS
+  # rebuild. Tie the tag to the runtime closure instead, so any package update
+  # causes the launcher to load the matching image on its next invocation.
+  imageTag = builtins.substring 0 16 (builtins.hashString "sha256" runtime.drvPath);
 in
 (pkgs.dockerTools.buildLayeredImage {
   name = "localhost/ccodex";
-  tag = "latest";
+  tag = imageTag;
   contents = [ runtime ];
 
   fakeRootCommands = ''
@@ -86,5 +91,5 @@ in
   };
 })
 // {
-  inherit runtime;
+  inherit imageTag runtime;
 }

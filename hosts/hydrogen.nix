@@ -35,6 +35,7 @@ in
   fleet.tailscaleClient = {
     enable = true;
     tags = [ "tag:server" ];
+    acceptRoutes = false;
     authKeyFile = config.sops.secrets.tailscale-auth-hydrogen.path;
     # Headscale policy distinguishes administrative and family clients.
     allowedTCPPorts = [ 22 80 443 25565 21115 21116 21117 21118 21119 ];
@@ -66,12 +67,16 @@ in
   # key; the public halves below are restricted to the forced Minecraft control command.
   fleet.minecraftServers = {
     enable = true;
+    listenAddress = devices.hydrogen.tailAddress;
     authorizedKeys =
       [ "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILxJG3+Zq8fSH/PG8cL3g1WQikuWE7U9XZCRsaSE9DgN minecraft-control-sulfur" ]
       ++ map (device: device.minecraftControlPublicKey) (builtins.attrValues devices.family);
   };
 
-  services.familyValheim.enable = true;
+  services.familyValheim = {
+    enable = true;
+    listenAddress = devices.hydrogen.tailAddress;
+  };
 
   # Static br0. Plain false, not mkDefault, to beat the generated hardware file.
   networking.useDHCP = false;
@@ -83,6 +88,10 @@ in
   networking.defaultGateway = "10.0.0.1";
   networking.nameservers = [ "10.0.0.1" ];
 
+  # Valheim publishes on the stable tail address. Permit the bind during the short boot
+  # window before tailscaled restores that address to tailscale0.
+  boot.kernel.sysctl."net.ipv4.ip_nonlocal_bind" = 1;
+
   # mkForce because the NetworkManager module defines wireless.enable outright rather than
   # as a default, and GNOME pulls NM in. No wifi on this host.
   networking.wireless.enable = lib.mkForce false;
@@ -93,8 +102,7 @@ in
   networking.networkmanager.enable = lib.mkForce false;
 
   # THE ACCESS BOUNDARY -- read before changing any port. Headscale policy grants
-  # admins direct access and limits family devices to the home service ports. The
-  # LAN firewall admits subnet-routed traffic only from the router's SNAT address.
+  # admins direct access and limits family devices to the declared service ports.
   networking.firewall.enable = true;
   networking.firewall.allowedTCPPorts = [ ];
   networking.firewall.allowedUDPPorts = [ ];
@@ -107,23 +115,6 @@ in
   # The router does not forward 22, so this widens reach to the house, not the Internet.
   networking.firewall.interfaces."br0".allowedTCPPorts = [ 22 ];
 
-  # Subnet-routed clients are SNATed to the router's LAN address. Admit only
-  # that source to ordinary home services; Marketplace instead uses hydrogen's
-  # direct tail address so policy can keep it administrative.
-  networking.firewall.extraCommands = lib.mkAfter ''
-    iptables -N tailscale-lan-input 2>/dev/null || true
-    iptables -F tailscale-lan-input
-    iptables -A tailscale-lan-input -s 10.0.0.1 -p tcp -m multiport --dports 80,443,25565:25575 -j ACCEPT
-    iptables -A tailscale-lan-input -s 10.0.0.1 -p udp -m multiport --dports 2456:2458 -j ACCEPT
-    iptables -A tailscale-lan-input -j RETURN
-    iptables -C nixos-fw -j tailscale-lan-input 2>/dev/null || iptables -I nixos-fw 1 -j tailscale-lan-input
-  '';
-  networking.firewall.extraStopCommands = lib.mkAfter ''
-    iptables -D nixos-fw -j tailscale-lan-input 2>/dev/null || true
-    iptables -F tailscale-lan-input 2>/dev/null || true
-    iptables -X tailscale-lan-input 2>/dev/null || true
-  '';
-
   services.openssh = {
     enable = true;
     # Key-only because 22 also remains reachable from the home LAN as a recovery path.
@@ -132,11 +123,9 @@ in
   };
 
   # The monitor itself stays on loopback; nginx gives it the fleet wildcard certificate.
-  # Unlike the other web apps, its config editor and live browser are administrative.
+  # Restrict the vhost to direct tailnet sources like the other private services.
   fleet.vhosts.marketplace = {
     port = 8467;
-    # Tailscale clients reach this vhost on hydrogen's direct tail address;
-    # Headscale policy permits admins but not tag:family.
     allowedCIDRs = [ "100.64.0.0/10" ];
   };
 

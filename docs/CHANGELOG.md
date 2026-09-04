@@ -16,6 +16,26 @@ Also the decision log. Rationale that would otherwise bloat a code comment lives
   finding: scripted networking is detaching its own slave, and `br0-netdev`'s
   `X-ReloadIfChanged` is the next suspect.
 
+## 2026-09-04 (opt-in USB access for ccodex)
+
+- **`ccodex --allow-usb` exposes the host USB bus to the container.** The launcher bind-mounts
+  `/dev/bus/usb` read-write and retains the caller's supplementary groups only for opted-in
+  sessions. Mounting the bus directory keeps peripherals visible when they disconnect and
+  re-enumerate during firmware and hardware development; ordinary sessions remain unchanged.
+
+## 2026-09-03 (direct-tail service routing)
+
+- **Every hydrogen service now uses its native Tailscale identity.** Headscale DNS and
+  sulfur's fallback host records resolve the HTTPS, Minecraft, Marketplace, and Valheim
+  names to `100.64.0.3`; Valheim and on-demand Minecraft publish on that address.
+- **The home-LAN subnet route is retired.** Fleet clients reject subnet routes, eliminating
+  Linux table-52 hairpinning while home. The router policy grants `tag:family` only the
+  declared ports on `tag:server`; Headscale itself remains an underlay/public endpoint.
+- **All HTTPS vhosts now share the family service boundary.** Moving them to one tail IP
+  means Headscale's layer-3 policy cannot distinguish Marketplace from the other names on
+  port 443. A future admin-only vhost needs application authentication or a distinct tail
+  identity.
+
 ## 2026-09-01 (fleet tunnel retirement)
 
 - **Headscale/Tailscale is now the sole fleet remote-access network.** Sulfur, hydrogen,

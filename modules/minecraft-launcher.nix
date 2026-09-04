@@ -53,7 +53,7 @@ in
       default = "mc.luckyobserver.com";
       description = ''
         Where "on hydrogen" servers are reached, and the SSH host the control channel
-        talks to. Resolves through Headscale DNS and the home subnet route.
+        talks to. Resolves through Headscale DNS to hydrogen's direct tail address.
       '';
     };
 

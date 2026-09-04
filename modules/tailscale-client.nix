@@ -10,7 +10,7 @@ let
     # Never select an exit node: ordinary Internet traffic keeps using the
     # current Wi-Fi/Ethernet default route.
     "--exit-node="
-  ];
+  ] ++ lib.optional (cfg.operatorUser != null) "--operator=${cfg.operatorUser}";
   # A tagged Headscale pre-auth key assigns the node's tags. Headscale rejects
   # enrollment when that same request also advertises tags from the client.
   desiredUpFlags = desiredSetFlags;
@@ -47,14 +47,24 @@ in
 
     acceptRoutes = lib.mkOption {
       type = lib.types.bool;
-      default = true;
-      description = "Accept approved subnet routes from the home router.";
+      default = false;
+      description = "Accept approved subnet routes from other tailnet nodes.";
     };
 
     acceptDns = lib.mkOption {
       type = lib.types.bool;
       default = true;
       description = "Accept MagicDNS and Headscale's stable service records.";
+    };
+
+    operatorUser = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      example = "alice";
+      description = ''
+        Local Unix user allowed to manage tailscaled without sudo. This grants the user
+        control of Tailscale preferences, including through the Linux systray.
+      '';
     };
 
     allowedTCPPorts = lib.mkOption {
@@ -71,16 +81,22 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    assertions = [{
-      assertion = lib.hasPrefix "https://" cfg.loginServer;
-      message = "fleet.tailscaleClient.loginServer must use public HTTPS.";
-    }];
+    assertions = [
+      {
+        assertion = lib.hasPrefix "https://" cfg.loginServer;
+        message = "fleet.tailscaleClient.loginServer must use public HTTPS.";
+      }
+      {
+        assertion = cfg.operatorUser == null || config.users.users ? ${cfg.operatorUser};
+        message = "fleet.tailscaleClient.operatorUser must name a declared local user.";
+      }
+    ];
 
     services.tailscale = {
       enable = true;
       openFirewall = true;
       authKeyFile = cfg.authKeyFile;
-      useRoutingFeatures = "client";
+      useRoutingFeatures = if cfg.acceptRoutes then "client" else "none";
       extraUpFlags = [ "--login-server=${cfg.loginServer}" ] ++ desiredUpFlags;
     };
 

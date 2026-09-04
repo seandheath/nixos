@@ -1,4 +1,4 @@
-{ pkgs }:
+{ pkgs, listenAddress ? "127.0.0.1" }:
 
 # Lifecycle for the on-demand Minecraft servers: one rootless podman container per server,
 # one world directory each. The launcher drives this locally, and hydrogen exposes the same
@@ -137,7 +137,7 @@ pkgs.writeShellApplication {
 
       podman run -d --name "$(ctr "$name")" \
         --restart=no \
-        -p "127.0.0.1:$port:25565" \
+        -p "${listenAddress}:$port:25565" \
         -v "$root/$name:/data:rw" \
         -e "MC_RCON_PASSWORD=$(cat "$root/$name/rcon.password")" \
         -e "MC_MOTD=$name" \

@@ -95,7 +95,7 @@ in
     server = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
       default = null;
-      example = "10.0.0.10:25565";
+      example = "mc.luckyobserver.com:25565";
       description = ''
         Server to connect to on launch, `HOST` or `HOST:PORT`. The client quick-plays
         straight into it, so no server list is involved. Null starts at the main menu.

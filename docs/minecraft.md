@@ -73,17 +73,15 @@ it performs **no identity verification**. Anything that reaches 25565 may claim 
 username, and a whitelist matches on names that are themselves unauthenticated.
 **Reachability is the authentication boundary.**
 
-- `openFirewall = false`; tagged family clients reach 25565 through the router's
-  approved `10.0.0.0/24` subnet route.
-- Hydrogen admits that subnet-routed traffic only from the router's SNAT address.
-  Couch clients connect over 127.0.0.1.
+- `openFirewall = false`; tagged family clients reach hydrogen's `tag:server` identity on
+  the declared Minecraft ports. Couch clients connect over 127.0.0.1.
 - Headscale policy, rather than a public port forward, controls reachability.
 
 Re-verify after any router or ACL change. From a device outside the tailnet:
 
 ```console
 $ nc -vz <wan-address> 25565     # must fail
-$ nc -vz 10.0.0.10 25565         # must fail
+$ nc -vz 100.64.0.3 25565         # must fail
 ```
 
 Residual risk, accepted: any enrolled peer can log in as any username — in practice, one child

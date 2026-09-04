@@ -12,12 +12,16 @@ let
   cfg = config.fleet.minecraftServers;
 
   root = "/var/lib/minecraft-servers";
+  ctl = import ../packages/minecraft-server-ctl.nix {
+    inherit pkgs;
+    inherit (cfg) listenAddress;
+  };
 
   # Whatever the key runs, this is what it gets. SSH_ORIGINAL_COMMAND is split into words
   # with globbing off, and only the control script's own subcommands are allowed through.
   sshEntry = pkgs.writeShellApplication {
     name = "minecraft-server-ctl-ssh";
-    runtimeInputs = [ pkgs.minecraft-server-ctl ];
+    runtimeInputs = [ ctl ];
     text = ''
       export MC_SERVERS_ROOT=${root}
 
@@ -52,6 +56,12 @@ in
         one shared key, so a single laptop can be revoked on its own.
       '';
     };
+
+    listenAddress = lib.mkOption {
+      type = lib.types.str;
+      default = "127.0.0.1";
+      description = "Host address on which to publish on-demand Minecraft servers.";
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -77,7 +87,7 @@ in
     };
     users.groups.mcctl = { };
 
-    environment.systemPackages = [ pkgs.minecraft-server-ctl ];
+    environment.systemPackages = [ ctl ];
 
     # sheath drives the same script directly rather than through SSH; the worlds are
     # mcctl's, so the path has to be pointed at explicitly.
