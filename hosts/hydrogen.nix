@@ -33,7 +33,7 @@ in
 
   fleet.bootGenerations = 20;
 
-  # Nightly fleet builds share the SSD with service data and the local Borg repository.
+  # Nightly fleet builds share the SSD with service data.
   nix.gc.dates = "daily";
   nix.settings = {
     min-free = 32 * 1024 * 1024 * 1024;

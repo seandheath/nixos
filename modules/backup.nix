@@ -1,18 +1,5 @@
 { config, pkgs, lib, ... }:
-# Borg backups of hydrogen's service data, in three repos answering different failures:
-#   /data/borg          fast restores, but on the same RAID0 array as the immich media
-#   BorgBase            offsite; the only copy that survives losing the machine
-#   /var/backup/borg    on the root SSD, so it survives /data failing
-#
-# The third is an independent job, not an rsync mirror: a mirror copies any damage in the
-# source and carries the same Repository ID, which collides in /root/.cache/borg.
-#
-# CLI, all as root: `borg-cmd backup` runs every repository under one consistent
-# Minecraft checkpoint.  `borg-cmd backup --data|--remote|--rootfs` selects repositories;
-# `borg-cmd data|remote|rootfs <borg arguments>` is for raw Borg maintenance.
-#
-# Secrets in secrets/secrets.yaml: borg-passphrase (KEEP A COPY OFF-HYDROGEN -- without it
-# the backups are unrecoverable) and borg-ssh-key.
+# Borg backups of hydrogen's service data to /data/borg and offsite BorgBase.
 let
   home = config.users.users.sheath.home;
 
@@ -35,8 +22,7 @@ let
     # Mutable web-managed searches, browser login state, cache, and logs.
     "/var/lib/ai-marketplace-monitor"
 
-    # The postgresql subdirectory, NOT /var/backup -- widening it to the parent sweeps the
-    # rootfs repo into every job, so each backup would archive a copy of the backups.
+    # Include the database dumps without sweeping in unrelated backup storage.
     "/var/backup/postgresql"
 
     # The whole Minecraft payload as a local binary cache. The flake can rebuild it only
@@ -110,13 +96,9 @@ let
   '';
 
 
-  # Named for the disk, not for "local" -- both this and rootRepo are on the machine.
   dataRepo = "/data/borg";
   # An identifier, not a credential: access needs borg-ssh-key + the passphrase.
   remoteRepo = "ssh://hl4nxm2t@hl4nxm2t.repo.borgbase.com/./repo";
-  # Deliberately NOT under any backupPaths entry -- that is what keeps the jobs from
-  # archiving this repo into themselves.
-  rootRepo = "/var/backup/borg";
   remoteRsh =
     "ssh -i ${config.sops.secrets.borg-ssh-key.path} -o StrictHostKeyChecking=accept-new";
 
@@ -143,10 +125,10 @@ let
     usage() {
       ${pkgs.coreutils}/bin/cat >&2 <<'EOF'
 Usage:
-  borg-cmd backup [--data] [--remote] [--rootfs]
-  borg-cmd <data|remote|rootfs> <borg command> [arguments...]
+  borg-cmd backup [--data] [--remote]
+  borg-cmd <data|remote> <borg command> [arguments...]
 
-Without repository flags, `backup` archives data, remote, then rootfs under one
+Without repository flags, `backup` archives data, then remote under one
 Minecraft checkpoint. The repository subcommands are for raw Borg maintenance.
 EOF
       exit 2
@@ -167,16 +149,15 @@ EOF
           case "$1" in
             --data) add_target data ;;
             --remote) add_target remote ;;
-            --rootfs) add_target rootfs ;;
             --help|-h) usage ;;
             *) echo "borg-cmd backup: unknown flag: $1" >&2; usage ;;
           esac
           shift
         done
-        [ "''${#targets[@]}" -gt 0 ] || targets=(data remote rootfs)
+        [ "''${#targets[@]}" -gt 0 ] || targets=(data remote)
         exec ${borgFleetRunner} "''${targets[@]}"
         ;;
-      data|remote|rootfs)
+      data|remote)
         repo="$1"
         shift
         [ "$#" -gt 0 ] || usage
@@ -187,7 +168,6 @@ EOF
             export BORG_REPO=${lib.escapeShellArg remoteRepo}
             export BORG_RSH=${lib.escapeShellArg remoteRsh}
             ;;
-          rootfs) export BORG_REPO=${lib.escapeShellArg rootRepo} ;;
         esac
         exec ${pkgs.borgbackup}/bin/borg "$@"
         ;;
@@ -232,33 +212,18 @@ in
     inherit prune;
   };
 
-  # Scheduled by fleet-borg-backup after the data and remote jobs.  Serializing all three
-  # keeps one consistent Minecraft checkpoint and avoids competing reads from /data.
-  services.borgbackup.jobs.rootfs = {
-    paths = backupPaths;
-    exclude = backupExclude;
-    repo = rootRepo;
-    encryption = { mode = "repokey-blake2"; inherit passCommand; };
-    compression = "zstd";
-    inherit prune;
-  };
-
   systemd.services.fleet-borg-backup = {
     description = "Run all Borg repositories from one consistent Minecraft checkpoint";
     startAt = "03:00";
     serviceConfig = {
       Type = "oneshot";
-      ExecStart = "${borgFleetRunner} data remote rootfs";
+      ExecStart = "${borgFleetRunner} data remote";
     };
     unitConfig.RequiresMountsFor = "/data";
   };
 
   # The data job writes to /data — don't run it before the disk is mounted.
   systemd.services.borgbackup-job-data.unitConfig.RequiresMountsFor = "/data";
-
-  # This job WRITES to root but READS /data/immich, and the module derives
-  # RequiresMountsFor only from the repo path.
-  systemd.services.borgbackup-job-rootfs.unitConfig.RequiresMountsFor = "/data";
 
   # The couch directory exists only once somebody has played. failOnWarnings = true and borg
   # treats a missing source as a warning, so on a fresh install this would fail the entire

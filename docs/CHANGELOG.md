@@ -16,6 +16,12 @@ Also the decision log. Rationale that would otherwise bloat a code comment lives
   finding: scripted networking is detaching its own slave, and `br0-netdev`'s
   `X-ReloadIfChanged` is the next suspect.
 
+## 2026-09-05 (SSD backup retirement)
+
+- **Borg now targets only `/data/borg` and BorgBase.** Remove the rootfs job and CLI target
+  so the 207 GiB SSD repository can be deleted without being recreated. The remaining
+  repositories keep their backup paths, retention, credentials, and schedules.
+
 ## 2026-09-05 (hydrogen store pressure)
 
 - **Hydrogen collects Nix garbage daily, retaining the existing 30-day rollback policy.**

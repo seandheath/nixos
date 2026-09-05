@@ -288,15 +288,14 @@ revisit then.
 > nobody had played this would have failed the *entire* nightly backup, Nextcloud and Immich
 > included. Do not remove the tmpfiles rule without also removing the path.
 
-Both jobs flush first: `preHook` sends `save-off` then `save-all flush` through
-`/run/minecraft-server.stdin` and waits 5 s. `save-on` runs from `ExecStopPost`, not
-`postHook` — `postHook` is skipped on non-zero exit, which would leave autosave off until the
-next server restart.
+`borg-cmd backup` and the 03:00 fleet job refresh PostgreSQL dumps, then checkpoint
+Minecraft before backing up to `/data/borg` and BorgBase. The shared runner restores
+autosaving with an exit trap, including when a repository fails.
 
 Verify a restore at least once:
 
 ```console
-$ sudo borg-cmd backup --data --rootfs
+$ sudo borg-cmd backup --data --remote
 $ sudo borg-cmd data list ::<archive> | grep 'minecraft/world/region' | head
 $ sudo borg-cmd data extract --strip-components 3 ::<archive> var/lib/minecraft/world/level.dat
 ```
