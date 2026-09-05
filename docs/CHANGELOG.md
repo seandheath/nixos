@@ -16,6 +16,14 @@ Also the decision log. Rationale that would otherwise bloat a code comment lives
   finding: scripted networking is detaching its own slave, and `br0-netdev`'s
   `X-ReloadIfChanged` is the next suspect.
 
+## 2026-09-05 (opt-in UART access)
+
+- **`cclaude --allow-uart` and `ccodex --allow-uart` expose connected serial devices.**
+  Each matching `/dev/ttyACM*` and `/dev/ttyUSB*` character device is passed through
+  read-write at the same path, with the caller's supplementary groups retained. The flag
+  can be combined with `--allow-usb` and works even when no serial devices are present.
+  Devices are selected at launch; restart the container after connecting or reconnecting one.
+
 ## 2026-09-05 (opt-in USB access for cclaude)
 
 - **`cclaude --allow-usb` exposes the host USB bus to the container.** It matches

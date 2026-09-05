@@ -1,6 +1,6 @@
 { pkgs, upstream }:
 
-# cclaude launcher with opt-in access to USB devices and the YNAB MCP server.
+# cclaude launcher with opt-in access to USB/UART devices and the YNAB MCP server.
 let
   podman = "${pkgs.podman}/bin/podman";
   image = "localhost/cclaude:latest";
@@ -16,11 +16,14 @@ pkgs.writeShellScriptBin "cclaude" ''
   image="${image}"
 
   allow_usb=false
+  allow_uart=false
   enable_ynab=false
   forwarded_args=()
   for arg in "$@"; do
     if [[ "$arg" == --allow-usb ]]; then
       allow_usb=true
+    elif [[ "$arg" == --allow-uart ]]; then
+      allow_uart=true
     elif [[ "$arg" == --ynab ]]; then
       enable_ynab=true
     else
@@ -37,7 +40,20 @@ pkgs.writeShellScriptBin "cclaude" ''
     fi
     # Mount the bus directory so devices that reconnect or re-enumerate remain visible.
     # keep-groups preserves access granted through host udev groups as well as ACLs.
-    usb_args=(-v /dev/bus/usb:/dev/bus/usb:rw --group-add=keep-groups)
+    usb_args=(-v /dev/bus/usb:/dev/bus/usb:rw)
+  fi
+
+  uart_args=()
+  if $allow_uart; then
+    for device in /dev/ttyACM* /dev/ttyUSB*; do
+      [[ -c "$device" ]] || continue
+      uart_args+=(--device "$device:$device:rw")
+    done
+  fi
+
+  device_group_args=()
+  if $allow_usb || $allow_uart; then
+    device_group_args=(--group-add=keep-groups)
   fi
 
   ynab_args=()
@@ -102,6 +118,8 @@ pkgs.writeShellScriptBin "cclaude" ''
     -v cclaude-home:/home/claude:rw,U \
     -v "''${project_dir}:/''${project_name}:rw" \
     "''${usb_args[@]}" \
+    "''${uart_args[@]}" \
+    "''${device_group_args[@]}" \
     "''${ynab_args[@]}" \
     -v /nix/store:/nix/store:ro \
     -v /nix/var/nix/daemon-socket:/nix/var/nix/daemon-socket \
