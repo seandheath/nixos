@@ -16,6 +16,12 @@ Also the decision log. Rationale that would otherwise bloat a code comment lives
   finding: scripted networking is detaching its own slave, and `br0-netdev`'s
   `X-ReloadIfChanged` is the next suspect.
 
+## 2026-09-05 (opt-in USB access for cclaude)
+
+- **`cclaude --allow-usb` exposes the host USB bus to the container.** It matches
+  `ccodex --allow-usb`: the launcher bind-mounts `/dev/bus/usb` read-write and retains the
+  caller's supplementary groups only for opted-in sessions.
+
 ## 2026-09-04 (opt-in YNAB MCP access)
 
 - **`cclaude --ynab` and `ccodex --ynab` expose YNAB only for that session.** The launchers

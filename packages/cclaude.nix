@@ -1,6 +1,6 @@
 { pkgs, upstream }:
 
-# cclaude launcher with opt-in access to the YNAB MCP server.
+# cclaude launcher with opt-in access to USB devices and the YNAB MCP server.
 let
   podman = "${pkgs.podman}/bin/podman";
   image = "localhost/cclaude:latest";
@@ -15,16 +15,30 @@ pkgs.writeShellScriptBin "cclaude" ''
   token_file="${tokenFile}"
   image="${image}"
 
+  allow_usb=false
   enable_ynab=false
   forwarded_args=()
   for arg in "$@"; do
-    if [[ "$arg" == --ynab ]]; then
+    if [[ "$arg" == --allow-usb ]]; then
+      allow_usb=true
+    elif [[ "$arg" == --ynab ]]; then
       enable_ynab=true
     else
       forwarded_args+=("$arg")
     fi
   done
   set -- "''${forwarded_args[@]}"
+
+  usb_args=()
+  if $allow_usb; then
+    if [[ ! -d /dev/bus/usb ]]; then
+      printf '%s\n' 'cclaude: --allow-usb requested, but /dev/bus/usb is unavailable' >&2
+      exit 1
+    fi
+    # Mount the bus directory so devices that reconnect or re-enumerate remain visible.
+    # keep-groups preserves access granted through host udev groups as well as ACLs.
+    usb_args=(-v /dev/bus/usb:/dev/bus/usb:rw --group-add=keep-groups)
+  fi
 
   ynab_args=()
   container_command=()
@@ -87,6 +101,7 @@ pkgs.writeShellScriptBin "cclaude" ''
     --tmpfs /tmp:rw,nosuid,nodev,size=2g,mode=1777 \
     -v cclaude-home:/home/claude:rw,U \
     -v "''${project_dir}:/''${project_name}:rw" \
+    "''${usb_args[@]}" \
     "''${ynab_args[@]}" \
     -v /nix/store:/nix/store:ro \
     -v /nix/var/nix/daemon-socket:/nix/var/nix/daemon-socket \
