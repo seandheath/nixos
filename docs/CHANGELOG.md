@@ -16,6 +16,13 @@ Also the decision log. Rationale that would otherwise bloat a code comment lives
   finding: scripted networking is detaching its own slave, and `br0-netdev`'s
   `X-ReloadIfChanged` is the next suspect.
 
+## 2026-09-05 (hydrogen store pressure)
+
+- **Hydrogen collects Nix garbage daily, retaining the existing 30-day rollback policy.**
+  Nightly fleet builds accumulated 53 GiB of unreferenced store data between weekly runs
+  on an SSD also holding a 207 GiB Borg repository. During builds, Nix now starts GC below
+  32 GiB free and aims for 64 GiB; referenced paths remain protected.
+
 ## 2026-09-05 (opt-in UART access)
 
 - **`cclaude --allow-uart` and `ccodex --allow-uart` expose connected serial devices.**

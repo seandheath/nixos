@@ -1,7 +1,7 @@
 # Central Nix daemon settings: experimental features, binary caches,
 # and automatic store maintenance. Imported by all hosts via commonModules
 # in flake.nix so every machine shares one source of truth for caches/GC.
-{ ... }:
+{ lib, ... }:
 
 {
   nix.settings = {
@@ -24,13 +24,13 @@
     auto-optimise-store = true;
   };
 
-  # Weekly garbage collection. Necessary because system.autoUpgrade
+  # Weekly garbage collection by default. Necessary because system.autoUpgrade
   # (modules/auto-update.nix) builds a new generation daily; without GC the
   # store grows without bound (bootloader configurationLimit only caps boot
   # entries, not store paths).
   nix.gc = {
     automatic = true;
-    dates = "weekly";
+    dates = lib.mkDefault "weekly";
     options = "--delete-older-than 30d";
   };
 

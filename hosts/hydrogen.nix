@@ -32,6 +32,14 @@ in
   system.stateVersion = "25.11";
 
   fleet.bootGenerations = 20;
+
+  # Nightly fleet builds share the SSD with service data and the local Borg repository.
+  nix.gc.dates = "daily";
+  nix.settings = {
+    min-free = 32 * 1024 * 1024 * 1024;
+    max-free = 64 * 1024 * 1024 * 1024;
+  };
+
   fleet.tailscaleClient = {
     enable = true;
     tags = [ "tag:server" ];
