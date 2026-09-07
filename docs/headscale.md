@@ -92,6 +92,8 @@ Run these checks from outside the home network:
    `paper.luckyobserver.com`, `calibre.luckyobserver.com`, and
    `mc.luckyobserver.com`, `valheim.luckyobserver.com`, and
    `marketplace.luckyobserver.com` resolve to hydrogen's direct `100.64.0.3` tail address.
+   Check `tailscale dns query nc.luckyobserver.com` explicitly: the fleet's `/etc/hosts`
+   entries can hide stale Headscale records from `getent` and browser checks on laptops.
 5. `ip route get 1.1.1.1` still names the current Wi-Fi/Ethernet interface,
    not `tailscale0`, and an external IP check shows the remote network's public
    address rather than the house.
@@ -101,3 +103,15 @@ Run these checks from outside the home network:
 
 The old fleet tunnels have been retired. `/var/lib/tailscale` is the durable
 identity that must remain persisted on machines with ephemeral roots.
+
+## Phone connects to Tailscale but cannot reach Nextcloud
+
+On 2026-09-06, Headscale still returned `10.0.0.10` for Nextcloud while hydrogen
+allowed HTTPS only on `tailscale0`. The direct-address changes existed in the local
+router repository but had not reached the running router. Laptop `/etc/hosts` entries
+pointed to `100.64.0.3`, masking the stale DNS records.
+
+Apply the router's service DNS and policy changes to its persistent deployment checkout
+at `/nix/persist/etc/nixos`, preserving its newer `flake.lock`, and rebuild there.
+Verify both `tailscale dns query nc.luckyobserver.com` and the router's own resolver
+return `100.64.0.3`. Reconnect Tailscale on the phone if it retains the old DNS answer.
