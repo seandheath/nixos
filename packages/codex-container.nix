@@ -30,6 +30,7 @@ let
     name = "codex-container-runtime";
     paths = with pkgs; [
       codex
+      nodejs # Ponytail plugin lifecycle hooks.
       nix
       git
       git-lfs

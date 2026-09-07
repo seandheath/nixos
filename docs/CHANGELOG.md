@@ -16,6 +16,12 @@ Also the decision log. Rationale that would otherwise bloat a code comment lives
   finding: scripted networking is detaching its own slave, and `br0-netdev`'s
   `X-ReloadIfChanged` is the next suspect.
 
+## 2026-09-06 (Ponytail plugin runtime)
+
+- **Include Node.js in the `ccodex` runtime** so Ponytail lifecycle hooks have an
+  interpreter independent of the host system profile. Plugin installations remain
+  client-managed; `codex` and `ccodex` share the same plugin state.
+
 ## 2026-09-05 (SSD backup retirement)
 
 - **Borg now targets only `/data/borg` and BorgBase.** Remove the rootfs job and CLI target
