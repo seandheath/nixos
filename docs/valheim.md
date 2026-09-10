@@ -20,8 +20,12 @@ sudo systemctl start valheim-update
 
 `valheim-update` is the only normal update path. It stops cleanly (which creates a local
 backup), marks the next start for a staged SteamCMD update, and starts the service. The
-container image and server-only mod versions remain pinned by Nix. Keep them frozen across
-Valheim 1.0 until compatibility is tested.
+container image and server-only mod versions remain pinned by Nix.
+
+Updated to Valheim 1.0.7 on 2026-09-10. SkipSleep 1.0.5 is disabled because it throws
+`MissingFieldException` in the sleep loop on 1.0; sleeping uses the normal game rules.
+SmoothSave remains enabled. The pre-upgrade world backup is
+`/var/lib/valheim/backups/20260910-112952-pre-update-backup.tar.gz` (seven-day retention).
 
 World data and seven days of hourly/shutdown snapshots live under `/var/lib/valheim` and
 are included in all three Borg jobs. Restore only while `valheim.service` is stopped.

@@ -14,23 +14,8 @@ let
 
   serverMods = [
     "Smoothbrain-SmoothSave-1.0.5"
-    "R1NS3-SkipSleep-1.0.5"
   ];
   mods = lib.concatStringsSep "\n" serverMods;
-
-  skipSleepConfig = pkgs.writeText "SkipSleep.cfg" ''
-    [General]
-
-    ## Threshold of ratio of players that need to be sleeping, must be > 0
-    # Setting type: Double
-    # Default value: 0.5
-    ratio = 0.5
-
-    ## Show a continuous message of the amount of players currently sleeping (if > 0)
-    # Setting type: Boolean
-    # Default value: true
-    showMessage = true
-  '';
 
   migrateVanillaClients = pkgs.writeShellScript "valheim-migrate-vanilla-clients-v1" ''
     set -eu
@@ -63,8 +48,10 @@ let
       ${pkgs.coreutils}/bin/touch "$marker"
     fi
 
-    ${pkgs.coreutils}/bin/install -D -m 0644 ${skipSleepConfig} \
-      ${root}/server/BepInEx/config/SkipSleep.cfg
+    # SkipSleep 1.0.5 breaks Game.UpdateSleeping on Valheim 1.0 (ZRoutedRpc.Everybody).
+    # Removing it from MODS does not remove its already-installed DLL.
+    ${pkgs.coreutils}/bin/rm -rf "$plugins/SkipSleep" "$plugins/R1NS3-SkipSleep" \
+      "$plugins/ModSkipSleepValheim.dll"
   '';
 
   start = pkgs.writeShellScript "valheim-start" ''
