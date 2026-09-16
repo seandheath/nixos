@@ -9,8 +9,7 @@
     gnomeExtensions.vitals
     gnomeExtensions.caffeine
     gnome-tweaks
-    gnome-terminal
-  ];
+  ] ++ lib.optional (!config.programs.nautilus-open-any-terminal.enable) pkgs.gnome-terminal;
   environment.gnome.excludePackages = with pkgs; [
     epiphany
     gnome-music

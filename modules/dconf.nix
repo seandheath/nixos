@@ -90,11 +90,7 @@
         "org/gnome/settings-daemon/plugins/media-keys/custom-keybindings/custom0" =
           {
             binding = "<Alt>Return";
-            # --gtk-single-instance=true, matching the shipped desktop entry's
-            # New Window action: a bare invocation forks a second process instead
-            # of asking the running one for another window.
-            command =
-              "/etc/profiles/per-user/${config.fleet.adminUser}/bin/ghostty --gtk-single-instance=true";
+            command = "/etc/profiles/per-user/${config.fleet.adminUser}/bin/alacritty";
             name = "open-terminal";
           };
         "org/gnome/germinal/legacy".theme-variant = "dark";

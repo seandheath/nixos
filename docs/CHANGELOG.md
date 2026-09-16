@@ -26,6 +26,15 @@ Also the decision log. Rationale that would otherwise bloat a code comment lives
 - Add settings/storage regressions and disposable VM coverage; document usage and
   current desktop limitations in [installer.md](installer.md).
 
+## 2026-09-11 (Alacritty)
+
+- **Ghostty → Alacritty on sulfur.** Keep Inconsolata at 14 pt, a black background,
+  and a Bash login shell. Selecting text populates only the primary selection for
+  middle-click paste; explicit copy still uses the regular clipboard. Alt+Enter,
+  desktop terminal launches, and Nautilus use Alacritty. Other hosts keep GNOME Terminal.
+- Remove Ghostty-specific terminfo from the hosts and RE image; ncurses already
+  includes Alacritty's entry.
+
 ## 2026-09-06 (Ponytail plugin runtime)
 
 - **Include Node.js in the `ccodex` runtime** so Ponytail lifecycle hooks have an

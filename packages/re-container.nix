@@ -96,14 +96,9 @@ pkgs.dockerTools.buildLayeredImage {
     pkgs.bashInteractive
     pkgs.coreutils
 
-    # Both are here for their **terminfo databases**, not for tput. A dockerTools image ships
-    # no terminfo at all (cclaude gets one free from debian's ncurses-base), so the forwarded
-    # TERM resolves to nothing, both TUIs lose cursor addressing, and they fall back to
-    # clearing and repainting the whole screen every frame — violent flicker. ncurses does not
-    # carry xterm-ghostty, which is what the host terminal sends. See TERMINFO_DIRS in
-    # config.Env below; both halves are required.
+    # The terminfo database includes Alacritty. Without it, forwarded TERM values cannot
+    # resolve and TUIs flicker as they repaint. See TERMINFO_DIRS in config.Env below.
     pkgs.ncurses
-    pkgs.ghostty.terminfo
     # HTTPS to the vLLM endpoint. Without this every model call fails cert verification.
     pkgs.cacert
     pkgs.dockerTools.usrBinEnv

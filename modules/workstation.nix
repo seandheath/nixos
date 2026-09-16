@@ -31,6 +31,10 @@ in
 
   # Programs
   programs.firefox.enable = true;
+  programs.nautilus-open-any-terminal = {
+    enable = true;
+    terminal = "alacritty";
+  };
   environment.systemPackages = [ pkgs.porkbun-domain-search-mcp ];
 
   # MCP launchers read these at process startup; no client config or Nix store path contains
