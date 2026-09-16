@@ -1,7 +1,7 @@
 { config, pkgs, lib, ... }:{
   programs.virt-manager.enable = true;
-  users.groups.libvirtd.members = ["sheath"];
-  users.groups.podman.members = ["sheath"];
+  users.groups.libvirtd.members = [config.fleet.adminUser];
+  users.groups.podman.members = [config.fleet.adminUser];
   virtualisation.libvirtd = {
     enable = true;
     qemu.swtpm.enable = true;

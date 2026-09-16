@@ -34,7 +34,7 @@ disko.lib.testLib.makeDiskoTest {
   inherit pkgs;
   name = "fleet-two-disk-luks";
   efi = true;
-  testMode = "direct";
+  testMode = "module";
 
   disko-config = {
     disko.devices = {
@@ -119,7 +119,7 @@ disko.lib.testLib.makeDiskoTest {
     machine.succeed("test -b /dev/mapper/crypthome")
     # The real assertion: the second disk opened without a second prompt.
     machine.succeed("mountpoint /home")
-    machine.succeed("findmnt --source /dev/mapper/crypthome /home")
-    machine.succeed("findmnt --source /dev/mapper/cryptroot /nix")
+    machine.succeed("findmnt -rn -M /home -o SOURCE | grep -F /dev/mapper/crypthome")
+    machine.succeed("findmnt -rn -M /nix -o SOURCE | grep -F /dev/mapper/cryptroot")
   '';
 }

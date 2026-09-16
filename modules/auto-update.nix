@@ -17,7 +17,7 @@ let
       state="''${STATE_DIRECTORY:-/var/lib/nixos-upgrade}"
       repo="$state/checkout"
       provision=/persist/nixos-install
-      host=${lib.escapeShellArg config.networking.hostName}
+      host=${lib.escapeShellArg config.fleet.profileName}
 
       for file in default.nix disk.nix hardware.nix; do
         [ -s "$provision/$file" ] || { echo "missing local provisioning file: $provision/$file" >&2; exit 1; }
@@ -35,7 +35,10 @@ let
       target="$repo/provisioning/$host"
       mkdir -p "$target"
       install -m 0600 "$provision/default.nix" "$provision/disk.nix" "$provision/hardware.nix" "$target/"
-      exec ${config.system.build.nixos-rebuild}/bin/nixos-rebuild "$action" --flake "$repo#$host" -L
+      if [ -f "$provision/settings.nix" ]; then
+        install -m 0600 "$provision/settings.nix" "$target/"
+      fi
+      exec ${config.system.build.nixos-rebuild}/bin/nixos-rebuild "$action" --flake "path:$repo#$host" -L
     '';
   };
 
@@ -76,7 +79,7 @@ let
     runtimeInputs = [ config.nix.package ];
     text = ''
       value="$(nix eval --raw \
-        "github:seandheath/nixos#nixosConfigurations.${config.networking.hostName}.config.fleet.hardware.isPlaceholder")"
+        "github:seandheath/nixos#nixosConfigurations.${config.fleet.profileName}.config.fleet.hardware.isPlaceholder")"
       if [ "$value" = true ]; then
         echo "refusing automatic upgrade: GitHub still has placeholder hardware for ${config.networking.hostName}" >&2
         echo "provision this machine with a real hardware configuration first" >&2
@@ -134,7 +137,7 @@ in
         enable = true;
         # The repo, not a local checkout. A checkout nothing pulls means nixpkgs advances
         # nightly while the configuration never does.
-        flake = "github:seandheath/nixos#${config.networking.hostName}";
+        flake = "github:seandheath/nixos#${config.fleet.profileName}";
         # The committed lock, nothing overridden. A nightly that resolves the branch tip
         # itself leaves the lock behind, which makes every hand-run rebuild a rollback of
         # however far the fleet has drifted. see CHANGELOG 2026-08-19

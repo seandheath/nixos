@@ -9,14 +9,13 @@
 { config, lib, pkgs, ... }:
 let
   devices = import ./devices.nix;
-  hostName = config.networking.hostName;
+  hostName = config.fleet.profileName;
   self = devices.family.${hostName} or (throw ''
     modules/family/profile.nix: no entry for host "${hostName}" in modules/family/devices.nix.
   '');
 
-  # username == hostName == the sops key prefix == the Minecraft handle, lowercased.
-  # One string, everywhere. Its password and enrollment secrets are in family.yaml.
-  username = hostName;
+  # Login names may be changed locally; fleet identities and secret names remain stable.
+  username = config.fleet.primaryUser;
 in
 {
   imports = [
@@ -56,7 +55,7 @@ in
     # neededForUsers decrypts before accounts are created, which is the only way a
     # declarative password can come from sops. Escape hatch if activation ever fails here:
     # users.mutableUsers = true plus `passwd`.
-    sops.secrets."${username}-password-hash".neededForUsers = true;
+    sops.secrets."${hostName}-password-hash".neededForUsers = true;
 
     users.users.${username} = {
       isNormalUser = true;
@@ -66,7 +65,7 @@ in
       # the machine, including sheath's age key, which decrypts family.yaml. See the open
       # item in docs/CHANGELOG.md about no longer sharing that hash.
       extraGroups = [ "wheel" "networkmanager" "video" "audio" "input" ];
-      hashedPasswordFile = config.sops.secrets."${username}-password-hash".path;
+      hashedPasswordFile = config.sops.secrets."${hostName}-password-hash".path;
     };
     users.groups.${username} = { };
 
@@ -105,9 +104,9 @@ in
 
     services.minecraftLauncher = {
       enable = true;
-      controlKeyFile = config.sops.secrets."minecraft-control-${username}".path;
+      controlKeyFile = config.sops.secrets."minecraft-control-${hostName}".path;
     };
-    sops.secrets."minecraft-control-${username}" = {
+    sops.secrets."minecraft-control-${hostName}" = {
       owner = username;
       mode = "0400";
     };

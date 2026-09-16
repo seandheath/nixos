@@ -1,7 +1,7 @@
 { config, pkgs, lib, ... }:
 # Borg backups of hydrogen's service data to /data/borg and offsite BorgBase.
 let
-  home = config.users.users.sheath.home;
+  home = config.users.users.${config.fleet.adminUser}.home;
 
   backupPaths = [
     "/var/lib/nextcloud"
@@ -230,9 +230,9 @@ in
   # nightly job -- Nextcloud and Immich included.
   systemd.tmpfiles.rules =
     let
-      inherit (config.users.users.sheath) group;
+      inherit (config.users.users.${config.fleet.adminUser}) group;
     in
     [
-      "d ${home}/.local/share/minecraft-couch 0755 sheath ${group} -"
+      "d ${home}/.local/share/minecraft-couch 0755 ${config.fleet.adminUser} ${group} -"
     ];
 }

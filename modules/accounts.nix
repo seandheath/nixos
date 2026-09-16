@@ -43,7 +43,7 @@ in
       sopsFile = ../secrets/family.yaml;
       neededForUsers = true;
     };
-    users.users.sheath.hashedPasswordFile =
+    users.users.${config.fleet.adminUser}.hashedPasswordFile =
       config.sops.secrets."sheath-password-hash".path;
 
     sops.secrets."root-password-hash" =
@@ -56,7 +56,7 @@ in
 
     security.sudo.extraRules = lib.mkIf cfg.sudoNoPassword [
       {
-        users = [ "sheath" ];
+        users = [ config.fleet.adminUser ];
         commands = [ { command = "ALL"; options = [ "NOPASSWD" ]; } ];
       }
     ];

@@ -5,6 +5,7 @@ let
   cfg = config.fleet.tailscaleClient;
   tailscale = lib.getExe config.services.tailscale.package;
   desiredSetFlags = [
+    "--hostname=${config.fleet.profileName}"
     "--accept-dns=${lib.boolToString cfg.acceptDns}"
     "--accept-routes=${lib.boolToString cfg.acceptRoutes}"
     # Never select an exit node: ordinary Internet traffic keeps using the

@@ -16,6 +16,16 @@ Also the decision log. Rationale that would otherwise bloat a code comment lives
   finding: scripted networking is detaching its own slave, and `br0-netdev`'s
   `X-ReloadIfChanged` is the next suspect.
 
+## 2026-09-16 (Installer defaults)
+
+- Check installer defaults automatically and keep all normal settings editable,
+  following the NixOS graphical installer's choices. Validate in a temporary
+  checkout; show all erased disks together and protect every preserved Btrfs member.
+- Persist local settings through fleet rebuilds. Separate profile identity from
+  computer/login names and keep custom password hashes outside the Nix store.
+- Add settings/storage regressions and disposable VM coverage; document usage and
+  current desktop limitations in [installer.md](installer.md).
+
 ## 2026-09-06 (Ponytail plugin runtime)
 
 - **Include Node.js in the `ccodex` runtime** so Ponytail lifecycle hooks have an

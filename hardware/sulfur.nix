@@ -27,61 +27,61 @@
     "pcie_aspm=off"
   ];
 
-  boot.initrd.luks.devices."cryptroot" = {
+  boot.initrd.luks.devices."cryptroot" = lib.mkIf (!config.fleet.disk.enable) {
     device = "/dev/disk/by-uuid/67cacaa1-f13e-4984-a84b-905d09d416aa";
     allowDiscards = true;
     bypassWorkqueues = true;
   };
 
   # Ephemeral root.
-  fileSystems."/" = {
+  fileSystems."/" = lib.mkIf (!config.fleet.disk.enable) {
     device = "none";
     fsType = "tmpfs";
     options = [ "defaults" "size=6G" "mode=755" ];
   };
 
-  fileSystems."/nix" = {
+  fileSystems."/nix" = lib.mkIf (!config.fleet.disk.enable) {
     device = "/dev/mapper/cryptroot";
     fsType = "btrfs";
     options = [ "subvol=@nix" "compress=zstd" "noatime" "discard=async" ];
     neededForBoot = true;
   };
 
-  fileSystems."/home" = {
+  fileSystems."/home" = lib.mkIf (!config.fleet.disk.enable) {
     device = "/dev/mapper/cryptroot";
     fsType = "btrfs";
     options = [ "subvol=@home" "compress=zstd" "noatime" "discard=async" ];
     neededForBoot = true;
   };
 
-  fileSystems."/persist" = {
+  fileSystems."/persist" = lib.mkIf (!config.fleet.disk.enable) {
     device = "/dev/mapper/cryptroot";
     fsType = "btrfs";
     options = [ "subvol=@persist" "compress=zstd" "noatime" "discard=async" ];
     neededForBoot = true;
   };
 
-  fileSystems."/var/log" = {
+  fileSystems."/var/log" = lib.mkIf (!config.fleet.disk.enable) {
     device = "/dev/mapper/cryptroot";
     fsType = "btrfs";
     options = [ "subvol=@log" "compress=zstd" "noatime" "discard=async" ];
     neededForBoot = true;
   };
 
-  fileSystems."/swap" = {
+  fileSystems."/swap" = lib.mkIf (!config.fleet.disk.enable) {
     device = "/dev/mapper/cryptroot";
     fsType = "btrfs";
     options = [ "subvol=@swap" "noatime" ];
   };
 
-  fileSystems."/boot" = {
+  fileSystems."/boot" = lib.mkIf (!config.fleet.disk.enable) {
     device = "/dev/disk/by-uuid/08E2-FB95";
     fsType = "vfat";
     options = [ "fmask=0077" "dmask=0077" ];
   };
 
   # 32 GB, sized for hibernation.
-  swapDevices = [{
+  swapDevices = lib.mkIf (!config.fleet.disk.enable) [{
     device = "/swap/swapfile";
     size = 32768;
   }];

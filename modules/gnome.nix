@@ -1,4 +1,5 @@
-{ config, pkgs, ... }:{
+{ config, pkgs, lib, ... }:{
+  config = lib.mkIf (builtins.elem config.fleet.desktop [ "inherit" "gnome" ]) {
   environment.systemPackages = with pkgs; [
     # GNOME-specific packages not in workstation.nix
     gnomeExtensions.appindicator
@@ -22,4 +23,5 @@
   ];
   services.displayManager.gdm.enable = true;
   services.desktopManager.gnome.enable = true;
+  };
 }

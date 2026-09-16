@@ -5,7 +5,9 @@ let
 in
 {
   imports = [
-    ../hardware/hydrogen.nix
+    # A fresh install may be on a different machine; prefer its detected hardware.
+    (if builtins.pathExists ../provisioning/hydrogen/hardware.nix
+     then ../provisioning/hydrogen/hardware.nix else ../hardware/hydrogen.nix)
     ../modules/gnome.nix
     ../modules/audio.nix
     ../modules/nix-ld.nix
@@ -142,7 +144,7 @@ in
   fleet.accounts.sudoNoPassword = true;
 
   systemd.tmpfiles.rules = [
-    "d /data/games 0755 sheath sheath -"
+    "d /data/games 0755 ${config.fleet.adminUser} ${config.fleet.adminUser} -"
   ];
 
   environment.systemPackages = with pkgs; [
@@ -157,7 +159,7 @@ in
   services.xserver.enable = true;
   virtualisation.libvirtd.enable = true;
   services.displayManager.autoLogin.enable = true;
-  services.displayManager.autoLogin.user = "sheath";
+  services.displayManager.autoLogin.user = config.fleet.primaryUser;
 
   # https://github.com/NixOS/nixpkgs/issues/103746 -- GNOME autologin needs these off.
   systemd.services."getty@tty1".enable = false;

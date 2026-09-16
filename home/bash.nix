@@ -1,4 +1,4 @@
-{ config, pkgs, ... }: {
+{ config, pkgs, osConfig, ... }: {
 
   home.packages = with pkgs; [
     fzf
@@ -58,7 +58,7 @@
           nix eval --raw --apply 'c: builtins.concatStringsSep "\n" (builtins.attrNames c)' \
             "$FLAKE#nixosConfigurations" | fzf
         else
-          echo "$HOSTNAME"
+          echo "${osConfig.fleet.profileName}"
         fi
       }
 
@@ -66,7 +66,7 @@
         local op="$1" target_host
         target_host=$(_nix_target_host) || return 1
         [[ -n "$target_host" ]] || return 1
-        sudo nixos-rebuild "$op" --flake "$FLAKE#$target_host"
+        sudo nixos-rebuild "$op" --flake "path:$FLAKE#$target_host"
       }
 
       # nr: switch now. nb: stage for next boot (kernel/bootloader changes). Neither

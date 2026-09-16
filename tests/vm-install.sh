@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Launch a QEMU machine with two blank disks to exercise the installer by hand.
 #
-# checks.disko-vm covers the disk half automatically. This covers what it cannot: the
+# tests/disko-vm.nix covers encrypted boot automatically. This covers what it cannot: the
 # TUI, the non-disk phases, and resuming across a reboot of the live ISO.
 
 set -euo pipefail

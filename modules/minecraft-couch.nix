@@ -58,7 +58,7 @@
       # Clear of GDM (1) and the autologin session (2); getty@tty7 is conflicted out below.
       couchVt = 7;
 
-      user = "sheath";
+      user = config.fleet.primaryUser;
       home = config.users.users.${user}.home;
       # Created on demand by minecraft-client; nothing to materialize in advance.
       couchRoot = "${home}/.local/share/minecraft-couch";

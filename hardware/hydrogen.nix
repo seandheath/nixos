@@ -13,38 +13,32 @@
   boot.kernelModules = [ "kvm-intel" ];
   boot.extraModulePackages = [ ];
 
-  fileSystems."/" =
-    { device = "/dev/disk/by-uuid/9b9c51ae-3007-4f8a-9837-a01bb4309d1c";
+  fileSystems."/" = lib.mkIf (!config.fleet.disk.enable) { device = "/dev/disk/by-uuid/9b9c51ae-3007-4f8a-9837-a01bb4309d1c";
       fsType = "btrfs";
       options = [ "subvol=@root" ];
     };
 
-  fileSystems."/nix" =
-    { device = "/dev/disk/by-uuid/9b9c51ae-3007-4f8a-9837-a01bb4309d1c";
+  fileSystems."/nix" = lib.mkIf (!config.fleet.disk.enable) { device = "/dev/disk/by-uuid/9b9c51ae-3007-4f8a-9837-a01bb4309d1c";
       fsType = "btrfs";
       options = [ "subvol=@nix" ];
     };
 
-  fileSystems."/home" =
-    { device = "/dev/disk/by-uuid/9b9c51ae-3007-4f8a-9837-a01bb4309d1c";
+  fileSystems."/home" = lib.mkIf (!config.fleet.disk.enable) { device = "/dev/disk/by-uuid/9b9c51ae-3007-4f8a-9837-a01bb4309d1c";
       fsType = "btrfs";
       options = [ "subvol=@home" ];
     };
 
-  fileSystems."/persist" =
-    { device = "/dev/disk/by-uuid/9b9c51ae-3007-4f8a-9837-a01bb4309d1c";
+  fileSystems."/persist" = lib.mkIf (!config.fleet.disk.enable) { device = "/dev/disk/by-uuid/9b9c51ae-3007-4f8a-9837-a01bb4309d1c";
       fsType = "btrfs";
       options = [ "subvol=@persist" ];
     };
 
-  fileSystems."/var/log" =
-    { device = "/dev/disk/by-uuid/9b9c51ae-3007-4f8a-9837-a01bb4309d1c";
+  fileSystems."/var/log" = lib.mkIf (!config.fleet.disk.enable) { device = "/dev/disk/by-uuid/9b9c51ae-3007-4f8a-9837-a01bb4309d1c";
       fsType = "btrfs";
       options = [ "subvol=@log" ];
     };
 
-  fileSystems."/swap" =
-    { device = "/dev/disk/by-uuid/9b9c51ae-3007-4f8a-9837-a01bb4309d1c";
+  fileSystems."/swap" = lib.mkIf (!config.fleet.disk.enable) { device = "/dev/disk/by-uuid/9b9c51ae-3007-4f8a-9837-a01bb4309d1c";
       fsType = "btrfs";
       options = [ "subvol=@swap" ];
     };
@@ -55,8 +49,7 @@
   # world-readable and logs it as "a security hole" on every boot. Only root
   # reads the ESP from Linux, and the firmware ignores unix permissions
   # entirely, so tightening this costs nothing.
-  fileSystems."/boot" =
-    { device = "/dev/disk/by-uuid/CED8-DF10";
+  fileSystems."/boot" = lib.mkIf (!config.fleet.disk.enable) { device = "/dev/disk/by-uuid/CED8-DF10";
       fsType = "vfat";
       options = [ "fmask=0077" "dmask=0077" ];
     };
@@ -65,13 +58,12 @@
   # (/data/immich), the local Borg repo (/data/borg), and existing movies/tv.
   # subvol=/ is the top-level subvolume (subvolid 5) where that content lives.
   # nofail so a missing/degraded disk never blocks boot.
-  fileSystems."/data" =
-    { device = "/dev/disk/by-uuid/75c4fbbf-7ab0-42f2-b333-31d825d280c2";
+  fileSystems."/data" = lib.mkIf (!config.fleet.disk.enable) { device = "/dev/disk/by-uuid/75c4fbbf-7ab0-42f2-b333-31d825d280c2";
       fsType = "btrfs";
       options = [ "subvol=/" "compress=zstd" "noatime" "nofail" ];
     };
 
-  swapDevices = [ ];
+  swapDevices = lib.mkIf (!config.fleet.disk.enable) [ ];
 
   nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
   hardware.cpu.intel.updateMicrocode = lib.mkDefault config.hardware.enableRedistributableFirmware;

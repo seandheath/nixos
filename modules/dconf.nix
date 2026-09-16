@@ -1,4 +1,5 @@
 { config, pkgs, lib,... }: {
+  config = lib.mkIf (builtins.elem config.fleet.desktop [ "inherit" "gnome" ]) {
   #dconf.settings = {
   programs.dconf.profiles = {
     user.databases = [{
@@ -93,11 +94,12 @@
             # New Window action: a bare invocation forks a second process instead
             # of asking the running one for another window.
             command =
-              "/etc/profiles/per-user/sheath/bin/ghostty --gtk-single-instance=true";
+              "/etc/profiles/per-user/${config.fleet.adminUser}/bin/ghostty --gtk-single-instance=true";
             name = "open-terminal";
           };
         "org/gnome/germinal/legacy".theme-variant = "dark";
       };
     }];
+  };
   };
 }

@@ -27,7 +27,7 @@ in
   services.minecraftLauncher.enable = true;
   services.minecraftLauncher.controlKeyFile = config.sops.secrets.minecraft-control-sulfur.path;
   sops.secrets.minecraft-control-sulfur = {
-    owner = "sheath";
+    owner = config.fleet.adminUser;
     mode = "0400";
   };
 
@@ -36,7 +36,7 @@ in
     enable = true;
     tags = [ "tag:admin" ];
     acceptRoutes = false;
-    operatorUser = "sheath";
+    operatorUser = config.fleet.adminUser;
     authKeyFile = config.sops.secrets.tailscale-auth-sulfur.path;
   };
   sops.secrets.tailscale-auth-sulfur = { };
@@ -202,7 +202,7 @@ in
       # Let Mutter enumerate the new displays first.
       ExecStartPre = "${pkgs.coreutils}/bin/sleep 5";
       ExecStart = "${pkgs.dock-monitors.pythonWithDbus}/bin/python3 ${pkgs.dock-monitors.script}";
-      User = "sheath";
+      User = config.fleet.adminUser;
       Environment = "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus";
     };
     # Debounce: DRM fires several events per dock connect.

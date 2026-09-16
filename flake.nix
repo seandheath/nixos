@@ -85,17 +85,17 @@
         # Every host: sulfur's Ghostty sets TERM=xterm-ghostty, which nixpkgs' ncurses does
         # not carry, and an SSH session inherits it.
         ({ pkgs, ... }: { environment.systemPackages = [ pkgs.ghostty.terminfo ]; })
-        {
+        ({ config, ... }: {
           home-manager.useGlobalPkgs = true;
           home-manager.useUserPackages = true;
-          home-manager.users.sheath = import ./home/sheath.nix;
+          home-manager.users.${config.fleet.adminUser} = import ./home/sheath.nix;
           home-manager.extraSpecialArgs = { inherit inputs; };
           # Rename pre-existing files aside rather than failing activation, which would
           # fail the whole nixos-rebuild switch with it.
           home-manager.backupFileExtension = "hm-bak";
-          users.users.sheath = import ./users/sheath.nix;
-          users.groups.sheath = {};
-        }
+          users.users.${config.fleet.adminUser} = (import ./users/sheath.nix) // { group = config.fleet.adminUser; };
+          users.groups.${config.fleet.adminUser} = {};
+        })
       ];
 
       # A host has a disk-config only once the installer has generated one; the hosts
@@ -112,8 +112,8 @@
       mkHost = { hostName, extraModules ? [ ] }: nixpkgs.lib.nixosSystem {
         inherit system;
         specialArgs = { inherit inputs; };
-        modules = [ ./hosts/${hostName}.nix ]
-          ++ diskConfigFor hostName ++ extraModules ++ commonModules;
+        modules = [ ./hosts/${hostName}.nix { fleet.profileName = hostName; } ]
+          ++ diskConfigFor hostName ++ provisioningFor hostName ++ extraModules ++ commonModules;
       };
 
       # The kids' laptops. modules/family/profile.nix derives the username, secret names,
@@ -143,7 +143,7 @@
         modules = [
           ./modules/family/profile.nix
           ./hardware/${hostName}.nix
-          { networking.hostName = hostName; }
+          { networking.hostName = hostName; fleet.profileName = hostName; }
         ] ++ provisioningFor hostName ++ extraModules ++ commonModules;
       }) familyHosts;
     in {
@@ -155,7 +155,7 @@
       # a build regression in it goes unnoticed until someone needs to install a machine.
       checks.${system} =
         nixpkgs.lib.mapAttrs (_: h: h.config.system.build.toplevel) hosts
-        // { inherit (pkgs) installer; };
+        // { inherit (pkgs) installer; installer-unit = pkgs.installer.tests.unit; };
 
       packages.${system} = {
         inherit (pkgs)
