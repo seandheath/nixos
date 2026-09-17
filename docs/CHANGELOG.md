@@ -2,6 +2,13 @@
 
 Also the decision log. Rationale that would otherwise bloat a code comment lives here.
 
+## 2026-09-17 (installer secrets passphrase)
+
+- Use age's bundled batchpass plugin instead of feeding a simulated terminal.
+  Decryption errors now report the actual failure without an interactive prompt;
+  failed decryption preserves existing keys, and new keys are private from creation.
+- Cover real encryption/decryption and incorrect passwords in the packaged installer tests.
+
 ## Open
 
 - **Narrow `pcie_aspm=off` on sulfur** to `pcie_aspm.policy=performance`, or disable the SD

@@ -402,7 +402,7 @@ class Board:
             bad.append("boot the installer in UEFI mode")
         if not (self.repo / "flake.nix").is_file() or not (self.repo / ".git").exists():
             bad.append("not a configuration checkout")
-        for tool in ("nix", "nixos-install", "nixos-generate-config", "nixos-enter", "script", "age", "mkpasswd", "lsblk"):
+        for tool in ("nix", "nixos-install", "nixos-generate-config", "nixos-enter", "age", "age-plugin-batchpass", "mkpasswd", "lsblk"):
             if not shutil.which(tool):
                 bad.append(f"{tool} is missing")
         return Status("failed", "; ".join(bad)) if bad else Status("ok", "UEFI and installation tools available")
@@ -561,10 +561,18 @@ def keyboard_preview(settings):
 
 
 def age_decrypt(source: Path, destination: Path, passphrase: str) -> None:
-    tool = "rage" if shutil.which("rage") and not shutil.which("age") else "age"
-    inner = f"{tool} -d -o {shell_quote(str(destination))} {shell_quote(str(source))}"
-    command(["script", "--echo", "never", "-qec", inner, "/dev/null"], "age decrypt", input_text=passphrase + "\n")
-    if not destination.is_file(): raise RuntimeError("age produced no output; the passphrase is probably wrong")
+    """Decrypt a small secrets key without terminal prompts or logging its contents."""
+    result = subprocess.run(
+        ["age", "-d", "-j", "batchpass", str(source)],
+        stdin=subprocess.DEVNULL, capture_output=True,
+        env=child_env() | {"AGE_PASSPHRASE": passphrase, "AGE_PASSPHRASE_FD": ""},
+    )
+    if result.returncode:
+        raise RuntimeError(f"age decrypt failed: {result.stderr.decode(errors='replace').strip()}")
+    # Do not replace an existing key on failure or expose a new key before chmod.
+    with os.fdopen(os.open(destination, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600), "wb") as output:
+        os.fchmod(output.fileno(), 0o600)
+        output.write(result.stdout)
 
 
 def shell_quote(value: str) -> str: return "'" + value.replace("'", "'\\''") + "'"

@@ -9,7 +9,7 @@ pkgs.writeShellApplication {
   runtimeInputs = with pkgs; [
     age
     mkpasswd
-    util-linux # script, lsblk, blkid, mountpoint
+    util-linux # lsblk, blkid, mountpoint
     openssh # ssh-keygen
     git
     coreutils
@@ -23,7 +23,7 @@ pkgs.writeShellApplication {
     exec ${pkgs.python3}/bin/python ${source}/installer.py "$@"
   '';
 
-  derivationArgs.passthru.tests.unit = pkgs.runCommand "installer-unit-tests" { nativeBuildInputs = [ pkgs.python3 pkgs.util-linux ]; } ''
+  derivationArgs.passthru.tests.unit = pkgs.runCommand "installer-unit-tests" { nativeBuildInputs = [ pkgs.python3 pkgs.util-linux pkgs.age ]; } ''
     export PYTHONDONTWRITEBYTECODE=1
     export PYTHONTZPATH=${pkgs.tzdata}/share/zoneinfo
     mkdir source
