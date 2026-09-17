@@ -8,6 +8,8 @@ Also the decision log. Rationale that would otherwise bloat a code comment lives
   Decryption errors now report the actual failure without an interactive prompt;
   failed decryption preserves existing keys, and new keys are private from creation.
 - Cover real encryption/decryption and incorrect passwords in the packaged installer tests.
+- Accept key files containing multiple identities when any identity matches the selected
+  profile's recipients; comparing the whole public-key output rejected valid bundles.
 
 ## Open
 

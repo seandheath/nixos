@@ -522,10 +522,10 @@ class Board:
             if not key:
                 key = Path(directory) / "key"
                 age_decrypt(source, key, self.age_passphrase)
-            # Validate syntax and the public identity, without printing private key material.
-            public = command(["age-keygen", "-y", str(key)], "checking the secrets key").strip()
+            # Key files can contain several identities; any authorized recipient suffices.
+            public = command(["age-keygen", "-y", str(key)], "checking the secrets key").splitlines()
             recipients = re.findall(r"recipient: (age1[0-9a-z]+)", (self.repo / "secrets" / self.facts.sops_file).read_text())
-            if public not in recipients:
+            if not set(public).intersection(recipients):
                 return Status("failed", "this key is not a recipient of the selected profile secrets")
         return Status("ok", "fleet secrets key verified")
 
