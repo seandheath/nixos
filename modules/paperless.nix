@@ -20,6 +20,8 @@
     };
   };
 
+  systemd.services.paperless-task-queue.serviceConfig.RestartSec = 30;
+
   fleet.vhosts.paper.port = 28981;
 
 }

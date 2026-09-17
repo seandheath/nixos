@@ -11,6 +11,11 @@ Also the decision log. Rationale that would otherwise bloat a code comment lives
 - Accept key files containing multiple identities when any identity matches the selected
   profile's recipients; comparing the whole public-key output rejected valid bundles.
 
+## 2026-09-17 (Paperless restart delay)
+
+- Wait 30 seconds before restarting the Paperless worker after failure. The default
+  100 ms delay caused sustained CPU load when hydrogen's filesystem became read-only.
+
 ## Open
 
 - **Narrow `pcie_aspm=off` on sulfur** to `pcie_aspm.policy=performance`, or disable the SD
