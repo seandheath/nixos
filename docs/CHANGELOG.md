@@ -16,6 +16,11 @@ Also the decision log. Rationale that would otherwise bloat a code comment lives
 - Wait 30 seconds before restarting the Paperless worker after failure. The default
   100 ms delay caused sustained CPU load when hydrogen's filesystem became read-only.
 
+## 2026-09-17 (hydrogen tower Ethernet)
+
+- Attach `enp48s0` to hydrogen's `br0`; the replacement tower does not have the old
+  `enp0s31f6` interface. Keep its LAN address and bridge firewall rules unchanged.
+
 ## Open
 
 - **Narrow `pcie_aspm=off` on sulfur** to `pcie_aspm.policy=performance`, or disable the SD

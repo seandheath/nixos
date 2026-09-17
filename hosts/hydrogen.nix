@@ -90,7 +90,7 @@ in
 
   # Static br0. Plain false, not mkDefault, to beat the generated hardware file.
   networking.useDHCP = false;
-  networking.bridges."br0".interfaces = [ "enp0s31f6" ];
+  networking.bridges."br0".interfaces = [ "enp48s0" ];
   networking.interfaces.br0.ipv4.addresses = [{
     address = "10.0.0.10";
     prefixLength = 24;
