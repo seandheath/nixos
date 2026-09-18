@@ -69,9 +69,26 @@ in
   # key-only SSH protect the control channel.
   fleet.gitServer.enable = true;
 
-  # The fleet's flake.lock is bumped and gated here, on the only host that is always up.
-  # One writer only -- a second is a push race. see CHANGELOG 2026-08-19
+  # Publish candidates centrally; each machine builds before activating.
   fleet.lockUpdate.enable = true;
+  system.autoUpgrade = {
+    dates = "05:05";
+    randomizedDelaySec = "5min";
+    allowReboot = true;
+    rebootWindow = { lower = "05:00"; upper = "06:00"; };
+  };
+  systemd.services.nixos-upgrade.serviceConfig.ExecCondition =
+    pkgs.writeShellScript "upgrade-backups-idle" ''
+      # Exit 1 from ExecCondition skips the run while a backup is active.
+      if ! ${pkgs.util-linux}/bin/flock -n /run/lock/fleet-borg-backup.lock ${pkgs.coreutils}/bin/true \
+        || ${pkgs.systemd}/bin/systemctl show --property=ActiveState --value \
+          fleet-borg-backup.service borgbackup-job-data.service borgbackup-job-remote.service \
+          postgresqlBackup-nextcloud.service postgresqlBackup-immich.service \
+          | ${pkgs.gnugrep}/bin/grep -Eq '^(active|activating|deactivating)$'; then
+        echo "Skipping automatic upgrade: a backup is running."
+        exit 1
+      fi
+    '';
 
   # On-demand worlds alongside the shared one. Each launcher has a dedicated SOPS-managed
   # key; the public halves below are restricted to the forced Minecraft control command.

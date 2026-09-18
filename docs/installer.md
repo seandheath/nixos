@@ -60,8 +60,8 @@ missing passphrases or required selections are reported as failed checks.
 
 After partitioning, choices and generated settings, hardware and disk modules
 live in `/persist/nixos-install`. The installed checkout imports them from
-`provisioning/<profile>/`. Nightly `fleet-rebuild` copies them into its fetched
-checkout before rebuilding. Password hashes are root-only files under
+`provisioning/<profile>/`. The native nightly updater's preparation hook and manual
+`fleet-rebuild` copy them into separate fetched checkouts before rebuilding. Password hashes are root-only files under
 `/persist/secrets`; neither passwords nor hashes are embedded in Nix source.
 
 If installation fails while the target is mounted, restart the installer; it

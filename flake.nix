@@ -40,8 +40,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
 
-    # Prebuilt nix-index database (nix-locate/comma). Refreshes on deliberate input bumps
-    # (`nu`), not the nightly, which passes --no-write-lock-file.
+    # Prebuilt nix-index database (nix-locate/comma), refreshed with the other inputs.
     nix-index-database = {
       url = "github:nix-community/nix-index-database";
       inputs.nixpkgs.follows = "nixpkgs";

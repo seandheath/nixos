@@ -2,6 +2,23 @@
 
 Also the decision log. Rationale that would otherwise bloat a code comment lives here.
 
+## 2026-09-18 (native nightly updates)
+
+- Update all flake inputs together; advancing nixpkgs alone left SOPS using the removed
+  Go 1.25 builder. Each host now builds its own candidate before activation, so a broken
+  laptop or installer no longer blocks the server's updates.
+- Use NixOS's native `system.autoUpgrade` on provisioned hosts too. A preparation hook
+  fetches the committed checkout and copies local installation facts into it. Manual
+  `fleet-rebuild` uses a temporary checkout. Neither path changes the lockfile.
+- Hydrogen checks at 05:05 with up to five minutes of jitter and may reboot during
+  05:00–06:00. An active backup skips the run. Native behavior stages boot changes that
+  finish outside the window until a later run; other hosts never reboot automatically.
+  Sulfur's diagnostic hold remains in place.
+- Use standard systemd status and journals for both jobs. Remove custom notifications,
+  age checks and login hooks. No status files, custom scheduler or retry loop.
+  Inspect both stages with `journalctl -u nixos-lock-update -u nixos-upgrade --since yesterday`;
+  a successful rebuild alone does not mean new inputs were published.
+
 ## 2026-09-17 (installer secrets passphrase)
 
 - Use age's bundled batchpass plugin instead of feeding a simulated terminal.
@@ -26,8 +43,6 @@ Also the decision log. Rationale that would otherwise bloat a code comment lives
 - **Revisit `pcie_aspm=off` on sulfur** with a controlled boot test. It leaves ASPM to
   firmware and resolved the card-reader AER storm; `pcie_aspm.policy=performance` is not
   an equivalent replacement.
-- **Off-box failure notification.** `nixos-upgrade` failures notify the logged-in desktop,
-  which on the four kids' laptops is a child who cannot act on it. Needs ntfy on hydrogen.
 - **Stop sharing `sheath-password-hash` with the kids' laptops.** A child with wheel can read
   the family age key and offline-crack a hash that is also sheath's password on hydrogen and
   sulfur. Give the laptops their own admin hash.
