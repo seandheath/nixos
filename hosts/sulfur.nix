@@ -32,9 +32,6 @@ in
   };
 
   fleet.bootGenerations = 20;
-  # Keep the freeze investigation stable: GitHub rebuilds would replace these local fixes.
-  # Resume once the validated fixes are published and the diagnostic trial is complete.
-  systemd.timers.nixos-upgrade.enable = lib.mkForce false;
   fleet.tailscaleClient = {
     enable = true;
     tags = [ "tag:admin" ];

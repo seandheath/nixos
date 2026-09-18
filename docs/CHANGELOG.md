@@ -13,7 +13,7 @@ Also the decision log. Rationale that would otherwise bloat a code comment lives
 - Hydrogen checks at 05:05 with up to five minutes of jitter and may reboot during
   05:00–06:00. An active backup skips the run. Native behavior stages boot changes that
   finish outside the window until a later run; other hosts never reboot automatically.
-  Sulfur's diagnostic hold remains in place.
+  Sulfur's diagnostic hold is lifted; nightly updates are enabled again.
 - Use standard systemd status and journals for both jobs. Remove custom notifications,
   age checks and login hooks. No status files, custom scheduler or retry loop.
   Inspect both stages with `journalctl -u nixos-lock-update -u nixos-upgrade --since yesterday`;
