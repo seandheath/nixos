@@ -130,7 +130,11 @@
         sulfur = mkHost {
           hostName = "sulfur";
           extraModules = [
-            nixos-hardware.nixosModules.asus-zephyrus-gu605my
+            nixos-hardware.nixosModules.asus-zephyrus-gu605cw
+            {
+              # Sulfur supplies its panel setting; the shared module adds obsolete NVIDIA flags.
+              disabledModules = [ "${nixos-hardware}/asus/zephyrus/shared/backlight.nix" ];
+            }
             impermanence.nixosModules.impermanence
           ];
         };

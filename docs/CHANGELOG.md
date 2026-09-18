@@ -23,8 +23,9 @@ Also the decision log. Rationale that would otherwise bloat a code comment lives
 
 ## Open
 
-- **Narrow `pcie_aspm=off` on sulfur** to `pcie_aspm.policy=performance`, or disable the SD
-  reader via udev. Disabling ASPM fleet-wide costs idle battery.
+- **Revisit `pcie_aspm=off` on sulfur** with a controlled boot test. It leaves ASPM to
+  firmware and resolved the card-reader AER storm; `pcie_aspm.policy=performance` is not
+  an equivalent replacement.
 - **Off-box failure notification.** `nixos-upgrade` failures notify the logged-in desktop,
   which on the four kids' laptops is a child who cannot act on it. Needs ntfy on hydrogen.
 - **Stop sharing `sheath-password-hash` with the kids' laptops.** A child with wheel can read
@@ -34,6 +35,49 @@ Also the decision log. Rationale that would otherwise bloat a code comment lives
   nightlies pass with no repair logged. A repair logged after 2026-08-13 is itself the
   finding: scripted networking is detaching its own slave, and `br0-netdev`'s
   `X-ReloadIfChanged` is the next suspect.
+
+## 2026-09-18 (Sulfur diagnostic configuration rollback)
+
+- The failed boot started September 17 at 12:36 with S0ix enabled. No suspend was
+  recorded. At 04:35 on September 18, the unattended GitHub rebuild replaced the local
+  diagnostic configuration; records continued until 04:53:33 without a panic or GPU Xid.
+  This sequence does not establish that the update caused the freeze.
+- Restore the local fixes and temporarily disable unattended rebuilds on Sulfur so
+  subsequent trials retain their configuration and diagnostics. Re-enable after the
+  validated changes are published and the trial is complete. Other hosts are unaffected.
+- Evidence is in `/home/sheath/diagnostics/sulfur-2026-09-18-0453`.
+
+## 2026-09-17 (Sulfur power-management cleanup)
+
+- Use the correct GU605CW hardware profile, exclude its shared obsolete NVIDIA
+  backlight flags, and retain Sulfur's working Intel DPCD interface. Explicitly disable
+  the profile's Tuned service: GNOME's power-profiles-daemon owns power profiles and EPP.
+- Manage `asusd.ron` through the native NixOS option, preserving existing values except
+  disabling ASUS AC/battery profile switching and linked EPP. Restart asusd on config
+  changes. The installed [asusctl manual](https://github.com/OpenGamingCollective/asusctl/blob/6.4.0/MANUAL.md#profiles)
+  warns about concurrent profile managers.
+- Enable NVIDIA S0ix with a zero-MiB VRAM copy threshold and select s2idle: occupied
+  VRAM stays in self-refresh during normal sleep. This uses more standby power; it
+  does not provide VRAM retention through hibernation or power loss. No larger tmpfs
+  or disk-backed VRAM store is added. Keep native NVIDIA preservation/notifiers for
+  other power transitions. See [NVIDIA power management](https://download.nvidia.com/XFree86/Linux-x86_64/595.71.05/README/powermanagement.html).
+- Retain the runtime-D3 and PCIe workarounds pending controlled tests. Remove duplicate
+  manual VRAM-preservation settings and the redundant supergfxd pciutils path; retain
+  GPU switching for diagnosis. These fixes do not establish the cause of past freezes.
+
+## 2026-09-17 (Sulfur freeze diagnostics)
+
+- Enable keyboard SysRq diagnostic dumps and disk sync (`kernel.sysrq = 24`). On a
+  freeze, press Alt+PrintScreen or Alt+M4 once: keyd emits `w` (blocked tasks), `l`
+  (CPU stacks), `m` (memory), then `s` (sync), with short pauses and no key repeat.
+  The shortcut depends on keyd responding; also try SSH before powering off.
+- Sync the journal every 30 seconds and persist `/var/lib/systemd/pstore` so archived
+  kernel crash records survive the ephemeral root. These cannot guarantee a record
+  from a complete hardware lockup. After reboot, inspect `journalctl -b -1 -k` and
+  `journalctl -u systemd-pstore`, plus `/var/lib/systemd/pstore`.
+- The September 16 journal ends at 21:15:40 EDT without shutdown, suspend, OOM, or a
+  runtime GPU/storage fault. CPU bank-0 machine checks recur at boot, including after
+  clean restarts; none were recorded on September 17. The freeze's cause is unproven.
 
 ## 2026-09-16 (Installer defaults)
 

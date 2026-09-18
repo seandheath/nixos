@@ -14,16 +14,13 @@
     "nvme_core.default_ps_max_latency_us=0"
     "i915.enable_psr=0"  # Disable PSR to fix aux errors on Arrow Lake graphics
 
-    # This panel needs the DPCD interface including HDR/VESA; nixos-hardware's asus module
-    # sets =1, and ours are appended after, so last-wins for an int modparam. Verify with
-    # `cat /proc/cmdline` -- =3 must appear LAST.
+    # Keep this panel's working Intel DPCD backlight interface (3 = force Intel).
     "i915.enable_dpcd_backlight=3"
 
 
     # The Realtek card reader storms correctable AER errors (Replay Timer Timeout) every
-    # ~150 us and the kernel spends the whole boot in the AER handler. The errors are
-    # correctable -- nothing corrupts; the failure is the cost of REPORTING them. Costs idle
-    # battery, and narrowing it is an open item. See CHANGELOG 2026-08-11.
+    # ~150 us without this workaround. Leave ASPM to firmware rather than letting Linux
+    # configure it; this does not necessarily disable hardware ASPM. See CHANGELOG 2026-08-11.
     "pcie_aspm=off"
   ];
 

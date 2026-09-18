@@ -32,6 +32,9 @@ in
   };
 
   fleet.bootGenerations = 20;
+  # Keep the freeze investigation stable: GitHub rebuilds would replace these local fixes.
+  # Resume once the validated fixes are published and the diagnostic trial is complete.
+  systemd.timers.nixos-upgrade.enable = lib.mkForce false;
   fleet.tailscaleClient = {
     enable = true;
     tags = [ "tag:admin" ];
@@ -42,7 +45,10 @@ in
   sops.secrets.tailscale-auth-sulfur = { };
 
   # sulfur wipes its root subvolume at boot, so the node key must live on /persist.
-  environment.persistence."/persist".directories = [ "/var/lib/tailscale" ];
+  environment.persistence."/persist".directories = [
+    "/var/lib/tailscale"
+    "/var/lib/systemd/pstore"  # Keep archived kernel crash records across boots.
+  ];
   # Not sops: the age key lives under /home, which is exactly what has not mounted when
   # root recovery is needed.
   fleet.accounts.rootPassword = "persist";
@@ -50,14 +56,6 @@ in
   # Kernel deliberately unpinned: a pin would hold this laptop back long after nvidia-open
   # could handle newer, and a driver that refuses to build is a loud failure, not a silent
   # one. If that starts happening, pin the DRIVER.
-  #
-  # 0x00 is the only value that keeps the dGPU out of D3cold; finegrained = false merely
-  # omits the modparam and lets the driver choose, which since 610 means RTD3 on. Verify
-  # after a driver bump: grep DynamicPowerManagement /proc/driver/nvidia/params -> 0.
-  # One block only -- a second assignment here is a duplicate-key error, not a merge.
-  boot.extraModprobeConfig = ''
-    options nvidia NVreg_PreserveVideoMemoryAllocations=1 NVreg_DynamicPowerManagement=0x00
-  '';
 
   services.xserver = {
     enable = true;
@@ -85,6 +83,29 @@ in
   ];
 
   services.asusd.enable = true;
+  # PPD owns platform profiles and CPU EPP. Preserve the other existing ASUS settings.
+  services.asusd.asusdConfig.text = ''
+    (
+      charge_control_end_threshold: 100,
+      base_charge_control_end_threshold: 0,
+      disable_nvidia_powerd_on_battery: true,
+      ac_command: "",
+      bat_command: "",
+      platform_profile_linked_epp: false,
+      platform_profile_on_battery: Quiet,
+      change_platform_profile_on_battery: false,
+      platform_profile_on_ac: Performance,
+      change_platform_profile_on_ac: false,
+      profile_quiet_epp: Power,
+      profile_balanced_epp: BalancePower,
+      profile_custom_epp: Performance,
+      profile_performance_epp: Performance,
+      ac_profile_tunings: {},
+      dc_profile_tunings: {},
+      armoury_settings: {},
+    )
+  '';
+  systemd.services.asusd.restartTriggers = [ config.environment.etc."asusd/asusd.ron".source ];
 
   # asus-shutdown traps SIGTERM and defers exit; upstream ships SendSIGKILL=no with
   # TimeoutStopSec=45, so systemd cannot reap it and every rebuild that moves asusctl's
@@ -96,9 +117,9 @@ in
   };
 
   services.supergfxd.enable = true;
-  systemd.services.supergfxd.path = [ pkgs.pciutils ];
 
   services.power-profiles-daemon.enable = true;
+  services.tuned.enable = lib.mkForce false;  # The GU605CW profile enables it by default.
 
   hardware = {
     enableRedistributableFirmware = true;
@@ -107,12 +128,15 @@ in
       nvidiaSettings = true;
       modesetting.enable = true;
       powerManagement.enable = true;
-      # Necessary but NOT sufficient -- see the modparam above. RTD3 assumes an
-      # offload-only dGPU; the dock's display hangs off a card0/nvidia-drm connector, so a
-      # link drop lets the GPU reach D3cold while Mutter still holds an active KMS output
-      # on it and gnome-shell deadlocks. Re-enable only if every external display is
-      # routed to the Intel GPU.
       powerManagement.finegrained = false;
+      moduleParams.nvidia = {
+        # Keep the existing runtime-D3 workaround while diagnosing freezes.
+        # finegrained = false alone leaves runtime power management to the driver.
+        NVreg_DynamicPowerManagement = "0x00";
+        # Keep occupied VRAM in self-refresh during s2idle instead of copying it out.
+        NVreg_EnableS0ixPowerManagement = 1;
+        NVreg_S0ixPowerManagementVideoMemoryThreshold = 0;
+      };
       # Deliberately unpinned, unlike hydrogen: the RTD3 defence is the modparam, which
       # keeps working as the driver moves. Freezing trades a loud break for a silent one.
       package = config.boot.kernelPackages.nvidiaPackages.latest;
@@ -133,14 +157,28 @@ in
     };
   };
 
-  # Copilot key (shift+meta+f23) becomes a Ctrl layer; M4 (prog1) becomes SysRq.
+  # SysRq: diagnostic dumps (8) + sync (16), used by the keyd shortcut below.
+  boot.kernel.sysctl."kernel.sysrq" = 24;
+  # Bound ordinary journal buffering before a hard lockup or forced power-off.
+  services.journald.settings.Journal.SyncIntervalSec = "30s";
+
+  # Alt+PrintScreen or Alt+M4 dumps blocked tasks, CPU stacks, and memory, then syncs.
   services.keyd = {
     enable = true;
     keyboards.default = {
       ids = [ "*" ];
-      settings.main = {
-        "leftshift+leftmeta" = "layer(control)";
-        "prog1" = "sysrq";
+      settings = let
+        diagnostics = "macro2(0, 0, macro(leftalt+sysrq+w 200ms leftalt+sysrq+l 200ms leftalt+sysrq+m 200ms leftalt+sysrq+s))";
+      in {
+        main = {
+          "leftshift+leftmeta" = "layer(control)";
+          "prog1" = "sysrq";
+        };
+        alt = {
+          sysrq = diagnostics;
+          print = diagnostics;
+          prog1 = diagnostics;
+        };
       };
     };
   };
@@ -174,6 +212,7 @@ in
   services.fwupd.enable = true;
 
   # Prevent suspend when on AC power (docked)
+  systemd.sleep.settings.Sleep.MemorySleepMode = "s2idle";
   services.logind.settings.Login = {
     HandleLidSwitch = "suspend";
     HandleLidSwitchExternalPower = "ignore";
