@@ -123,6 +123,7 @@ in
 
   hardware = {
     enableRedistributableFirmware = true;
+    nvidia-container-toolkit.enable = true;
     nvidia = {
       open = true;  # recommended for RTX 50 series
       nvidiaSettings = true;
