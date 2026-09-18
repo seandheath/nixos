@@ -1,4 +1,4 @@
-{ config, lib, ... }:
+{ pkgs, ... }:
 # calibre-web ebook library, reachable through the home tailnet at
 # https://calibre.luckyobserver.com.
 #
@@ -10,6 +10,13 @@
 {
   services.calibre-web = {
     enable = true;
+    # nixpkgs packages the entry point in __init__.py, not __main__.py.
+    package = pkgs.calibre-web.overrideAttrs (old: {
+      postPatch = old.postPatch + ''
+        substituteInPlace pyproject.toml \
+          --replace-quiet 'calibreweb.__main__:main' 'calibreweb:main'
+      '';
+    });
     listen.ip = "127.0.0.1";
     listen.port = 8083;
     options = {
