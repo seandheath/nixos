@@ -53,8 +53,8 @@ in
   options.fleet.disk = {
     enable = lib.mkEnableOption "declarative disko layout for this host";
 
-    # Consumed only by `disko --mode destroy,format`; the booted system mounts by
-    # partlabel, so this path never has to be right on an already-installed machine.
+    # Disko partitions this path, and /boot uses its partition symlink so cloned disks
+    # with duplicate GPT labels cannot receive each other's boot-loader updates.
     system.device = lib.mkOption {
       type = lib.types.str;
       default = "/dev/disk/by-id/DISK-CONFIG-NOT-COMMITTED";
@@ -195,6 +195,9 @@ in
     };
 
     fileSystems = lib.genAttrs bootCritical (_: { neededForBoot = true; })
+      // {
+        "/boot".device = lib.mkForce "${cfg.system.device}-part1";
+      }
       // lib.optionalAttrs (cfg.data.device != null) {
         # Preserved, never in disko.devices: a multi-device btrfs mounts the whole array
         # off any member's shared UUID, and nothing here may reformat it.

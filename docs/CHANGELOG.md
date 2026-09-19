@@ -4,6 +4,8 @@ Also the decision log. Rationale that would otherwise bloat a code comment lives
 
 ## 2026-09-18 (native nightly updates)
 
+- Mount `/boot` through the configured system disk's by-id partition. Hydrogen had two
+  cloned ESP labels, so upgrades updated one disk while firmware booted the stale other.
 - Update all flake inputs together; advancing nixpkgs alone left SOPS using the removed
   Go 1.25 builder. Each host now builds its own candidate before activation, so a broken
   laptop or installer no longer blocks the server's updates.
