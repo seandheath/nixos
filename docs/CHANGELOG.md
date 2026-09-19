@@ -246,17 +246,6 @@ Also the decision log. Rationale that would otherwise bloat a code comment lives
   account authorizes that key, while OpenSSH's default `id_ed25519` is a different identity;
   without `IdentityFile` and `IdentitiesOnly`, pushes failed before reaching `git-shell`.
 
-## 2026-08-26 (read-only Porkbun domain search)
-
-- **Codex, Claude Code, OpenCode, and Qwen Code can query Porkbun.** The pinned MCP build
-  exposes only credential validation, availability, and pricing; registration, account, and
-  DNS tools do not exist in its tool surface. SOPS supplies a dedicated key at process start.
-- **RE containers omit Porkbun; `ccodex` includes it.** The RE agents do not need registrar
-  access, while the general Codex container receives only the two required secret files.
-- **The launcher supplies its own CA bundle.** Codex sanitizes the environment inherited by
-  stdio MCP children; without an explicit CA path, Node inside `ccodex` reduced every Porkbun
-  HTTPS failure to `fetch failed` even though the MCP transport itself was healthy.
-
 ## 2026-08-21 (isolated Codex)
 
 - **`ccodex` runs Codex `--yolo` inside rootless Podman.** The current working tree, a dedicated

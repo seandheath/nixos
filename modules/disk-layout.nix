@@ -48,6 +48,10 @@ let
   # sops-install-secrets runs during initrd activation, so every path it or the account
   # hashes touch has to be mounted before stage 2. disko does not set this itself.
   bootCritical = [ "/nix" "/persist" "/var/log" "/home" ];
+
+  systemMounts = [ "/nix" "/persist" "/var/log" ]
+    ++ lib.optional (cfg.rootMode == "subvol") "/"
+    ++ lib.optional homeOnSystemDisk "/home";
 in
 {
   options.fleet.disk = {
@@ -195,6 +199,12 @@ in
     };
 
     fileSystems = lib.genAttrs bootCritical (_: { neededForBoot = true; })
+      // lib.optionalAttrs (!cfg.system.encrypt) (lib.genAttrs systemMounts (_: {
+        device = lib.mkForce "${cfg.system.device}-part2";
+      }))
+      // lib.optionalAttrs (!homeOnSystemDisk && !cfg.home.encrypt) {
+        "/home".device = lib.mkForce "${cfg.home.device}-part1";
+      }
       // {
         "/boot".device = lib.mkForce "${cfg.system.device}-part1";
       }

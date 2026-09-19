@@ -166,8 +166,6 @@
           jackify
           minecraft-server-ctl
           minecraft-server-image
-          porkbun-domain-search-mcp
-          porkbun-mcp-domain-search
           qwen-code
           reference-download
           re-container

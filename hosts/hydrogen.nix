@@ -35,6 +35,12 @@ in
 
   fleet.bootGenerations = 20;
 
+  fileSystems."/backup" = {
+    device = "/dev/disk/by-id/nvme-Samsung_SSD_970_EVO_500GB_S5H7NJ0N419311D-part1";
+    fsType = "btrfs";
+    options = [ "noatime" "compress=zstd" ];
+  };
+
   # Nightly fleet builds share the SSD with service data.
   nix.gc.dates = "daily";
   nix.settings = {
@@ -82,7 +88,8 @@ in
       # Exit 1 from ExecCondition skips the run while a backup is active.
       if ! ${pkgs.util-linux}/bin/flock -n /run/lock/fleet-borg-backup.lock ${pkgs.coreutils}/bin/true \
         || ${pkgs.systemd}/bin/systemctl show --property=ActiveState --value \
-          fleet-borg-backup.service borgbackup-job-data.service borgbackup-job-remote.service \
+          fleet-borg-backup.service borgbackup-job-data.service borgbackup-job-ssd.service \
+          borgbackup-job-remote.service \
           postgresqlBackup-nextcloud.service postgresqlBackup-immich.service \
           | ${pkgs.gnugrep}/bin/grep -Eq '^(active|activating|deactivating)$'; then
         echo "Skipping automatic upgrade: a backup is running."
@@ -170,7 +177,7 @@ in
     # /data is RAID0 with no redundancy and both devices carry btrfs corruption_errs;
     # btrfs can detect corruption there but never repair it.
     smartmontools
-    vlc p7zip neovim tmux rsync go
+    vlc p7zip neovim tmux rsync go python3
   ];
 
   services.xserver.enable = true;

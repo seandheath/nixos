@@ -63,14 +63,6 @@ in
           # Only one model is served; split this out if a smaller one is ever added.
           small_model = "vllm/${config.sops.placeholder."openwebui-model"}";
 
-          # ReVa 7.3.0 serves at /mcp/message, not /mcp, and only while Ghidra has a program
-          # open -- which is also why loopback is correct.
-          mcp.reva = {
-            type = "remote";
-            url = "http://localhost:8080/mcp/message";
-            enabled = true;
-          };
-
           # `opencode --agent re`, or Tab. primary = selectable as a top-level agent.
           agent.re = {
             description = "Reverse engineering against the program currently open in Ghidra/ReVa";
@@ -93,18 +85,14 @@ in
           };
         };
 
-        hostConfig = baseConfig // {
-          mcp = baseConfig.mcp // {
-            porkbun = {
-              type = "local";
-              command = [ "porkbun-domain-search-mcp" ];
-              enabled = true;
-            };
-          };
-          permission = {
-            porkbun_ping = "allow";
-            porkbun_check_domain = "allow";
-            porkbun_get_pricing = "allow";
+        reConfig = baseConfig // {
+          # ReVa 7.3.0 serves at /mcp/message, not /mcp, and only while Ghidra has a
+          # program open. Keep it out of normal OpenCode sessions so they do not report
+          # a connection failure when Ghidra is closed.
+          mcp.reva = {
+            type = "remote";
+            url = "http://localhost:8080/mcp/message";
+            enabled = true;
           };
         };
       in {
@@ -114,12 +102,12 @@ in
 
         sops.templates."opencode.json" = {
           path = "${config.home.homeDirectory}/.config/opencode/opencode.json";
-          content = builtins.toJSON hostConfig;
+          content = builtins.toJSON baseConfig;
         };
 
         sops.templates."opencode-re.json" = {
           path = "${config.home.homeDirectory}/.config/opencode/opencode-re.json";
-          content = builtins.toJSON baseConfig;
+          content = builtins.toJSON reConfig;
         };
       }
     ) ];

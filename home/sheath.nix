@@ -24,7 +24,6 @@ let
     inherit pkgs;
     upstream = cclaudePackages;
   };
-  porkbunMcp = "${pkgs.porkbun-domain-search-mcp}/bin/porkbun-domain-search-mcp";
 in
 {
   imports = [
@@ -111,32 +110,6 @@ in
     };
     Install.WantedBy = [ "graphical-session.target" ];
   };
-
-  # Both native clients own mutable user configuration, so register the declarative command
-  # only when it differs. Their MCP processes load credentials from the SOPS-backed launcher.
-  # Claude is installed by its upstream installer under ~/.local, not by the cclaude flake:
-  # cclaude is a Podman wrapper with only bin/cclaude and an isolated config volume. Keep
-  # the native registration optional so a fresh machine without that installer can still
-  # activate Home Manager.
-  home.activation.porkbunMcpClients = lib.mkIf workstation
-    (lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      porkbun_command=${lib.escapeShellArg porkbunMcp}
-
-      codex_config="$(${pkgs.codex}/bin/codex mcp get porkbun 2>/dev/null || true)"
-      if [[ "$codex_config" != *"$porkbun_command"* ]]; then
-        run ${pkgs.codex}/bin/codex mcp remove porkbun >/dev/null 2>&1 || true
-        run ${pkgs.codex}/bin/codex mcp add porkbun -- "$porkbun_command"
-      fi
-
-      claude_bin="$HOME/.local/bin/claude"
-      if [[ -x "$claude_bin" ]]; then
-        claude_config="$("$claude_bin" mcp get porkbun 2>/dev/null || true)"
-        if [[ "$claude_config" != *"$porkbun_command"* ]]; then
-          run "$claude_bin" mcp remove porkbun --scope user >/dev/null 2>&1 || true
-          run "$claude_bin" mcp add --scope user porkbun -- "$porkbun_command"
-        fi
-      fi
-    '');
 
   home.username = osConfig.fleet.adminUser;
   home.homeDirectory = osConfig.users.users.${osConfig.fleet.adminUser}.home;

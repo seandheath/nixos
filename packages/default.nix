@@ -11,6 +11,14 @@ final: prev: {
   installer = import ./installer.nix { pkgs = final; };
   jackify = import ./jackify.nix { pkgs = final; };
 
+  # Bun 1.4 breaks OpenCode's split executable; nixpkgs has the same fix after our pin.
+  opencode = if prev.opencode.version == "1.18.30" then prev.opencode.overrideAttrs (previousAttrs: {
+    postPatch = previousAttrs.postPatch + ''
+      substituteInPlace packages/opencode/script/build.ts \
+        --replace-fail 'splitting: true,' 'splitting: false,'
+    '';
+  }) else prev.opencode;
+
   # Hold the jar at the fleet-wide pin rather than whatever the channel ships.
   #
   # This lived in modules/minecraft-server.nix, where it reached hydrogen but not the flake
@@ -28,8 +36,6 @@ final: prev: {
   minecraft-menu = import ./minecraft-menu { pkgs = final; };
   minecraft-server-image = import ./minecraft-server-image.nix { pkgs = final; };
   minecraft-server-ctl = import ./minecraft-server-ctl.nix { pkgs = final; };
-  porkbun-domain-search-mcp = import ./porkbun-domain-search-mcp.nix { pkgs = final; };
-  porkbun-mcp-domain-search = import ./porkbun-mcp-domain-search.nix { pkgs = final; };
   qwen-code = import ./qwen-code.nix { pkgs = final; };
   reference-download = import ./reference-download.nix { pkgs = final; };
   re-container = import ./re-container.nix { pkgs = final; };

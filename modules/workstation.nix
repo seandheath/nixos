@@ -35,12 +35,6 @@ in
     enable = true;
     terminal = "alacritty";
   };
-  environment.systemPackages = [ pkgs.porkbun-domain-search-mcp ];
-
-  # MCP launchers read these at process startup; no client config or Nix store path contains
-  # credentials.
-  sops.secrets.porkbun-api-key.owner = config.fleet.adminUser;
-  sops.secrets.porkbun-secret-api-key.owner = config.fleet.adminUser;
   sops.secrets.ynab-api-token.owner = config.fleet.adminUser;
 
   # Grant the active session user access to Cynthion's bootloader, Apollo, and analyzer
@@ -80,12 +74,7 @@ in
         settings="$HOME/.claude/settings.json"
         mkdir -p "$(dirname "$settings")"
         [ -s "$settings" ] || echo '{}' > "$settings"
-        ${pkgs.jq}/bin/jq '.permissions.allow = ((.permissions.allow // []) + [
-          "mcp__ReVa",
-          "mcp__porkbun__ping",
-          "mcp__porkbun__check_domain",
-          "mcp__porkbun__get_pricing"
-        ] | unique)' \
+        ${pkgs.jq}/bin/jq '.permissions.allow = ((.permissions.allow // []) + ["mcp__ReVa"] | unique)' \
           "$settings" > "$settings.tmp" && mv "$settings.tmp" "$settings"
       '';
     }) ];

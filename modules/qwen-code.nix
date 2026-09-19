@@ -24,24 +24,10 @@ let
     model.name = "$OPENWEBUI_MODEL";
     context.fileName = "QWEN.md";
 
-    mcpServers = {
-      # `httpUrl` selects StreamableHTTPClientTransport; ReVa does not serve SSE.
-      reva.httpUrl = "http://localhost:8080/mcp/message";
-      porkbun = {
-        command = "porkbun-domain-search-mcp";
-        includeTools = [ "ping" "check_domain" "get_pricing" ];
-        trust = true;
-      };
-    };
+    # `httpUrl` selects StreamableHTTPClientTransport; ReVa does not serve SSE.
+    mcpServers.reva.httpUrl = "http://localhost:8080/mcp/message";
 
-    # The MCP binary exposes only these three read-only calls, so trusting its tools cannot
-    # register domains, spend credit, inspect the account, or alter DNS.
     permissions.allow = [ "run_shell_command(python3 -c *)" ];
-  };
-
-  # The container launchers are RE-specific and deliberately receive no registrar secret.
-  reSettings = settings // {
-    mcpServers = builtins.removeAttrs settings.mcpServers [ "porkbun" ];
   };
 in
 {
@@ -67,7 +53,7 @@ in
     };
 
     home.file.".qwen/re-settings.json" = {
-      text = builtins.toJSON reSettings;
+      text = builtins.toJSON settings;
     };
 
     # Rendered into the one file qwen-code reads but never writes. Sub-module so `config` is

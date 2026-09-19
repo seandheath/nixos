@@ -1,5 +1,5 @@
 { config, pkgs, lib, ... }:
-# Borg backups of hydrogen's service data to /data/borg and offsite BorgBase.
+# Borg backups of hydrogen's service data to two local disks and offsite BorgBase.
 let
   home = config.users.users.${config.fleet.adminUser}.home;
 
@@ -97,6 +97,7 @@ let
 
 
   dataRepo = "/data/borg";
+  ssdRepo = "/backup/borg";
   # An identifier, not a credential: access needs borg-ssh-key + the passphrase.
   remoteRepo = "ssh://hl4nxm2t@hl4nxm2t.repo.borgbase.com/./repo";
   remoteRsh =
@@ -125,10 +126,10 @@ let
     usage() {
       ${pkgs.coreutils}/bin/cat >&2 <<'EOF'
 Usage:
-  borg-cmd backup [--data] [--remote]
-  borg-cmd <data|remote> <borg command> [arguments...]
+  borg-cmd backup [--data] [--ssd] [--remote]
+  borg-cmd <data|ssd|remote> <borg command> [arguments...]
 
-Without repository flags, `backup` archives data, then remote under one
+Without repository flags, `backup` archives data, SSD, then remote under one
 Minecraft checkpoint. The repository subcommands are for raw Borg maintenance.
 EOF
       exit 2
@@ -148,22 +149,24 @@ EOF
         while [ "$#" -gt 0 ]; do
           case "$1" in
             --data) add_target data ;;
+            --ssd) add_target ssd ;;
             --remote) add_target remote ;;
             --help|-h) usage ;;
             *) echo "borg-cmd backup: unknown flag: $1" >&2; usage ;;
           esac
           shift
         done
-        [ "''${#targets[@]}" -gt 0 ] || targets=(data remote)
+        [ "''${#targets[@]}" -gt 0 ] || targets=(data ssd remote)
         exec ${borgFleetRunner} "''${targets[@]}"
         ;;
-      data|remote)
+      data|ssd|remote)
         repo="$1"
         shift
         [ "$#" -gt 0 ] || usage
         export BORG_PASSCOMMAND=${lib.escapeShellArg passCommand}
         case "$repo" in
           data) export BORG_REPO=${lib.escapeShellArg dataRepo} ;;
+          ssd) export BORG_REPO=${lib.escapeShellArg ssdRepo} ;;
           remote)
             export BORG_REPO=${lib.escapeShellArg remoteRepo}
             export BORG_RSH=${lib.escapeShellArg remoteRsh}
@@ -200,6 +203,17 @@ in
     encryption = { mode = "repokey-blake2"; inherit passCommand; };
     compression = "zstd";
     prune = prune // { prefix = "hydrogen"; };
+    startAt = [ ];
+  };
+
+  services.borgbackup.jobs.ssd = {
+    paths = backupPaths;
+    exclude = backupExclude;
+    repo = ssdRepo;
+    encryption = { mode = "repokey-blake2"; inherit passCommand; };
+    compression = "zstd";
+    inherit prune;
+    startAt = [ ];
   };
 
   services.borgbackup.jobs.remote = {
@@ -210,6 +224,7 @@ in
     environment.BORG_RSH = remoteRsh;
     compression = "zstd";
     inherit prune;
+    startAt = [ ];
   };
 
   systemd.services.fleet-borg-backup = {
@@ -217,13 +232,14 @@ in
     startAt = "03:00";
     serviceConfig = {
       Type = "oneshot";
-      ExecStart = "${borgFleetRunner} data remote";
+      ExecStart = "${borgFleetRunner} data ssd remote";
     };
-    unitConfig.RequiresMountsFor = "/data";
+    unitConfig.RequiresMountsFor = [ "/data" "/backup" ];
   };
 
   # The data job writes to /data — don't run it before the disk is mounted.
   systemd.services.borgbackup-job-data.unitConfig.RequiresMountsFor = "/data";
+  systemd.services.borgbackup-job-ssd.unitConfig.RequiresMountsFor = "/backup";
 
   # The couch directory exists only once somebody has played. failOnWarnings = true and borg
   # treats a missing source as a warning, so on a fresh install this would fail the entire
