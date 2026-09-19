@@ -11,9 +11,8 @@
 #   packages/qwen-code.nix — so building the image from those is reproducible, needs no
 #   network at build time, and cannot drift from what `qwen`/`opencode` are on the host.
 #
-# Contents are deliberately minimal: a rogue agent can only execute what is in this list,
-# and there is no /nix/store mount or nix daemon socket to widen it (unlike cclaude, which
-# mounts both so Claude can run `nix develop`).
+# Contents are deliberately minimal. At runtime the launcher mounts the host store and Nix
+# daemon so agents can use project dev shells; unrelated host files remain unmounted.
 let
   qwen-code = import ./qwen-code.nix { inherit pkgs; };
 
@@ -60,12 +59,7 @@ let
       exec "$@"
     '';
   };
-in
-pkgs.dockerTools.buildLayeredImage {
-  name = "localhost/re-agents";
-  tag = "latest";
-
-  contents = [
+  runtimePaths = [
     qwen-code
     pkgs.opencode
 
@@ -108,6 +102,19 @@ pkgs.dockerTools.buildLayeredImage {
     entrypoint
   ];
 
+  # The launcher replaces the image's store with the host store so Nix dev shells work.
+  # Keep every image command alive on the host across garbage collection.
+  runtime = pkgs.symlinkJoin {
+    name = "re-container-runtime";
+    paths = runtimePaths;
+  };
+in
+(pkgs.dockerTools.buildLayeredImage {
+  name = "localhost/re-agents";
+  tag = "latest";
+
+  contents = runtimePaths;
+
   # $HOME is a named volume mounted at runtime with podman's `,U` (chown to the container
   # user); the mountpoint still has to exist in the image for a read-only rootfs.
   #
@@ -141,4 +148,6 @@ pkgs.dockerTools.buildLayeredImage {
       "TERMINFO_DIRS=/share/terminfo"
     ];
   };
-}
+}).overrideAttrs (old: {
+  passthru = (old.passthru or { }) // { inherit runtime; };
+})

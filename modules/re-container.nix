@@ -1,9 +1,8 @@
 { pkgs, ... }:
 
-# `cqwen` and `copencode`: the RE agents in a rootless Podman sandbox rather than directly
-# on the host. Both are driven by a remote model and handed a shell tool, so uncontained
-# they reach SSH keys, GPG and this config. Modelled on the cclaude flake, whose security
-# flags are the known-good reference. The host `qwen`/`opencode` stay as a fallback.
+# `cqwen` and `copencode`: the RE agents in a rootless Podman container. Their OpenCode
+# permissions are unrestricted and the host Nix store/daemon are available so project
+# flakes work, while unrelated home-directory data remains outside the mount namespace.
 #
 # WHAT THIS DOES NOT PROTECT: the Ghidra database. ReVa's write tools act on the live
 # program on the HOST, through the MCP connection this deliberately punches through the
@@ -37,7 +36,10 @@ let
 
   # Shared launcher. $1 is the in-container command; the rest are the user's args.
   #
-  # Mounts: cwd -> /<basename> read-write, the only writable path touching the host. qwen's
+  # Mounts: cwd -> the same absolute path read-write. Keeping the path identical lets host
+  # OpenCode sessions resume in copencode without their absolute file references becoming
+  # inaccessible external directories. The host Nix store, daemon, profiles, and current
+  # system are also mounted so the project's flake can supply tools. qwen's
   # settings.json and QWEN.md go to /run/config/qwen read-only because the entrypoint has to
   # copy them into $HOME (qwen-code rewrites settings.json on startup); opencode.json goes
   # straight into $HOME since OpenCode only reads it. re-instructions.md is mounted at its
@@ -54,9 +56,9 @@ let
     fi
 
     project_dir="$(pwd)"
-    # Podman container names must match [a-zA-Z0-9][a-zA-Z0-9_.-]*, and the basename is also
-    # the in-container mount point, so map anything outside that set to '-'. Same treatment
-    # as cclaude's, including keeping \n so basename's trailing newline survives.
+    # Podman container names must match [a-zA-Z0-9][a-zA-Z0-9_.-]*, so map anything outside
+    # that set to '-'. Same treatment as cclaude's, including keeping \n so basename's
+    # trailing newline survives.
     project_name="$(basename "$project_dir" | tr -c 'a-zA-Z0-9_.\n-' '-')"
 
     # Host config paths. These are all symlinks — into the nix store for the home-manager
@@ -97,11 +99,18 @@ let
       --tmpfs /tmp:rw,nosuid,nodev,size=2g,mode=1777 \
       -v re-agents-home:/home/re:rw,U \
       \
-      -v "''${project_dir}:/''${project_name}:rw" \
+      -v "''${project_dir}:''${project_dir}:rw" \
+      -v /nix/store:/nix/store:ro \
+      -v /nix/var/nix/daemon-socket:/nix/var/nix/daemon-socket \
+      -v /nix/var/nix/profiles:/nix/var/nix/profiles:ro \
+      -v /run/current-system:/run/current-system:ro \
       \
       --network=pasta:-T,8080 \
       \
       -e HOME=/home/re \
+      -e PATH=/bin:/run/current-system/sw/bin \
+      -e NIX_REMOTE=daemon \
+      -e 'NIX_CONFIG=experimental-features = nix-command flakes' \
       -e TERM="''${TERM:-xterm-256color}" \
       -e COLORTERM="''${COLORTERM:-truecolor}" \
       \
@@ -109,18 +118,18 @@ let
       "''${env_args[@]}" \
       ${extraArgs} \
       \
-      -w "/''${project_name}" \
+      -w "''${project_dir}" \
       ${imageName} \
       ${cmd} "$@"
   '';
 
-  # qwen-code's install is RE-only (its ~/.qwen carries ReVa and the RE context file), so
-  # there is no agent flag to pass. OpenCode is a general coding tool whose RE behaviour
-  # lives in a named agent, hence --agent re.
+  # qwen-code's install is RE-only (its ~/.qwen carries ReVa and the RE context file).
+  # OpenCode's RE config selects its named agent by default, leaving subcommands such as
+  # `import` free of a leading --agent flag that OpenCode misparses.
   cqwen = mkLauncher "cqwen" "" "qwen";
-  copencode = mkLauncher "copencode" "" "opencode --agent re";
+  copencode = mkLauncher "copencode" "" "opencode";
   cqwen-shell = mkLauncher "cqwen-shell" "" "bash";
 in
 {
-  environment.systemPackages = [ cqwen copencode cqwen-shell cqwen-build ];
+  environment.systemPackages = [ cqwen copencode cqwen-shell cqwen-build image.runtime ];
 }

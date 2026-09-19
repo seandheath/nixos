@@ -51,6 +51,13 @@ pkgs.ghidra-bin.overrideAttrs (old: {
     # Ghidra creates a lock file next to each loaded extension. The store is
     # read-only, so pre-create it — same trick as nixpkgs' with-extensions.nix.
     touch "$out/lib/ghidra/Ghidra/Extensions/reverse-engineering-assistant/.dbDirLock"
+
+    # The upstream Linux launcher forces 1x scaling, which is unreadable on sulfur's
+    # 3840x2400 panel. This is Ghidra's documented HiDPI control.
+    substituteInPlace "$out/lib/ghidra/support/launch.properties" \
+      --replace-fail \
+        'VMARGS_LINUX=-Dsun.java2d.uiScale=1' \
+        'VMARGS_LINUX=-Dsun.java2d.uiScale=2'
   '';
 
   meta = old.meta // {

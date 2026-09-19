@@ -86,6 +86,11 @@ in
         };
 
         reConfig = baseConfig // {
+          default_agent = "re";
+          permission = "allow";
+          agent = baseConfig.agent // {
+            re = baseConfig.agent.re // { permission = "allow"; };
+          };
           # ReVa 7.3.0 serves at /mcp/message, not /mcp, and only while Ghidra has a
           # program open. Keep it out of normal OpenCode sessions so they do not report
           # a connection failure when Ghidra is closed.
