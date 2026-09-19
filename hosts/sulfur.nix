@@ -3,6 +3,12 @@
 
 let
   devices = import ../modules/family/devices.nix;
+  qbittorrentWithJackett = pkgs.writeShellScriptBin "qbittorrent" ''
+    set -e
+    ${pkgs.systemd}/bin/systemctl --user start jackett.service
+    trap '${pkgs.systemd}/bin/systemctl --user stop jackett.service' EXIT
+    ${pkgs.qbittorrent}/bin/qbittorrent "$@"
+  '';
 in
 {
   imports = [
@@ -29,6 +35,14 @@ in
   sops.secrets.minecraft-control-sulfur = {
     owner = config.fleet.adminUser;
     mode = "0400";
+  };
+
+  systemd.user.services.jackett = {
+    description = "Jackett";
+    serviceConfig = {
+      ExecStart = "${pkgs.jackett}/bin/Jackett --NoUpdates --Port 9117 --DataFolder %h/.config/Jackett";
+      Restart = "on-failure";
+    };
   };
 
   fleet.bootGenerations = 20;
@@ -77,6 +91,7 @@ in
     file
     btrfs-progs
     jackify
+    (lib.hiPrio qbittorrentWithJackett)
   ];
 
   services.asusd.enable = true;
