@@ -2,6 +2,18 @@
 
 Also the decision log. Rationale that would otherwise bloat a code comment lives here.
 
+## 2026-09-20 (Sulfur lockup panics)
+
+- Panic on hard/soft lockup, hung task and oops, rebooting after 20 s. Eighteen of 24
+  boots since September 4 ended with a silent journal: the NMI watchdog only warns, and
+  a warning cannot reach disk from a locked kernel, so efi_pstore was never written.
+- The boot-time bank-0 machine checks follow clean shutdowns only, never a freeze; they
+  are not the cause. Same-generation boots both pass and freeze, so neither is a
+  kernel or driver bump. Five recent freezes came hours after lid close on AC.
+- An empty pstore after the next freeze places the fault below the kernel. Next trial:
+  `intel_idle.max_cstate=1`.
+- Removal gate: drop these sysctls once the freeze is identified.
+
 ## 2026-09-18 (native nightly updates)
 
 - Mount `/boot` through the configured system disk's by-id partition. Hydrogen had two

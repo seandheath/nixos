@@ -172,6 +172,12 @@ in
 
   # SysRq: diagnostic dumps (8) + sync (16), used by the keyd shortcut below.
   boot.kernel.sysctl."kernel.sysrq" = 24;
+  # A detected lockup must panic or efi_pstore never records it. see CHANGELOG 2026-09-20
+  boot.kernel.sysctl."kernel.hardlockup_panic" = 1;
+  boot.kernel.sysctl."kernel.softlockup_panic" = 1;
+  boot.kernel.sysctl."kernel.hung_task_panic" = 1;
+  boot.kernel.sysctl."kernel.panic_on_oops" = 1;
+  boot.kernel.sysctl."kernel.panic" = 20;
   # Bound ordinary journal buffering before a hard lockup or forced power-off.
   services.journald.settings.Journal.SyncIntervalSec = "30s";
 
