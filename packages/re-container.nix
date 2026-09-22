@@ -111,7 +111,10 @@ let
 in
 (pkgs.dockerTools.buildLayeredImage {
   name = "localhost/re-agents";
-  tag = "latest";
+  # Tag by content so the launcher's `image exists` check fails, and reloads, whenever the
+  # image changes. A fixed tag left a stale image whose /etc symlinks pointed into
+  # GC'd store paths, and crun cannot create those under the read-only host store mount.
+  tag = builtins.substring 0 32 (baseNameOf runtime.outPath);
 
   contents = runtimePaths;
 

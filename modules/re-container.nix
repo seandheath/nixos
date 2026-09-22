@@ -25,7 +25,7 @@
 # Needs rootless podman, set up in modules/virtualisation.nix.
 let
   image = pkgs.re-container;
-  imageName = "localhost/re-agents:latest";
+  imageName = "${image.imageName}:${image.imageTag}";
   podman = "${pkgs.podman}/bin/podman";
 
   # The image is already a store path, so this is just an import.
