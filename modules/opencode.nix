@@ -14,6 +14,8 @@ in
   # client-neutral, since the two name the shell tool differently. NOT called AGENTS.md:
   # OpenCode auto-loads that into every session, where this prose is noise.
   home-manager.users.${config.fleet.adminUser} = {
+    xdg.configFile."opencode/AGENTS.md".source = ../prompts/AGENTS.md;
+
     xdg.configFile."opencode/re-instructions.md" = {
       source = ../prompts/re-agent.md;
       force = true;

@@ -59,9 +59,10 @@ in
       nix-direnv.enable = true;
     };
 
-    # Claude Code global config. Sourced from the repo CLAUDE.md so there is one copy.
-    home.file.".claude/CLAUDE.md".source = ../CLAUDE.md;
+    # One instruction source for Claude and Codex, including their containers.
+    home.file.".claude/CLAUDE.md".source = ../prompts/AGENTS.md;
     home.file.".claude/CLAUDE.md".force = true;
+    home.file.".codex/AGENTS.md".source = ../prompts/AGENTS.md;
 
     # Claude Code permission rules, merged rather than declared: settings.json is NOT a
     # home.file because Claude Code writes to it itself, and a read-only store symlink makes
