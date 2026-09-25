@@ -17,7 +17,14 @@
 
     # Communication and collaboration
     element-desktop
-    signal-desktop
+    # Chromium's Wayland CSD frame ignores gtk-theme=Adwaita-dark; GTK_THEME forces it.
+    # Per-app, not session-wide: GTK_THEME breaks libadwaita styling in GNOME apps.
+    (symlinkJoin {
+      name = "signal-desktop";
+      paths = [ signal-desktop ];
+      nativeBuildInputs = [ makeWrapper ];
+      postBuild = "wrapProgram $out/bin/signal-desktop --set GTK_THEME Adwaita:dark";
+    })
     discord
     thunderbird
     nextcloud-client
