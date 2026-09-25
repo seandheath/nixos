@@ -96,9 +96,11 @@ in
           # ReVa 7.3.0 serves at /mcp/message, not /mcp, and only while Ghidra has a
           # program open. Keep it out of normal OpenCode sessions so they do not report
           # a connection failure when Ghidra is closed.
+          # 127.0.0.1, not localhost: in the container that resolves to ::1, which pasta -T
+          # forwards to the host's ::1 where ReVa (IPv4-only loopback) is not listening.
           mcp.reva = {
             type = "remote";
-            url = "http://localhost:8080/mcp/message";
+            url = "http://127.0.0.1:8080/mcp/message";
             enabled = true;
           };
         };
