@@ -21,46 +21,18 @@ let
     # Keep the commands hidden by the host /nix/store mount alive across garbage collection:
     # ${runtime}
 
-    allow_usb=false
-    allow_uart=false
+    . ${../packages/container-devices.sh}
+
     enable_ynab=false
     forwarded_args=()
     for arg in "$@"; do
-      if [[ "$arg" == --allow-usb ]]; then
-        allow_usb=true
-      elif [[ "$arg" == --allow-uart ]]; then
-        allow_uart=true
-      elif [[ "$arg" == --ynab ]]; then
+      if [[ "$arg" == --ynab ]]; then
         enable_ynab=true
       else
         forwarded_args+=("$arg")
       fi
     done
     set -- "''${forwarded_args[@]}"
-
-    usb_args=()
-    if $allow_usb; then
-      if [[ ! -d /dev/bus/usb ]]; then
-        printf '%s\n' 'ccodex: --allow-usb requested, but /dev/bus/usb is unavailable' >&2
-        exit 1
-      fi
-      # Mount the bus directory so devices that reconnect or re-enumerate remain visible.
-      # keep-groups preserves access granted through host udev groups as well as ACLs.
-      usb_args=(-v /dev/bus/usb:/dev/bus/usb:rw)
-    fi
-
-    uart_args=()
-    if $allow_uart; then
-      for device in /dev/ttyACM* /dev/ttyUSB*; do
-        [[ -c "$device" ]] || continue
-        uart_args+=(--device "$device:$device:rw")
-      done
-    fi
-
-    device_group_args=()
-    if $allow_usb || $allow_uart; then
-      device_group_args=(--group-add=keep-groups)
-    fi
 
     ynab_args=()
     if $enable_ynab; then
@@ -157,9 +129,7 @@ let
       --security-opt label=disable \
       --read-only \
       --tmpfs /tmp:rw,nosuid,nodev,size=2g,mode=1777 \
-      "''${usb_args[@]}" \
-      "''${uart_args[@]}" \
-      "''${device_group_args[@]}" \
+      "''${device_args[@]}" \
       "''${ynab_args[@]}" \
       -v ccodex-home:/home/codex:rw,U \
       -v "''${codex_home}:''${codex_home}:rw" \

@@ -16,6 +16,8 @@
 # a COPY of the project, not the primary one. "It's in a container" says nothing about the
 # database on the other end of the socket.
 #
+# `--allow-usb` / `--allow-uart` opt into host USB / serial access (packages/container-devices.sh).
+#
 # `--network=pasta:-T,8080` forwards the container's localhost:8080 to the host's, which is
 # the only way to reach ReVa -- it binds loopback, and podman's host.containers.internal is
 # pasta's gateway, where 8080 is unreachable. Measured from inside: host 8080 reachable,
@@ -49,6 +51,8 @@ let
   # written into the persistent home volume.
   mkLauncher = name: extraArgs: cmd: pkgs.writeShellScriptBin name ''
     set -euo pipefail
+
+    . ${../packages/container-devices.sh}
 
     if ! ${podman} image exists ${imageName} 2>/dev/null; then
       printf '%s: image not found, loading...\n' "${name}" >&2
@@ -118,6 +122,7 @@ let
       \
       "''${config_args[@]}" \
       "''${env_args[@]}" \
+      "''${device_args[@]}" \
       ${extraArgs} \
       \
       -w "''${project_dir}" \

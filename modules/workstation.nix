@@ -1,14 +1,18 @@
 { config, pkgs, lib, ... }:
 
 let
-  cynthionUdevRules = pkgs.writeTextFile {
-    name = "cynthion-cable-udev-rules";
-    destination = "/lib/udev/rules.d/60-cynthion-cable.rules";
+  devBoardUdevRules = pkgs.writeTextFile {
+    name = "dev-board-udev-rules";
+    destination = "/lib/udev/rules.d/60-dev-boards.rules";
     text = ''
+      # Cynthion: bootloader, Apollo, analyzer.
       SUBSYSTEM=="usb", ATTR{idVendor}=="1d50", ATTR{idProduct}=="615b", TAG+="uaccess"
       SUBSYSTEM=="usb", ATTR{idVendor}=="1d50", ATTR{idProduct}=="615c", TAG+="uaccess"
       SUBSYSTEM=="usb", ATTR{idVendor}=="1209", ATTR{idProduct}=="0010", TAG+="uaccess"
       SUBSYSTEM=="usb", ATTR{idVendor}=="1209", ATTR{idProduct}=="0001", TAG+="uaccess"
+      # TI XDS110 debug probe (LaunchPads): runtime and firmware-update modes.
+      SUBSYSTEM=="usb", ATTR{idVendor}=="0451", ATTR{idProduct}=="bef3", TAG+="uaccess"
+      SUBSYSTEM=="usb", ATTR{idVendor}=="0451", ATTR{idProduct}=="bef4", TAG+="uaccess"
     '';
   };
 in
@@ -37,9 +41,9 @@ in
   };
   sops.secrets.ynab-api-token.owner = config.fleet.adminUser;
 
-  # Grant the active session user access to Cynthion's bootloader, Apollo, and analyzer
-  # USB identities without requiring a plugdev group.
-  services.udev.packages = [ cynthionUdevRules ];
+  # Grant the active session user access to dev-board USB identities without a plugdev
+  # group. The container launchers' --allow-usb rides on these ACLs via keep-id.
+  services.udev.packages = [ devBoardUdevRules ];
 
   # Avahi for network printer discovery (.local hostname resolution)
   services.avahi = {
