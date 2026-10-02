@@ -69,6 +69,11 @@ essentials.
 - Validate untrusted input at boundaries, handle failures that could lose data,
   and never commit secrets or implement cryptographic primitives.
 
+## Diagrams
+
+- Terminals don't render Mermaid. When a diagram helps, write it to a `.mmd` file,
+  render with `mmdc -i x.mmd -o x.svg` (or `.png`), and give the user the output path.
+
 ## NixOS configuration
 
 - Prefer declarative module options over scripts that adjust live settings.

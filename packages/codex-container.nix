@@ -31,6 +31,7 @@ let
     paths = with pkgs; [
       codex
       nodejs # Ponytail plugin lifecycle hooks.
+      mmdc
       nix
       git
       git-lfs

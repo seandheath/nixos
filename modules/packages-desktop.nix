@@ -9,6 +9,7 @@
     # Document creation and processing
     tectonic
     pandoc
+    mmdc
     recoll
     evince
     poppler-utils

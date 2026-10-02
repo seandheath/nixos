@@ -11,6 +11,13 @@ final: prev: {
   installer = import ./installer.nix { pkgs = final; };
   jackify = import ./jackify.nix { pkgs = final; };
 
+  # mermaid-cli for agents. The containers have no fonts (text renders blank) and their
+  # dropped caps break Chromium's sandbox; the input is the agent's own diagram.
+  mmdc = final.writeShellScriptBin "mmdc" ''
+    export FONTCONFIG_FILE=${final.makeFontsConf { fontDirectories = [ final.dejavu_fonts ]; }}
+    exec ${final.mermaid-cli}/bin/mmdc -p ${final.writeText "puppeteer.json" (builtins.toJSON { args = [ "--no-sandbox" ]; })} "$@"
+  '';
+
   # Bun 1.4 breaks OpenCode's split executable; nixpkgs has the same fix after our pin.
   opencode = if prev.opencode.version == "1.18.30" then prev.opencode.overrideAttrs (previousAttrs: {
     postPatch = previousAttrs.postPatch + ''

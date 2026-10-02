@@ -73,6 +73,7 @@ let
     # pre-approved path; poppler-utils remains available for page-aware ad-hoc inspection.
     pkgs.reference-download
     pkgs.poppler-utils
+    pkgs.mmdc
 
     # Reading a reference source tree (see the "Reference source" section of the prompt).
     # Both agents have ripgrep-backed search tools of their own, but they also shell out to

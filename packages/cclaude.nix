@@ -92,6 +92,7 @@ pkgs.writeShellScriptBin "cclaude" ''
     "''${device_args[@]}" \
     "''${ynab_args[@]}" \
     -v /nix/store:/nix/store:ro \
+    -v ${pkgs.mmdc}/bin/mmdc:/usr/local/bin/mmdc:ro \
     -v /nix/var/nix/daemon-socket:/nix/var/nix/daemon-socket \
     -v /nix/var/nix/profiles:/nix/var/nix/profiles:ro \
     -e CLAUDE_CODE_OAUTH_TOKEN="''${token}" \
