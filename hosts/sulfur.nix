@@ -46,6 +46,9 @@ in
   };
 
   fleet.bootGenerations = 20;
+  # Keep the local C1-only freeze trial from being replaced by the remote checkout.
+  # Re-enable after the trial concludes or its settings are published.
+  systemd.timers.nixos-upgrade.enable = lib.mkForce false;
   fleet.tailscaleClient = {
     enable = true;
     tags = [ "tag:admin" ];

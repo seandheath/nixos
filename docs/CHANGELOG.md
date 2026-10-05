@@ -2,6 +2,52 @@
 
 Also the decision log. Rationale that would otherwise bloat a code comment lives here.
 
+## 2026-10-05 (aarch64 emulation)
+
+- sulfur registers qemu-user for `aarch64-linux` (`boot.binfmt.emulatedSystems`), so
+  `cclaude`, `copencode`, and `ccodex` can build aarch64 NixOS closures. They build
+  through the host daemon socket, so no container change was needed. If emulated
+  builds of large uncached closures are too slow, add a remote aarch64 builder.
+
+## 2026-10-02 (OpenCode --reva)
+
+- `opencode` and `copencode` default to general coding; add `--reva` to load
+  the RE agent and connect to `http://127.0.0.1:8080/mcp/message`. Host OpenCode keeps
+  its permission prompts; container OpenCode permits tools within the existing rootless
+  Podman boundary. ReVa mode forwards only host loopback port 8080. `cqwen` keeps its
+  existing RE behavior. Pass wrapper flags before an upstream `--`.
+- Offline launcher/configuration regression check:
+  `python3 tests/test_agent_launchers.py /path/to/pinned/nixpkgs`.
+- Remove `aider-chat`: its tests fail against current litellm and qwen-code/opencode/
+  codex cover it. DeepSeek Harness was trialled and dropped before landing.
+
+## 2026-09-30 (Sulfur C1-only trial)
+
+- The September 30 boot ends at 21:40:00 EDT during active use; keyboard and mouse
+  stopped responding and the user forced a reboot. No shutdown, suspend, OOM, runtime
+  GPU fault, or lockup panic was recorded. EFI pstore was registered and enabled, but
+  systemd found it empty after reboot. This does not establish a hardware cause.
+- Add the previously planned `intel_idle.max_cstate=1` trial. The current driver exposes
+  `POLL`, `C1_ACPI`, `C2_ACPI`, and `C3_ACPI`; the parameter limits it to the first regular
+  idle state. Expect higher idle power use and potentially more heat. It requires reboot;
+  remove it if a freeze recurs with only C1 exposed. See the
+  [kernel documentation](https://www.kernel.org/doc/html/v6.15/admin-guide/pm/intel_idle.html#kernel-command-line-options-and-module-parameters).
+- Evidence: `/home/sheath/diagnostics/sulfur-2026-09-30-2140`.
+- Pause sulfur's unattended rebuilds so they cannot overwrite the local trial as they
+  did on September 18. Re-enable after the trial concludes or its settings are published.
+
+## 2026-09-28 (hotplug-safe --allow-uart)
+
+- **Serial ports are now at `/dev/uart/ttyACM*` inside containers, and survive replugging.**
+  `podman --device` in rootless mode bind-mounts the host inode at create time; unplugging
+  deletes that inode and the container's node reads `//deleted` in mountinfo. The host now
+  keeps `/dev/uart/<port>` bound to `/dev/<port>` via udev `SYSTEMD_WANTS` +
+  `uart-bind@.service` (`BindsTo=dev-%i.device`), and launchers mount `/dev/uart` with
+  `rslave`, so binds propagate live. Binding the whole `/dev` was rejected: the user's
+  `input`/`video` groups would expose keyboard and webcam nodes to the sandbox.
+- Tools that auto-detect ports via `/sys/class/tty` will not find them; pass the path.
+- The 2026-09-05 note "restart the container after reconnecting" no longer applies.
+
 ## 2026-09-20 (Sulfur lockup panics)
 
 - Panic on hard/soft lockup, hung task and oops, rebooting after 20 s. Eighteen of 24
@@ -10,8 +56,9 @@ Also the decision log. Rationale that would otherwise bloat a code comment lives
 - The boot-time bank-0 machine checks follow clean shutdowns only, never a freeze; they
   are not the cause. Same-generation boots both pass and freeze, so neither is a
   kernel or driver bump. Five recent freezes came hours after lid close on AC.
-- An empty pstore after the next freeze places the fault below the kernel. Next trial:
-  `intel_idle.max_cstate=1`.
+- An empty pstore after the next freeze would leave a CPU/firmware idle-transition fault
+  as a candidate, not prove it: lockup detection and crash writes can also fail.
+  Next trial: `intel_idle.max_cstate=1` (prepared September 30).
 - Removal gate: drop these sysctls once the freeze is identified.
 
 ## 2026-09-18 (native nightly updates)

@@ -12,6 +12,8 @@
 
   boot.kernelParams = [
     "nvme_core.default_ps_max_latency_us=0"
+    # Diagnostic trial after silent hard freezes; remove if freezes recur with C1 only.
+    "intel_idle.max_cstate=1"
     "i915.enable_psr=0"  # Disable PSR to fix aux errors on Arrow Lake graphics
 
     # Keep this panel's working Intel DPCD backlight interface (3 = force Intel).

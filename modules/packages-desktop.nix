@@ -40,10 +40,9 @@
     # gemini-cli removed 2026-08-11: nixpkgs marks it for removal upstream -- Google
     # moved unpaid and AI Pro/Ultra tiers to Antigravity CLI, so the package is on its
     # way out of the tree rather than merely stale. packages/qwen-code.nix (a
-    # gemini-cli fork) and aider-chat below cover the same ground.
+    # gemini-cli fork) covers the same ground.
     git
     python3
-    aider-chat
     codex   # OpenAI Codex CLI; auth via `codex login`, config in ~/.codex
     gnumake
     nodejs

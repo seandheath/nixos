@@ -69,6 +69,13 @@ essentials.
 - Validate untrusted input at boundaries, handle failures that could lose data,
   and never commit secrets or implement cryptographic primitives.
 
+## Containers
+
+- Inside cclaude/ccodex/copencode, serial ports are at `/dev/uart/ttyACM*` or
+  `/dev/uart/ttyUSB*`, not `/dev/tty*`; they come and go with the device. Tools that
+  auto-detect ports via `/sys/class/tty` won't find them, so pass the path explicitly.
+  The USB bus is at `/dev/bus/usb`.
+
 ## Diagrams
 
 - Terminals don't render Mermaid. When a diagram helps, write it to a `.mmd` file,

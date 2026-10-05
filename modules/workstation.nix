@@ -41,9 +41,40 @@ in
   };
   sops.secrets.ynab-api-token.owner = config.fleet.adminUser;
 
+  # Container launchers build through the host daemon; this lets them build aarch64-linux.
+  boot.binfmt.emulatedSystems = [ "aarch64-linux" ];
+
   # Grant the active session user access to dev-board USB identities without a plugdev
   # group. The container launchers' --allow-usb rides on these ACLs via keep-id.
   services.udev.packages = [ devBoardUdevRules ];
+
+  # --allow-uart: podman --device snapshots the host inode at create time, so a replugged
+  # port is a dead mount inside the container. Instead keep /dev/uart/<port> bound to
+  # /dev/<port> for the device's lifetime; containers mount /dev/uart rslave so the binds
+  # propagate in and out live. Whole-/dev was rejected: it would leak input/video nodes.
+  services.udev.extraRules = ''
+    SUBSYSTEM=="tty", KERNEL=="ttyACM*|ttyUSB*", TAG+="systemd", ENV{SYSTEMD_WANTS}+="uart-bind@%k.service"
+  '';
+  # Exists from boot so containers can start before any port is plugged.
+  systemd.tmpfiles.rules = [ "d /dev/uart 0755 root root -" ];
+  systemd.services."uart-bind@" = {
+    description = "Bind /dev/%i to /dev/uart/%i for containers";
+    bindsTo = [ "dev-%i.device" ];
+    after = [ "dev-%i.device" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+      ExecStart = "${pkgs.writeShellScript "uart-bind" ''
+        set -e
+        mkdir -p /dev/uart
+        touch "/dev/uart/$1"
+        exec ${pkgs.util-linux}/bin/mount --bind "/dev/$1" "/dev/uart/$1"
+      ''} %i";
+      # Lazy: a container may still hold the port open when it is unplugged.
+      ExecStop = "${pkgs.util-linux}/bin/umount -l /dev/uart/%i";
+      ExecStopPost = "${pkgs.coreutils}/bin/rm -f /dev/uart/%i";
+    };
+  };
 
   # Avahi for network printer discovery (.local hostname resolution)
   services.avahi = {

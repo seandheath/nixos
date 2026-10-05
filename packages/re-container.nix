@@ -1,15 +1,15 @@
 { pkgs }:
 
-# Container image for the sandboxed RE agents (`cqwen` / `copencode`, see
-# modules/re-container.nix). Both agents are driven by a remote model and handed a shell
+# Container image for `cqwen` and `copencode` (see modules/re-container.nix).
+# The agents are driven by a remote model and handed a shell
 # tool, so this bounds what a rogue or confused one can reach on the host.
 #
 # Why dockerTools.buildLayeredImage rather than a Containerfile:
 #   cclaude (the reference this is modelled on) builds from debian:bookworm-slim and
 #   installs Claude Code with a curl-to-bash installer, because that is how Claude Code
-#   ships. Both agents here already exist as Nix packages — including the version-pinned
+#   ships. The agents here already exist as Nix packages — including the version-pinned
 #   packages/qwen-code.nix — so building the image from those is reproducible, needs no
-#   network at build time, and cannot drift from what `qwen`/`opencode` are on the host.
+#   network at image build time, and use the same tools as the host.
 #
 # Contents are deliberately minimal. At runtime the launcher mounts the host store and Nix
 # daemon so agents can use project dev shells; unrelated host files remain unmounted.
@@ -126,8 +126,10 @@ in
   # --tmpfs rejects `uid=`, so the tmpfs lands owned by the namespace root and the uid-1000
   # agent cannot write to it. The volume is the same mechanism cclaude uses, and it buys
   # persistent session history. Nothing secret is written there — see the entrypoint note.
+  #
+  # .config/opencode is pre-created: podman would otherwise make it root-owned after `,U`.
   fakeRootCommands = ''
-    mkdir -p .${homeDir} .tmp
+    mkdir -p .${homeDir}/.config/opencode .tmp
     chown -R ${toString uid}:${toString uid} .${homeDir}
     chmod 1777 .tmp
   '';

@@ -1,13 +1,24 @@
-{ config, pkgs, ... }:
+{ config, pkgs, lib, ... }:
 let
   vllm = import ./vllm-endpoint.nix;
+  launcher = pkgs.writeShellScriptBin "opencode" ''
+    set -euo pipefail
+    . ${../packages/reva-flag.sh}
+    if $reva; then
+      export OPENCODE_CONFIG="$HOME/.config/opencode/opencode-re.json"
+      if [[ ! -r "$OPENCODE_CONFIG" ]]; then
+        echo 'opencode: ReVa configuration is missing; apply home-manager first' >&2
+        exit 1
+      fi
+    fi
+    exec ${pkgs.opencode}/bin/opencode "$@"
+  '';
 in
 
-# OpenCode: the agent loop of the RE stack, pointed at the remote vLLM
-# (modules/vllm-endpoint.nix) and Ghidra's ReVa MCP server (packages/ghidra-reva.nix).
+# OpenCode on Althatech; --reva opts into Ghidra's MCP server and the RE prompt.
 # Imported from workstation.nix, which is the host gate -- hydrogen never evaluates this.
 {
-  environment.systemPackages = [ pkgs.opencode pkgs.reference-download ];
+  environment.systemPackages = [ (lib.hiPrio launcher) pkgs.reference-download ];
   environment.variables.OPENCODE_ENABLE_EXA = "1";
 
   # prompts/re-agent.md is the canonical copy, shared with qwen-code.nix; keep it
@@ -28,8 +39,7 @@ in
       force = true;
     };
 
-    # The host config includes domain search; the RE-container copy omits it so registrar
-    # credentials never enter a general-purpose agent sandbox with unrestricted outbound net.
+    # Host and container configs share the provider; only the container pre-approves tools.
     imports = [ ({ config, lib, ... }:
       let
         baseConfig = {
@@ -65,7 +75,10 @@ in
           # Only one model is served; split this out if a smaller one is ever added.
           small_model = "vllm/${config.sops.placeholder."openwebui-model"}";
 
-          # `opencode --agent re`, or Tab. primary = selectable as a top-level agent.
+        };
+
+        reConfig = baseConfig // {
+          default_agent = "re";
           agent.re = {
             description = "Reverse engineering against the program currently open in Ghidra/ReVa";
             mode = "primary";
@@ -84,14 +97,6 @@ in
             permission.skill."datasheet-reference" = "allow";
             permission.webfetch = "allow";
             permission.websearch = "allow";
-          };
-        };
-
-        reConfig = baseConfig // {
-          default_agent = "re";
-          permission = "allow";
-          agent = baseConfig.agent // {
-            re = baseConfig.agent.re // { permission = "allow"; };
           };
           # ReVa 7.3.0 serves at /mcp/message, not /mcp, and only while Ghidra has a
           # program open. Keep it out of normal OpenCode sessions so they do not report
@@ -117,6 +122,18 @@ in
         sops.templates."opencode-re.json" = {
           path = "${config.home.homeDirectory}/.config/opencode/opencode-re.json";
           content = builtins.toJSON reConfig;
+        };
+
+        sops.templates."opencode-container.json" = {
+          path = "${config.home.homeDirectory}/.config/opencode/opencode-container.json";
+          content = builtins.toJSON (baseConfig // { permission = "allow"; });
+        };
+        sops.templates."opencode-container-re.json" = {
+          path = "${config.home.homeDirectory}/.config/opencode/opencode-container-re.json";
+          content = builtins.toJSON (reConfig // {
+            permission = "allow";
+            agent.re = reConfig.agent.re // { permission = "allow"; };
+          });
         };
       }
     ) ];
