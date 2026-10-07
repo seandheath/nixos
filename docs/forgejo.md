@@ -71,7 +71,7 @@ test and the Hydrogen build on a machine with Nix daemon/KVM access before cutov
 
 Validated on Hydrogen on 2026-10-07: the full host build, runner-enabled build,
 offline checks and VM integration test passed. The VM covers private SSH push/clone,
-repository-scoped rootless CI with exact-commit checkout and no host sockets/secrets,
+repository-scoped rootless CI with exact-commit checkout and no container-engine sockets or host secrets,
 failed-export recovery, database/state restoration and another CI job after a VM
 restart. Client DNS and off-site Borg recovery still require cutover checks.
 
@@ -202,9 +202,9 @@ directly inside jobs still have no hardware devices or KVM access.
 
 After enrollment, run a disposable private repository workflow that checks out
 its exact commit with a SHA-pinned checkout action, prints tool versions, and
-asserts Docker/Podman sockets and `/run/secrets` are absent. Replace the old
-assertion that the Nix socket is absent with a socket-presence check and a small
-`nix build`; verify its output is readable and direct store writes are rejected.
+asserts Docker/Podman sockets and `/run/secrets` are absent. Check that the Nix
+daemon socket is present and run a small `nix build`; verify its output is readable
+and direct store writes are rejected.
 Try an unauthorized bind mount and confirm rejection. Verify fresh workspaces,
 container cleanup, successful jobs after a runner restart and a host reboot.
 Admit only trusted workflow authors: rootless containers reduce host access;

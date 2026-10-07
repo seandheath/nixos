@@ -63,7 +63,9 @@ assert config["forge"]["mirror"]["DISABLE_NEW_PUSH"]
 assert config["runner"]["runner"]["capacity"] == 1
 assert all(":docker://" in label for label in config["runner"]["runner"]["labels"])
 assert config["runner"]["container"]["docker_host"] == "-"
-assert config["runner"]["container"]["valid_volumes"] == []
+assert config["runner"]["container"]["valid_volumes"] == [
+    "/nix/store", "/nix/var/nix/daemon-socket",
+]
 assert not config["runner"]["container"]["privileged"]
 assert config["runner"]["container"]["network"] != "host"
 container_options = shlex.split(config["runner"]["container"]["options"])

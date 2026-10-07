@@ -17,6 +17,8 @@ let
   forgeCommand = "${lib.getExe forge.package} --work-path ${forge.stateDir} --config ${forge.customDir}/conf/app.ini";
   runnerRuntime = pkgs.buildEnv {
     name = "hydrogen-actions-runtime";
+    # Keep /var writable: fakeNss supplies a symlink into the read-only store.
+    pathsToLink = [ "/bin" "/etc" "/usr" ];
     paths = with pkgs; [
       bashInteractive
       coreutils
@@ -41,7 +43,10 @@ let
   image = pkgs.dockerTools.buildLayeredImage {
     name = "localhost/hydrogen-actions";
     contents = [ runnerRuntime ];
-    extraCommands = "mkdir -m 1777 tmp";
+    extraCommands = ''
+      mkdir -m 1777 tmp
+      mkdir -p var/empty
+    '';
     config.Env = [
       "PATH=/bin:/usr/bin"
       "SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt"
@@ -252,7 +257,7 @@ in
           container = {
             network = "";
             privileged = false;
-            valid_volumes = [ ];
+            valid_volumes = [ "/nix/store" "/nix/var/nix/daemon-socket" ];
             docker_host = "-"; # Use DOCKER_HOST without mounting its socket inside jobs.
             force_pull = false;
             options = lib.concatStringsSep " " [

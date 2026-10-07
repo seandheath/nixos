@@ -61,6 +61,8 @@ pkgs.testers.runNixOSTest {
       ];
       virtualisation.memorySize = 4096;
       virtualisation.diskSize = 8192;
+      # Builds and the Nix database must survive the restore-and-reboot test together.
+      virtualisation.writableStoreUseTmpfs = false;
     };
     client = { lib, ... }: {
       networking.interfaces.eth1.ipv4.addresses = lib.mkForce [
@@ -147,6 +149,8 @@ pkgs.testers.runNixOSTest {
     def jobs_passed(count):
         tasks = json.loads(api("GET", "repos/sheath/test/actions/tasks", {}))["workflow_runs"]
         statuses = [task["status"] for task in tasks]
+        if "failure" in statuses:
+            server.log(server.succeed("find /var/lib/forgejo/data/actions_log -type f -name '*.log.zst' -exec ${pkgs.zstd}/bin/zstd -dc {} +"))
         assert "failure" not in statuses, statuses
         return len(statuses) >= count and all(status == "success" for status in statuses)
 
