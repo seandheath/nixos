@@ -75,6 +75,7 @@ in
   # Migration staging: retire only after the ref and restore checks in docs/forgejo.md.
   # Never disable the old transport before its repositories have been inventoried.
   fleet.gitServer.enable = true;
+  fleet.gitServer.authorizedKeys = [ ]; # Freeze legacy pushes during verified Forgejo migration.
 
   fleet.vhosts.git = {
     port = config.services.forgejo.settings.server.HTTP_PORT;
@@ -84,6 +85,14 @@ in
   networking.hosts.${devices.hydrogen.tailAddress} = [ "git.luckyobserver.com" ];
   sops.secrets.forgejo-admin-password.sopsFile = ../secrets/forgejo.yaml;
   fleet.forgejo.adminPasswordFile = config.sops.secrets.forgejo-admin-password.path;
+  sops.secrets.forgejo-runner-ci-checks = {
+    sopsFile = ../secrets/forgejo-runner.yaml;
+    restartUnits = [ "forgejo-runner-hydrogen.service" ];
+  };
+  fleet.forgejo.runnerConnections.ci-checks = {
+    uuid = "54f42cfb-63dc-4d01-b9d4-9a08c658aa2f";
+    tokenFile = config.sops.secrets.forgejo-runner-ci-checks.path;
+  };
 
   # Publish candidates centrally; each machine builds before activating.
   fleet.lockUpdate.enable = true;
