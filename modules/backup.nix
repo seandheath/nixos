@@ -19,6 +19,8 @@ let
     # Bare git repos. No flush hook like Minecraft's: the object store is append-only and
     # a ref update is an atomic rename, so a live push cannot tear an archive.
     "/var/lib/git"
+    # Stopped Forgejo state + PostgreSQL dump, atomically refreshed before archiving.
+    "/var/backup/forgejo/forgejo.tar"
     # Mutable web-managed searches, browser login state, cache, and logs.
     "/var/lib/ai-marketplace-monitor"
 
@@ -79,6 +81,8 @@ let
   # cannot coordinate concurrent units: whichever finishes first would re-enable autosave
   # while another archive was still reading the world.
   runBorgJobs = ''
+    # writeShellScript does not enable errexit: a failed export must abort explicitly.
+    ${pkgs.systemd}/bin/systemctl start --wait forgejo-backup.service || exit 1
     ${pgRefresh}
     ${minecraftFlush}
     trap '${minecraftResume}' EXIT

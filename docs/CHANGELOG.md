@@ -2,6 +2,21 @@
 
 Also the decision log. Rationale that would otherwise bloat a code comment lives here.
 
+## 2026-10-07 (Hydrogen Forgejo staging)
+
+- Add private Forgejo behind the existing wildcard nginx certificate, with native
+  PostgreSQL and tailnet SSH on 2222. Keep the old bare Git transport until the
+  migration and restore checks in `docs/forgejo.md` pass.
+- Add SOPS-file administrator bootstrap and repository-scoped runner enrollment.
+  CI uses a dedicated rootless Podman account and a Nix-pinned image; no enrollment
+  means no runner. Public mirroring remains a launch-time Hestia handoff.
+- Export stopped Forgejo state and its database atomically before all Borg targets;
+  failed exports resume Forgejo and abort archiving. Add offline failure checks
+  and a focused NixOS VM integration test.
+- Build both host variants and pass offline/VM checks on Hydrogen. Runtime tests
+  caught and fixed the built-in SSH username and rootless Podman helper PATH;
+  verify CI and Git access again after backup restoration and a VM restart.
+
 ## 2026-10-05 (aarch64 emulation)
 
 - sulfur registers qemu-user for `aarch64-linux` (`boot.binfmt.emulatedSystems`), so

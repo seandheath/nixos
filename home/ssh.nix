@@ -96,6 +96,14 @@ in
         IdentityFile = personalIdentity;
       };
 
+      # Keep the old alias working until the verified cutover in docs/forgejo.md.
+      "hydrogen-forge git.luckyobserver.com" = {
+        HostName = "git.luckyobserver.com";
+        User = "git";
+        Port = 2222;
+        IdentityFile = personalIdentity;
+      };
+
       "github.com" = {
         User = "git";
         IdentityFile = "~/.ssh/id_cclaude";

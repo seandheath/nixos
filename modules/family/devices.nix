@@ -25,6 +25,7 @@
   };
 
   serviceNames = [
+    "git.luckyobserver.com"
     "nc.luckyobserver.com"
     "immich.luckyobserver.com"
     "paper.luckyobserver.com"
