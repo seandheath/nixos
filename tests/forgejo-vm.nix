@@ -119,7 +119,7 @@ pkgs.testers.runNixOSTest {
     server.succeed("systemctl start forgejo-runner-hydrogen")
     server.wait_for_unit("forgejo-runner-hydrogen.service")
     nix_expr = 'derivation { name = "forgejo-ci-smoke"; system = builtins.currentSystem; ' \
-               'builder = "${pkgs.bash}/bin/bash"; args = [ "-c" "echo nix-ci > $out" ]; }'
+               'builder = (builtins.storePath "${pkgs.bash}") + "/bin/bash"; args = [ "-c" "echo nix-ci > $out" ]; }'
     workflow = {
         "on": {"push": {}},
         "jobs": {"smoke": {
@@ -131,7 +131,7 @@ pkgs.testers.runNixOSTest {
                        "test ! -e /run/podman\ntest ! -e /run/user/1102/forgejo-podman.sock\n"
                        "test -S /nix/var/nix/daemon-socket/socket\ntest ! -e source\n"
                        "if touch /nix/store/forgejo-write-probe; then exit 1; fi\n"
-                       'output=$(nix build --offline --no-link --print-out-paths --expr ' + shlex.quote(nix_expr) + ')\n'
+                       'output=$(nix build --offline --impure --no-link --print-out-paths --expr ' + shlex.quote(nix_expr) + ')\n'
                        'test "$(cat "$output")" = nix-ci\n'
                        'git clone "http://x-access-token:$CI_TOKEN@192.168.1.1/sheath/test.git" source\n'
                        'test "$(git -C source rev-parse HEAD)" = "$CI_SHA"\n'
