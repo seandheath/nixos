@@ -48,7 +48,8 @@ see [PostgreSQL's collation guidance](https://www.postgresql.org/docs/current/sq
    unit creates `sheath` only if absent; it does not reset an existing password
    on rebuild. Keep the SOPS recovery key off the machine too.
 3. Build with `nix build path:.#nixosConfigurations.hydrogen.config.system.build.toplevel`.
-   Activate on Hydrogen using the normal fleet deployment procedure. Check
+   Activate on Hydrogen with `sudo nixos-rebuild switch --flake path:/home/sheath/nixos#hydrogen`.
+   Keep the `path:` prefix so the ignored `provisioning/hydrogen/` disk configuration is included. Check
    `forgejo`, `forgejo-bootstrap`, nginx and PostgreSQL in `systemctl`/`journalctl`.
 4. Log in as `sheath`, change the initial password if prompted, enable 2FA and
    add the personal public SSH key from `users/sheath.nix` through Forgejo's UI.
