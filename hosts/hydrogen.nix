@@ -94,6 +94,15 @@ in
     tokenFile = config.sops.secrets.forgejo-runner-ci-checks.path;
   };
 
+  sops.secrets.forgejo-runner-groundedgadgets = {
+    sopsFile = ../secrets/forgejo-runner.yaml;
+    restartUnits = [ "forgejo-runner-hydrogen.service" ];
+  };
+  fleet.forgejo.runnerConnections.groundedgadgets = {
+    uuid = "43f6cbb4-7961-402b-8069-a349e2092ba8";
+    tokenFile = config.sops.secrets.forgejo-runner-groundedgadgets.path;
+  };
+
   # Publish candidates centrally; each machine builds before activating.
   fleet.lockUpdate.enable = true;
   system.autoUpgrade = {

@@ -11,8 +11,8 @@ Forgejo was activated on Hydrogen on 2026-10-07. Legacy SSH writes are now disab
 the old repository data remains for rollback. The initial administrator
 password is generated and encrypted in `secrets/forgejo.yaml` for the existing
 main SOPS recipient. No GitHub mirror or publishing credential is provisioned.
-The runner is enrolled only for the private `sheath/forgejo-ci-checks` repository.
-Other repositories require their own admission and registration.
+The runner is enrolled for `sheath/forgejo-ci-checks` and the `groundedgadgets`
+organization. Organization repositories with Actions enabled use `hydrogen-linux`.
 
 Live checks passed: valid HTTPS with an explicit DNS override, login page 200,
 unauthenticated repository search 403, tailnet-only SSH listener, administrator
@@ -172,10 +172,11 @@ rollback alone does not roll back a migrated Forgejo database.
 
 ## Runner enrollment and verification
 
-Enable Actions only for admitted repositories. For each, create a
-**repository-scoped** runner in its Settings → Actions → Runners page; copy its
-UUID and store its token as a separate SOPS secret. One runner process handles
-these registrations with capacity one:
+Enable Actions only for admitted repositories. GroundedGadgets repositories share
+the organization registration; they do not need individual runner tokens. For
+repositories outside that organization, create a repository-scoped runner and
+store its UUID and token as a separate SOPS secret. One runner process handles
+all registrations with capacity one:
 
 ```nix
 sops.secrets.forgejo-runner-protocol.restartUnits = [ "forgejo-runner-hydrogen.service" ];

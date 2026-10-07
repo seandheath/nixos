@@ -65,7 +65,7 @@ in
     };
     runnerConnections = lib.mkOption {
       default = { };
-      description = "One repository-scoped Forgejo registration per admitted repository. Empty disables CI.";
+      description = "Repository or organization Forgejo registrations. Empty disables CI.";
       type = lib.types.attrsOf (
         lib.types.submodule {
           options = {
