@@ -23,6 +23,7 @@ in
     ../modules/ai-marketplace-monitor.nix
     ../modules/backup.nix
     ../modules/git-server.nix
+    ../modules/forgejo.nix
     ../modules/minecraft-server.nix
     ../modules/minecraft-servers.nix      # extra worlds on demand, in rootless podman
     ../modules/minecraft-couch.nix
@@ -54,7 +55,7 @@ in
     acceptRoutes = false;
     authKeyFile = config.sops.secrets.tailscale-auth-hydrogen.path;
     # Headscale policy distinguishes administrative and family clients.
-    allowedTCPPorts = [ 22 80 443 25565 21115 21116 21117 21118 21119 ];
+    allowedTCPPorts = [ 22 80 443 2222 25565 21115 21116 21117 21118 21119 ];
     allowedUDPPorts = [ 2456 2457 2458 21116 ];
   };
   sops.secrets.tailscale-auth-hydrogen = { };
@@ -71,9 +72,18 @@ in
     archiveDir = "/var/lib/minecraft-archive";
   };
 
-  # Private git remotes, bare repos owned by the `git` account. Headscale policy and
-  # key-only SSH protect the control channel.
+  # Migration staging: retire only after the ref and restore checks in docs/forgejo.md.
+  # Never disable the old transport before its repositories have been inventoried.
   fleet.gitServer.enable = true;
+
+  fleet.vhosts.git = {
+    port = config.services.forgejo.settings.server.HTTP_PORT;
+    allowedCIDRs = [ "100.64.0.0/10" ];
+  };
+  # The runner and its containers need the same private endpoint as tailnet clients.
+  networking.hosts.${devices.hydrogen.tailAddress} = [ "git.luckyobserver.com" ];
+  sops.secrets.forgejo-admin-password.sopsFile = ../secrets/forgejo.yaml;
+  fleet.forgejo.adminPasswordFile = config.sops.secrets.forgejo-admin-password.path;
 
   # Publish candidates centrally; each machine builds before activating.
   fleet.lockUpdate.enable = true;
@@ -91,6 +101,7 @@ in
           fleet-borg-backup.service borgbackup-job-data.service borgbackup-job-ssd.service \
           borgbackup-job-remote.service \
           postgresqlBackup-nextcloud.service postgresqlBackup-immich.service \
+          forgejo-backup.service \
           | ${pkgs.gnugrep}/bin/grep -Eq '^(active|activating|deactivating)$'; then
         echo "Skipping automatic upgrade: a backup is running."
         exit 1
