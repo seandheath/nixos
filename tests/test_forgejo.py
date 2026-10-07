@@ -2,6 +2,7 @@
 import json
 import os
 from pathlib import Path
+import shlex
 import subprocess
 import sys
 import tarfile
@@ -39,6 +40,9 @@ in {
   restart = c.systemd.services.forgejo-backup.postStop;
   bootstrap = c.systemd.services.forgejo-bootstrap.script;
   forgeExecutable = base.pkgs.lib.getExe c.services.forgejo.package;
+  trustedUsers = c.nix.settings.trusted-users;
+  emulatedSystems = c.boot.binfmt.emulatedSystems;
+  runnerRuntime = map (p: p.name) c.system.extraDependencies;
 }
 '''
 result = subprocess.run(
@@ -62,6 +66,14 @@ assert config["runner"]["container"]["docker_host"] == "-"
 assert config["runner"]["container"]["valid_volumes"] == []
 assert not config["runner"]["container"]["privileged"]
 assert config["runner"]["container"]["network"] != "host"
+container_options = shlex.split(config["runner"]["container"]["options"])
+assert sorted(o for o in container_options if o.startswith("--volume=")) == [
+    "--volume=/nix/store:/nix/store:ro",
+    "--volume=/nix/var/nix/daemon-socket:/nix/var/nix/daemon-socket:ro",
+]
+assert "forgejo-ci" not in config["trustedUsers"]
+assert "aarch64-linux" in config["emulatedSystems"]
+assert "hydrogen-actions-runtime" in config["runnerRuntime"]
 assert config["service"]["User"] == config["podman"]["User"] == "forgejo-ci"
 assert config["service"]["SupplementaryGroups"] == []
 assert config["service"]["LoadCredential"] == ["server__connections__test__token_url:/run/secrets/test-runner"]

@@ -85,6 +85,7 @@ print(json.dumps({{"args": sys.argv[1:], "env": {{k: os.environ.get(k) for k in
     def network(call):
         return next(arg for arg in call["args"] if arg.startswith("--network="))
 
+    assert "/run/secrets/remote-coding:/run/secrets/remote-coding:ro" in launch("copencode", "run", "hello")["args"]
     assert launch("opencode", "--reva", "run", "hello")["env"]["OPENCODE_CONFIG"] == str(home / ".config/opencode/opencode-re.json")
     assert launch("opencode", "run", "hello")["env"]["OPENCODE_CONFIG"] is None
     assert launch("opencode", "--", "--reva")["args"] == ["--", "--reva"]

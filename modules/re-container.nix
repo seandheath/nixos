@@ -22,6 +22,8 @@ let
     env_args=()
     network=pasta:-T,none
     if $reva; then network=pasta:-T,8080; fi
+    sshagent_args=()
+    ${pkgs.lib.optionalString (cmd == "opencode") (import ../packages/container-ssh.nix { inherit pkgs; })}
 
     # Resolve Home Manager / SOPS symlinks before mounting, without copying secrets.
     resolve_file() {
@@ -93,6 +95,7 @@ let
       -e COLORTERM="''${COLORTERM:-truecolor}" \
       "''${config_args[@]}" \
       "''${env_args[@]}" \
+      "''${sshagent_args[@]}" \
       "''${device_args[@]}" \
       -w "''${project_dir}" \
       ${imageName} \

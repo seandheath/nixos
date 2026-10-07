@@ -2,6 +2,17 @@
 
 Also the decision log. Rationale that would otherwise bloat a code comment lives here.
 
+## 2026-10-07 (Forgejo migration and developer containers)
+
+- Disable legacy Git SSH writes and copy `groundedgadgets` into private Forgejo;
+  compare all refs and verify a fresh clone. Register the personal SSH key and
+  a repository-scoped runner for private CI checks; its first live job passes.
+- Add shared SSH-agent forwarding, public-identity selection and pinned Forgejo
+  host verification to ccodex/copencode/cclaude. Build the launchers and run focused
+  checks; installation and final container push verification remain pending.
+- Publish the Headscale DNS record. Record the remaining split-DNS routing,
+  off-site restore and database-maintenance verification in `docs/forgejo.md`.
+
 ## 2026-10-07 (Hydrogen Forgejo activation)
 
 - Push and activate the Forgejo configuration on Hydrogen after rebuilding and
@@ -25,6 +36,12 @@ Also the decision log. Rationale that would otherwise bloat a code comment lives
 - Build both host variants and pass offline/VM checks on Hydrogen. Runtime tests
   caught and fixed the built-in SSH username and rootless Podman helper PATH;
   verify CI and Git access again after backup restoration and a VM restart.
+
+## 2026-10-05 (--allow-kvm)
+
+- `cclaude`, `copencode`, and `ccodex` accept `--allow-kvm`, which passes `/dev/kvm`
+  through with `--device`. No group is carried in: systemd makes `/dev/kvm` 0666.
+  Verified under the launchers' rootless/keep-id/cap-drop=ALL flags (KVM_CREATE_VM ok).
 
 ## 2026-10-05 (aarch64 emulation)
 

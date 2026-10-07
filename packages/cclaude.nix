@@ -74,10 +74,7 @@ pkgs.writeShellScriptBin "cclaude" ''
     claudemd_args=(-v "''${HOME}/.claude/CLAUDE.md:/home/claude/.claude/CLAUDE.md:ro")
   fi
 
-  sshagent_args=()
-  if [[ -n "''${SSH_AUTH_SOCK:-}" ]]; then
-    sshagent_args=(-v "''${SSH_AUTH_SOCK}:/run/ssh-agent.sock:ro" -e SSH_AUTH_SOCK=/run/ssh-agent.sock)
-  fi
+  ${import ./container-ssh.nix { inherit pkgs; }}
 
   exec ${podman} run -it --rm \
     --name "cclaude-''${project_name}" \

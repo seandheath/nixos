@@ -1,9 +1,10 @@
 # Sourced by the agent container launchers (cclaude, ccodex, copencode). Removes
-# --allow-usb / --allow-uart from "$@" and fills device_args with the podman flags that
-# expose the host USB bus / serial ports (the latter at /dev/uart/<port>). Host access is granted by udev (uaccess ACLs,
+# --allow-usb / --allow-uart / --allow-kvm from "$@" and fills device_args with the podman flags
+# that expose the host USB bus / serial ports (the latter at /dev/uart/<port>) / KVM. Host access is granted by udev (uaccess ACLs,
 # dialout group) and carried in by --userns=keep-id plus keep-groups.
 allow_usb=false
 allow_uart=false
+allow_kvm=false
 _kept=()
 _device_options=true
 for _arg in "$@"; do
@@ -12,6 +13,7 @@ for _arg in "$@"; do
     --) _device_options=false; _kept+=("$_arg") ;;
     --allow-usb) allow_usb=true ;;
     --allow-uart) allow_uart=true ;;
+    --allow-kvm) allow_kvm=true ;;
     *) _kept+=("$_arg") ;;
   esac
 done
@@ -34,6 +36,14 @@ if $allow_uart; then
   # Host udev keeps /dev/uart/<port> bound to each serial port (modules/workstation.nix);
   # rslave lets replugged ports appear and disappear without restarting the container.
   device_args+=(-v /dev/uart:/dev/uart:rslave)
+fi
+if $allow_kvm; then
+  if [[ ! -c /dev/kvm ]]; then
+    printf '%s: --allow-kvm requested, but /dev/kvm is unavailable\n' "${0##*/}" >&2
+    exit 1
+  fi
+  # /dev/kvm is 0666 by systemd default, so no group is needed; it never hotplugs.
+  device_args+=(--device /dev/kvm)
 fi
 if $allow_usb || $allow_uart; then
   device_args+=(--group-add=keep-groups)

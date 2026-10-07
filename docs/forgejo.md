@@ -7,27 +7,39 @@ The native NixOS module selects Forgejo LTS; `flake.lock` pins it and Runner.
 
 ## Deployment state and bootstrap
 
-Forgejo was activated on Hydrogen on 2026-10-07. The old bare Git service
-and `hydrogen-git` alias remain until migration is verified. The initial administrator
+Forgejo was activated on Hydrogen on 2026-10-07. Legacy SSH writes are now disabled;
+the old repository data remains for rollback. The initial administrator
 password is generated and encrypted in `secrets/forgejo.yaml` for the existing
 main SOPS recipient. No GitHub mirror or publishing credential is provisioned.
-An empty `fleet.forgejo.runnerConnections` disables CI until enrollment.
+The runner is enrolled only for the private `sheath/forgejo-ci-checks` repository.
+Other repositories require their own admission and registration.
 
 Live checks passed: valid HTTPS with an explicit DNS override, login page 200,
 unauthenticated repository search 403, tailnet-only SSH listener, administrator
-creation and a mode-0600 backup export. Client DNS and repository/runner enrollment
-remain pending. Deployment logs are on Hydrogen in `/tmp/forgejo-deploy.ZTOCXxZg/`.
+creation and a mode-0600 backup export. `groundedgadgets` was copied to the private
+`sheath/groundedgadgets` repository; a fresh mirror clone matched every ref and
+passed `git fsck --full`. The personal SSH key is registered. A live runner job
+passed with a SHA-pinned checkout action, exact-commit verification and checks for
+absent host secrets/sockets. The off-site pre-migration archive is
+`hydrogen-remote-2026-10-07T12:08:44`.
+
+Headscale now serves `git.luckyobserver.com → 100.64.0.3`, but the client's OS resolver
+still needs a split-DNS route for this name. `tailscale dns query` succeeds while
+`resolvectl query` fails. A post-migration off-site backup/restore, client remote
+updates, and migration API-token revocation remain pending. Deployment logs are
+on Hydrogen in `/tmp/forgejo-deploy.ZTOCXxZg/`.
 
 Database creation exposed pre-existing libc collation drift (2.42 → 2.44).
 `template1` had no application tables; it was dumped to
 `/var/backup/postgresql/forgejo-deploy/template1-before-reindex.dump`, reindexed
 (database and system indexes), then its collation version was refreshed.
-The existing `postgres`, `nextcloud` and `immich` databases still need separate
-collation maintenance. Rebuild affected indexes before refreshing version metadata;
+Concurrent reindexing and version refresh for `postgres`, `nextcloud` and `immich`
+were started in `forgejo-collation-maintenance.service`; completion still needs
+verification. Rebuild affected indexes before refreshing version metadata;
 see [PostgreSQL's collation guidance](https://www.postgresql.org/docs/current/sql-altercollation.html).
 
-1. Add `git.luckyobserver.com → 100.64.0.3` to the router's Headscale DNS records
-   (`hosts/router/default.nix` in the router repository). The shared client name
+1. Complete the split-DNS routing for the Headscale extra record
+   (`modules/headscale-server.nix` in the router repository). The shared client name
    list and Hydrogen's own resolution are configured here. Keep port 2222 limited
    to administrative tailnet clients in Headscale policy; do not forward it on WAN.
 2. Retrieve the initial password locally when needed with
@@ -61,7 +73,52 @@ Validated on Hydrogen on 2026-10-07: the full host build, runner-enabled build,
 offline checks and VM integration test passed. The VM covers private SSH push/clone,
 repository-scoped rootless CI with exact-commit checkout and no host sockets/secrets,
 failed-export recovery, database/state restoration and another CI job after a VM
-restart. Live DNS/TLS, migration and off-site Borg recovery still require cutover checks.
+restart. Client DNS and off-site Borg recovery still require cutover checks.
+
+## Pushing from developer containers
+
+The updated `cclaude`, `ccodex` and `copencode` launchers forward a live
+`SSH_AUTH_SOCK`. They mount only `~/.ssh/personal.pub` to select the registered
+agent identity; private key files stay on the host. Forwarding permits use of
+the keys loaded in that agent. Forgejo's host key is pinned in
+`packages/forgejo-known-hosts`, and the launchers provide its tailnet IP inside
+the containers. Qwen launchers do not receive the agent.
+
+Load the key on the host before starting a new container:
+
+```sh
+ssh-add ~/.ssh/personal
+ccodex                  # or copencode / cclaude
+```
+
+The host must have `~/.ssh/personal.pub` beside the key. If needed, generate only
+the public half with `ssh-keygen -y -f ~/.ssh/personal > ~/.ssh/personal.pub`.
+Inside the updated container, use an existing Forgejo repository:
+
+```sh
+git remote set-url origin ssh://git@git.luckyobserver.com:2222/sheath/groundedgadgets.git
+git push -u origin HEAD
+```
+
+For a new repository, create it as private in Forgejo first, then use `git remote
+add origin` with its owner/repository URL. Pushing to Forgejo does not publish to
+GitHub. Public mirroring remains unconfigured.
+
+For API access, SOPS decrypts `remote-coding` to `/run/secrets/remote-coding`,
+readable only by the workstation user. Host Claude, Codex and OpenCode can read
+it directly; their container launchers mount the same path read-only. After
+rebuilding Sulfur, start new containers to receive the token. The shared agent
+instructions identify the API URL and token file; never print the token.
+
+The SSH-enabled launchers are installed. The API-token mounts need another
+rebuild; live container authentication remains unverified because the agent
+sandbox blocks sockets. Apply the changes on Sulfur from the user's normal
+terminal, then start a new container:
+
+```sh
+sudo nixos-rebuild switch --flake path:/home/sheath/nixos#sulfur
+hash -r
+```
 
 ## Replace the bare Git service
 
@@ -129,21 +186,30 @@ fleet.forgejo.runnerConnections.hestia-protocol = {
 
 The `forgejo-ci` account (UID 1102) has no SSH keys or sudo privileges. Its Podman
 API socket is private to that account. The runner gets the socket through
-`DOCKER_HOST`, but jobs do not get the socket, host directories or Nix daemon.
+`DOCKER_HOST`, but jobs do not get that socket or `/run/secrets`. Jobs mount the
+host `/nix/store` and Nix daemon socket directory read-only; the daemon accepts
+build requests as the untrusted `forgejo-ci` user. The runner is not a Nix
+trusted user and cannot change the daemon's trust or sandbox policy.
 Its image is built from the pinned Nixpkgs closure, loaded locally, and addressed
 by a content-derived tag. `runs-on: hydrogen-linux` provides shell, Git, Node,
-curl and basic CLI tools, **not an Ubuntu installation**. Language toolchains,
-Nix-in-container builds and hardware/VM testing need dedicated Hestia images or
-workers; don't grant host access to make a workflow pass.
+curl, Nix with flakes enabled, and basic CLI tools, **not an Ubuntu installation**.
+Use each repository's `flake.lock` with `nix develop`, `nix build` or `nix flake
+check` for pinned toolchains. Hydrogen provides aarch64 emulation for native
+ARM builds. Downloads and builds populate the shared host store; existing paths
+are reused until garbage collection removes them. Daemon builds use host Nix
+resource limits, not the job container's CPU and memory limits. Tools running
+directly inside jobs still have no hardware devices or KVM access.
 
 After enrollment, run a disposable private repository workflow that checks out
 its exact commit with a SHA-pinned checkout action, prints tool versions, and
-asserts `/var/run/docker.sock`, `/run/secrets` and the host Nix socket are absent.
+asserts Docker/Podman sockets and `/run/secrets` are absent. Replace the old
+assertion that the Nix socket is absent with a socket-presence check and a small
+`nix build`; verify its output is readable and direct store writes are rejected.
 Try an unauthorized bind mount and confirm rejection. Verify fresh workspaces,
 container cleanup, successful jobs after a runner restart and a host reboot.
 Admit only trusted workflow authors: rootless containers reduce host access;
 they do not make arbitrary workflows safe to run with publishing credentials.
-The cache service is disabled. Logs are in `journalctl -u forgejo-runner-hydrogen`
+The Forgejo Actions cache service is disabled. Logs are in `journalctl -u forgejo-runner-hydrogen`
 and `journalctl -u forgejo-podman`.
 
 ## Backup and recovery

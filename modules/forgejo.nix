@@ -15,10 +15,9 @@ let
   runnerHome = "/var/lib/forgejo-runner/hydrogen";
   runtime = "/run/user/${toString config.users.users.${runnerUser}.uid}";
   forgeCommand = "${lib.getExe forge.package} --work-path ${forge.stateDir} --config ${forge.customDir}/conf/app.ini";
-  # Nix's content-derived image tag changes with the closure, without a floating registry tag.
-  image = pkgs.dockerTools.buildLayeredImage {
-    name = "localhost/hydrogen-actions";
-    contents = with pkgs; [
+  runnerRuntime = pkgs.buildEnv {
+    name = "hydrogen-actions-runtime";
+    paths = with pkgs; [
       bashInteractive
       coreutils
       curl
@@ -30,16 +29,25 @@ let
       gnutar
       gzip
       jq
+      config.nix.package
       nodejs
       openssh
       cacert
       dockerTools.usrBinEnv
       dockerTools.fakeNss
     ];
+  };
+  # Nix's content-derived image tag changes with the closure, without a floating registry tag.
+  image = pkgs.dockerTools.buildLayeredImage {
+    name = "localhost/hydrogen-actions";
+    contents = [ runnerRuntime ];
     extraCommands = "mkdir -m 1777 tmp";
     config.Env = [
       "PATH=/bin:/usr/bin"
       "SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt"
+      "NIX_SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt"
+      "NIX_REMOTE=daemon"
+      "NIX_CONFIG=experimental-features = nix-command flakes"
     ];
   };
 in
@@ -191,6 +199,9 @@ in
     })
 
     (lib.mkIf runnerEnabled {
+      # The host store hides the image's copy; retain its command targets across GC.
+      system.extraDependencies = [ runnerRuntime ];
+      boot.binfmt.emulatedSystems = [ "aarch64-linux" ];
       virtualisation.podman.enable = true;
       users.groups.${runnerUser} = { };
       users.users.${runnerUser} = {
@@ -244,7 +255,12 @@ in
             valid_volumes = [ ];
             docker_host = "-"; # Use DOCKER_HOST without mounting its socket inside jobs.
             force_pull = false;
-            options = "--memory=8g --cpus=4 --pids-limit=1024 --add-host=git.luckyobserver.com:${devices.hydrogen.tailAddress}";
+            options = lib.concatStringsSep " " [
+              "--memory=8g --cpus=4 --pids-limit=1024"
+              "--add-host=git.luckyobserver.com:${devices.hydrogen.tailAddress}"
+              "--volume=/nix/store:/nix/store:ro"
+              "--volume=/nix/var/nix/daemon-socket:/nix/var/nix/daemon-socket:ro"
+            ];
           };
           server.connections = lib.mapAttrs (_: c: {
             url = forge.settings.server.ROOT_URL;

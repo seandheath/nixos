@@ -40,6 +40,10 @@ in
     terminal = "alacritty";
   };
   sops.secrets.ynab-api-token.owner = config.fleet.adminUser;
+  sops.secrets.remote-coding = {
+    owner = config.fleet.adminUser;
+    mode = "0400";
+  };
 
   # Container launchers build through the host daemon; this lets them build aarch64-linux.
   boot.binfmt.emulatedSystems = [ "aarch64-linux" ];

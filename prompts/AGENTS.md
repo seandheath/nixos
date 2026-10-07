@@ -1,89 +1,79 @@
-# Response Style
+# Goal
 
-Maximize useful information per word. Be concise in reporting, not in
-investigation, reasoning, or verification. Explicit user requests for
-length and format override these defaults.
+Deliver the requested change with the least code a reader needs to understand it. Simple and correct beats flexible, clever, or defensive. When unsure, choose fewer lines, fewer files, fewer concepts.
 
-## Answer first
+## Scope
 
-Start with the answer, recommendation, or deliverable. Do not restate
-the question or announce what you are about to explain. Address the
-requested scope; omit adjacent topics unless they materially change
-the answer.
+- Do what was asked. Nothing more.
+- Do not add features, options, flags, config, or "improvements" that were not requested.
+- Do not refactor, rename, reformat, or reorganize code outside the task.
+- Every changed line must trace to the request. Revert lines that don't.
+- Edit existing files. Create a file only when the change cannot live in an existing one.
+- No backward-compatibility shims, wrappers, aliases, or re-exports unless asked. Update the callers.
+- If the request is ambiguous or looks wrong, ask before coding. If running unattended, proceed and state the assumption.
+- Report unrelated problems you notice. Do not fix them.
 
-## Information density
+## Simplicity
 
-Use specific facts, values, commands, and concrete examples instead of
-vague descriptions. Explain each point once. Prefer one well-chosen
-example to several similar examples.
+- Write the direct solution. Add structure only when this task needs it.
+- No abstraction for a single use: no one-implementation interface, no one-type factory, no helper called once, no wrapper that only forwards.
+- Do not design for hypothetical future requirements.
+- Search for an existing helper before writing one. Reuse it. Do not duplicate logic.
+- Prefer the standard library and existing dependencies. Ask before adding a dependency.
+- Prefer flat control flow and early returns over nesting.
+- Use plain names. No clever one-liners that need a second read.
+- If 200 lines could be 50, write 50.
 
-When recommending, choose one option and give the decisive reason.
-Add alternatives only when requested or when a material tradeoff
-prevents a clear choice.
+## Errors: fail fast
 
-State uncertainty precisely and locally. Separate assumptions from
-established facts. Include relevant citations compactly; omit generic
-disclaimers.
+A loud failure is cheaper than a hidden one. Let errors surface where they happen.
 
-## Remove filler
+- Let errors propagate. Catch only where you can handle the error correctly.
+- No try/catch-and-continue, no catch-log-ignore, no broad catches.
+- No silent fallbacks, default values, or empty results that hide a failure.
+- No checks for conditions that cannot happen. Trust internal code, types, and framework guarantees.
+- Validate only at system boundaries (user input, external APIs, files, network). On invalid input, fail with a clear error. Do not coerce or guess.
+- No retries, timeouts, or recovery paths unless asked.
+- When you handle an error, add context and pass it on. Never swallow it.
 
-Omit greetings, praise, throat-clearing, unnecessary apologies,
-repeated conclusions, and commentary about your own response.
-Do not add an introduction or recap to an answer that already
-stands alone.
+## Deletion
 
-Do not end with unsolicited offers, follow-up questions, or suggestions
-for additional work. Ask for clarification only when an unresolved
-ambiguity materially blocks a correct answer; otherwise state a
-reasonable assumption and proceed.
+- Removing code is a good outcome. Prefer the change with fewer lines.
+- Remove code, imports, and files your change made unused.
+- No commented-out code, dead branches, or TODOs for work you could finish now.
+- Pre-existing dead code outside the task: report it, do not delete it.
 
-## Format
+## Comments and docs
 
-Use the simplest readable format. Add headings only when they improve
-navigation, lists for distinct items or steps, and tables for genuine
-comparisons. Avoid one-item lists, excessive bolding, and fragmented
-shorthand. Density must not come at the expense of readability.
+- Code says what. Comments say why: a non-obvious constraint, workaround, or decision.
+- No comments that restate code, no banner comments, no history comments ("added X", "fixed Y").
+- Do not add docstrings, comments, or type annotations to code you did not change.
+- Public interface docs: one or two sentences. Do not repeat what types already say.
+- Do not create README, notes, summary, or plan files unless asked.
+- When updating docs, keep them short and current. Delete outdated text instead of appending.
+- No debug logging in final code. Log only what operators need.
 
-For coding tasks, provide the requested code or change. Explain only
-non-obvious decisions, necessary usage, and relevant limitations.
-Report verification briefly and accurately; never imply that unrun
-tests passed. Do not repeat code in prose or paste unchanged files
-unless requested.
+## Tests and verification
 
-## Final check
+- Run the project checks (below) after changing code. Fix failures you caused.
+- Tests verify behavior; they do not define it. Never hard-code values or special-case test inputs to make tests pass.
+- Do not weaken, skip, or delete tests to get green. If a test is wrong, say so.
+- Add tests for changed behavior. Test through public interfaces. Mock only external systems.
+- Do not test impossible cases.
+- Fix root causes. Do not suppress errors, warnings, or lint rules.
+- Keep diffs small. Split large changes into steps that each pass the checks.
+- Delete temporary scripts and scratch files before finishing.
 
-Before sending, remove sentences that add no new fact, decision,
-necessary explanation, or action. Check that the first sentence is
-useful and that the user can act without reconstructing omitted
-essentials.
+## Forgejo
 
-## Working on code
+- The private forge is https://git.luckyobserver.com; its API base is https://git.luckyobserver.com/api/v1.
+- The API token is in `/run/secrets/remote-coding` on the host and in coding containers. Read it in shell commands for the `Authorization: token ...` header; never print it, commit it, or include it in messages.
 
-- Follow the project's conventions and use language-idiomatic tools. Prefer the
-  standard library over a new dependency when it reasonably covers the task.
-- Make focused changes that solve the cause. Avoid speculative structure.
-- Run a relevant build or focused check before claiming a change works. Add a
-  test when it would catch a meaningful regression.
-- Explain non-obvious reasons in comments. Keep public API docs and the README
-  accurate when a change affects them.
-- Validate untrusted input at boundaries, handle failures that could lose data,
-  and never commit secrets or implement cryptographic primitives.
+## Report
 
-## Containers
+End each task with:
 
-- Inside cclaude/ccodex/copencode, serial ports are at `/dev/uart/ttyACM*` or
-  `/dev/uart/ttyUSB*`, not `/dev/tty*`; they come and go with the device. Tools that
-  auto-detect ports via `/sys/class/tty` won't find them, so pass the path explicitly.
-  The USB bus is at `/dev/bus/usb`.
-
-## Diagrams
-
-- Terminals don't render Mermaid. When a diagram helps, write it to a `.mmd` file,
-  render with `mmdc -i x.mmd -o x.svg` (or `.png`), and give the user the output path.
-
-## NixOS configuration
-
-- Prefer declarative module options over scripts that adjust live settings.
-  Where correction is necessary, tie it to the event that causes drift.
-- Keep each setting's policy in one place. Use sops for secrets, keep them out
-  of the Nix store, and declare state that must survive reboot.
+- Changes: one line per file.
+- Checks: commands run and results. State plainly what failed or was not run.
+- Assumptions and open questions.
+- Unrelated issues noticed, not fixed. No praise, no restating the request, no description of unchanged code.

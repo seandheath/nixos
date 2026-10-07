@@ -2,7 +2,8 @@
 
 # `ccodex`: Codex with --yolo inside a rootless Podman boundary. The agent can write the
 # current project, its own named home volume, and the host Codex directory. The rest of the
-# host home, SSH/GPG agents, and other working trees remain hidden; network access stays available.
+# host home, private key files, GPG agent, and other working trees remain hidden.
+# An available SSH agent is forwarded for Git access; network access stays available.
 # `--allow-usb` / `--allow-uart` and `--ynab` opt into peripheral and financial-data access.
 let
   image = pkgs.codex-container;
@@ -99,7 +100,8 @@ let
       codex_args+=(-c 'tui.resume_cwd="current"')
     fi
 
-    # Author identity only. Authentication helpers and SSH agents stay outside the container.
+    # Author identity and SSH-agent access; private key files stay outside the container.
+    ${import ../packages/container-ssh.nix { inherit pkgs; }}
     gitconfig_args=()
     if [[ -f "$HOME/.gitconfig" ]]; then
       gitconfig_args=(-v "$HOME/.gitconfig:/run/gitconfig:ro" -e GIT_CONFIG_GLOBAL=/run/gitconfig)
@@ -145,6 +147,7 @@ let
       -e TERM="''${TERM:-xterm-256color}" \
       -e COLORTERM="''${COLORTERM:-truecolor}" \
       "''${gitconfig_args[@]}" \
+      "''${sshagent_args[@]}" \
       -w "''${project_dir}" \
       ${imageName} \
       "$codex_command" "''${codex_args[@]}" "$@")"
