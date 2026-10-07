@@ -2,6 +2,15 @@
 
 Also the decision log. Rationale that would otherwise bloat a code comment lives here.
 
+## 2026-10-07 (Hydrogen Forgejo activation)
+
+- Push and activate the Forgejo configuration on Hydrogen after rebuilding and
+  rerunning VM/offline checks against the current remote lockfile. Verify HTTPS,
+  private API access, SSH binding, administrator bootstrap and backup export.
+- Repair pre-existing `template1` collation drift after taking a dump, allowing
+  PostgreSQL to create Forgejo's database. Other existing databases still need
+  separate collation maintenance; record the remaining setup in `docs/forgejo.md`.
+
 ## 2026-10-07 (Hydrogen Forgejo staging)
 
 - Add private Forgejo behind the existing wildcard nginx certificate, with native

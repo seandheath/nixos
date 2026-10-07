@@ -7,11 +7,24 @@ The native NixOS module selects Forgejo LTS; `flake.lock` pins it and Runner.
 
 ## Deployment state and bootstrap
 
-The configuration is staged: Forgejo is enabled, but the old bare Git service
+Forgejo was activated on Hydrogen on 2026-10-07. The old bare Git service
 and `hydrogen-git` alias remain until migration is verified. The initial administrator
 password is generated and encrypted in `secrets/forgejo.yaml` for the existing
 main SOPS recipient. No GitHub mirror or publishing credential is provisioned.
 An empty `fleet.forgejo.runnerConnections` disables CI until enrollment.
+
+Live checks passed: valid HTTPS with an explicit DNS override, login page 200,
+unauthenticated repository search 403, tailnet-only SSH listener, administrator
+creation and a mode-0600 backup export. Client DNS and repository/runner enrollment
+remain pending. Deployment logs are on Hydrogen in `/tmp/forgejo-deploy.ZTOCXxZg/`.
+
+Database creation exposed pre-existing libc collation drift (2.42 → 2.44).
+`template1` had no application tables; it was dumped to
+`/var/backup/postgresql/forgejo-deploy/template1-before-reindex.dump`, reindexed
+(database and system indexes), then its collation version was refreshed.
+The existing `postgres`, `nextcloud` and `immich` databases still need separate
+collation maintenance. Rebuild affected indexes before refreshing version metadata;
+see [PostgreSQL's collation guidance](https://www.postgresql.org/docs/current/sql-altercollation.html).
 
 1. Add `git.luckyobserver.com → 100.64.0.3` to the router's Headscale DNS records
    (`hosts/router/default.nix` in the router repository). The shared client name
