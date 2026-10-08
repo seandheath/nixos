@@ -85,7 +85,8 @@ in
   sops.secrets.gitea-admin-password.sopsFile = ../secrets/gitea.yaml;
   fleet.gitea.adminPasswordFile = config.sops.secrets.gitea-admin-password.path;
   sops.secrets.gitea-actions-runner = { };
-  fleet.gitea.runnerTokenFile = config.sops.secrets.gitea-actions-runner.path;
+  sops.templates.gitea-actions-runner.content = "TOKEN=${config.sops.placeholder.gitea-actions-runner}\n";
+  fleet.gitea.runnerTokenFile = config.sops.templates.gitea-actions-runner.path;
 
   # Publish candidates centrally; each machine builds before activating.
   fleet.lockUpdate.enable = true;

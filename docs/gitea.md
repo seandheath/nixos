@@ -13,7 +13,8 @@ from `secrets/gitea.yaml`; decrypt its `gitea-admin-password` key with SOPS to l
 Change the initial password and register your SSH key in Gitea.
 
 Hydrogen enables its Actions runner using the `gitea-actions-runner` secret in
-`secrets/secrets.yaml`, which must contain `TOKEN=<registration token>`.
+`secrets/secrets.yaml`, containing the registration token. A SOPS template supplies
+the runner's `TOKEN=...` environment file.
 The runner uses `hydrogen-linux`
 with rootless Podman, a read-only Nix store, and the untrusted Nix daemon socket.
 Workflows belong in `.gitea/workflows/`.
