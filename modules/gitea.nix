@@ -42,7 +42,7 @@ let
   runnerRuntime = pkgs.buildEnv {
     name = "hydrogen-actions-runtime";
     # Keep /var writable: fakeNss supplies a symlink into the read-only store.
-    pathsToLink = [ "/bin" "/etc" "/usr" ];
+    pathsToLink = [ "/bin" "/etc" "/etc/ssl/certs" "/usr" ];
     paths = with pkgs; [
       bashInteractive
       coreutils
@@ -69,7 +69,9 @@ let
     contents = [ runnerRuntime ];
     extraCommands = ''
       mkdir -m 1777 tmp
-      mkdir -p var/empty
+      mkdir -p var/empty etc/ssl/certs lib64
+      ln -s ${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt etc/ssl/certs/ca-certificates.crt
+      ln -s ${pkgs.glibc}/lib/ld-linux-x86-64.so.2 lib64/ld-linux-x86-64.so.2
     '';
     config.Env = [
       "PATH=/bin:/usr/bin"

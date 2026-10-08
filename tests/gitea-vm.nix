@@ -119,6 +119,8 @@ pkgs.testers.runNixOSTest {
             "steps": [{
                 "env": {"CI_TOKEN": "$" + "{{ github.token }}", "CI_SHA": "$" + "{{ github.sha }}"},
                 "run": "set -eu\ngit --version\nnode --version\ncurl --version\nnix --version\n"
+                       "test -s /etc/ssl/certs/ca-certificates.crt\n"
+                       "/lib64/ld-linux-x86-64.so.2 --verify /bin/bash\n"
                        "test ! -e /var/run/docker.sock\ntest ! -e /run/secrets\n"
                        "test ! -e /run/podman\ntest ! -e /run/user/1102/gitea-podman.sock\n"
                        "test -S /nix/var/nix/daemon-socket/socket\ntest ! -e source\n"
