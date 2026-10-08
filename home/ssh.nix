@@ -96,7 +96,7 @@ in
         IdentityFile = personalIdentity;
       };
 
-      # Keep the old alias working until the verified cutover in docs/forgejo.md.
+      # Keep the old alias working until the verified cutover in docs/gitea.md.
       "hydrogen-forge git.luckyobserver.com" = {
         HostName = "git.luckyobserver.com";
         User = "git";

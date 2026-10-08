@@ -24,7 +24,7 @@ settings = json.loads(run("nix", "eval", "--json", flake, "--apply", '''hosts:
       (builtins.head h.config.systemd.services.nixos-upgrade.serviceConfig.ExecStartPre));
   }) hosts'''))
 for name, host in settings.items():
-    assert host["enabled"]
+    assert host["enabled"] == (name != "hydrogen")
     assert host["upgrade"]["enable"] and not host["upgrade"]["upgrade"]
     assert host["upgrade"]["allowReboot"] == (name == "hydrogen")
 assert settings["hydrogen"]["upgrade"]["rebootWindow"] == {"lower": "05:00", "upper": "06:00"}

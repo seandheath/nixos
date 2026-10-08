@@ -40,7 +40,7 @@ in
     terminal = "alacritty";
   };
   sops.secrets.ynab-api-token.owner = config.fleet.adminUser;
-  sops.secrets.remote-coding = {
+  sops.secrets.development-token = {
     owner = config.fleet.adminUser;
     mode = "0400";
   };

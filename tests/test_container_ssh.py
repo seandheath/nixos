@@ -28,7 +28,7 @@ with tempfile.TemporaryDirectory() as directory:
         return result.decode().rstrip("\0").split("\0")
 
     expected = ["--add-host=git.luckyobserver.com:100.64.0.3",
-                "-v", "/run/secrets/remote-coding:/run/secrets/remote-coding:ro"]
+                "-v", "/run/secrets/development-token:/run/secrets/development-token:ro"]
     assert arguments("") == expected
     assert arguments(str(home / "missing-agent")) == expected
     (home / "not-a-socket").touch()
@@ -38,11 +38,11 @@ with tempfile.TemporaryDirectory() as directory:
         args = arguments(str(home / "agent"))
         assert str(home / "agent") + ":/run/ssh-agent.sock:ro" in args
         assert "SSH_AUTH_SOCK=/run/ssh-agent.sock" in args
-        assert str(public) + ":/run/forgejo-identity.pub:ro" in args
+        assert str(public) + ":/run/gitea-identity.pub:ro" in args
         assert any(a.startswith("GIT_SSH_COMMAND=ssh -F /nix/store/") for a in args)
         assert not any("personal:" in a or "/.ssh:" in a for a in args)
         (home / ".ssh/personal.pub").unlink()
         args = arguments(str(home / "agent"))
         assert "SSH_AUTH_SOCK=/run/ssh-agent.sock" in args
-        assert not any("forgejo-identity" in a or "GIT_SSH_COMMAND" in a for a in args)
+        assert not any("gitea-identity" in a or "GIT_SSH_COMMAND" in a for a in args)
 print("Container SSH socket, public identity and missing-agent checks passed")

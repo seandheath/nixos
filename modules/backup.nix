@@ -19,8 +19,8 @@ let
     # Bare git repos. No flush hook like Minecraft's: the object store is append-only and
     # a ref update is an atomic rename, so a live push cannot tear an archive.
     "/var/lib/git"
-    # Stopped Forgejo state + PostgreSQL dump, atomically refreshed before archiving.
-    "/var/backup/forgejo/forgejo.tar"
+    # Stopped Gitea state + PostgreSQL dump, atomically refreshed before archiving.
+    "/var/backup/gitea/gitea.tar"
     # Mutable web-managed searches, browser login state, cache, and logs.
     "/var/lib/ai-marketplace-monitor"
 
@@ -82,7 +82,7 @@ let
   # while another archive was still reading the world.
   runBorgJobs = ''
     # writeShellScript does not enable errexit: a failed export must abort explicitly.
-    ${pkgs.systemd}/bin/systemctl start --wait forgejo-backup.service || exit 1
+    ${pkgs.systemd}/bin/systemctl start --wait gitea-backup.service || exit 1
     ${pgRefresh}
     ${minecraftFlush}
     trap '${minecraftResume}' EXIT

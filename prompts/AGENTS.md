@@ -64,10 +64,10 @@ A loud failure is cheaper than a hidden one. Let errors surface where they happe
 - Keep diffs small. Split large changes into steps that each pass the checks.
 - Delete temporary scripts and scratch files before finishing.
 
-## Forgejo
+## Gitea
 
 - The private forge is https://git.luckyobserver.com; its API base is https://git.luckyobserver.com/api/v1.
-- The API token is in `/run/secrets/remote-coding` on the host and in coding containers. Read it in shell commands for the `Authorization: token ...` header; never print it, commit it, or include it in messages.
+- The API token is in `/run/secrets/development-token` on the host and in coding containers. Read it in shell commands for the `Authorization: token ...` header; never print it, commit it, or include it in messages.
 
 ## Report
 

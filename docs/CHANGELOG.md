@@ -2,36 +2,36 @@
 
 Also the decision log. Rationale that would otherwise bloat a code comment lives here.
 
-## 2026-10-07 (Forgejo migration and developer containers)
+## 2026-10-07 (Gitea migration and developer containers)
 
-- Disable legacy Git SSH writes and copy `groundedgadgets` into private Forgejo;
+- Disable legacy Git SSH writes and copy `groundedgadgets` into private Gitea;
   compare all refs and verify a fresh clone. Register the personal SSH key and
   a repository-scoped runner for private CI checks; its first live job passes.
-- Add shared SSH-agent forwarding, public-identity selection and pinned Forgejo
+- Add shared SSH-agent forwarding, public-identity selection and pinned Gitea
   host verification to ccodex/copencode/cclaude. Build the launchers and run focused
   checks; installation and final container push verification remain pending.
 - Publish the Headscale DNS record. Record the remaining split-DNS routing,
-  off-site restore and database-maintenance verification in `docs/forgejo.md`.
+  off-site restore and database-maintenance verification in `docs/gitea.md`.
 
-## 2026-10-07 (Hydrogen Forgejo activation)
+## 2026-10-07 (Hydrogen Gitea activation)
 
-- Push and activate the Forgejo configuration on Hydrogen after rebuilding and
+- Push and activate the Gitea configuration on Hydrogen after rebuilding and
   rerunning VM/offline checks against the current remote lockfile. Verify HTTPS,
   private API access, SSH binding, administrator bootstrap and backup export.
 - Repair pre-existing `template1` collation drift after taking a dump, allowing
-  PostgreSQL to create Forgejo's database. Other existing databases still need
-  separate collation maintenance; record the remaining setup in `docs/forgejo.md`.
+  PostgreSQL to create Gitea's database. Other existing databases still need
+  separate collation maintenance; record the remaining setup in `docs/gitea.md`.
 
-## 2026-10-07 (Hydrogen Forgejo staging)
+## 2026-10-07 (Hydrogen Gitea staging)
 
-- Add private Forgejo behind the existing wildcard nginx certificate, with native
+- Add private Gitea behind the existing wildcard nginx certificate, with native
   PostgreSQL and tailnet SSH on 2222. Keep the old bare Git transport until the
-  migration and restore checks in `docs/forgejo.md` pass.
+  migration and restore checks in `docs/gitea.md` pass.
 - Add SOPS-file administrator bootstrap and repository-scoped runner enrollment.
   CI uses a dedicated rootless Podman account and a Nix-pinned image; no enrollment
   means no runner. Public mirroring remains a launch-time Hestia handoff.
-- Export stopped Forgejo state and its database atomically before all Borg targets;
-  failed exports resume Forgejo and abort archiving. Add offline failure checks
+- Export stopped Gitea state and its database atomically before all Borg targets;
+  failed exports resume Gitea and abort archiving. Add offline failure checks
   and a focused NixOS VM integration test.
 - Build both host variants and pass offline/VM checks on Hydrogen. Runtime tests
   caught and fixed the built-in SSH username and rootless Podman helper PATH;
@@ -473,7 +473,7 @@ Also the decision log. Rationale that would otherwise bloat a code comment lives
 
 - **Bare git repos on hydrogen, served by sshd.** `modules/git-server.nix` adds a `git`
   system user whose shell *is* `git-shell`, owning `/var/lib/git`. Chosen over a forge
-  (Forgejo/gitea): a forge brings a database, a web surface on the wildcard vhost, and an
+  (Gitea): a forge brings a database, a web surface on the wildcard vhost, and an
   account model to keep in step, none of which a single-user private remote needs. Repos
   stay plain directories, so a Borg restore hands them back working with no import step.
 - **No new port and no change to the access boundary.** sshd already answers on wgadm and

@@ -23,7 +23,7 @@ in
     ../modules/ai-marketplace-monitor.nix
     ../modules/backup.nix
     ../modules/git-server.nix
-    ../modules/forgejo.nix
+    ../modules/gitea.nix
     ../modules/minecraft-server.nix
     ../modules/minecraft-servers.nix      # extra worlds on demand, in rootless podman
     ../modules/minecraft-couch.nix
@@ -72,36 +72,20 @@ in
     archiveDir = "/var/lib/minecraft-archive";
   };
 
-  # Migration staging: retire only after the ref and restore checks in docs/forgejo.md.
-  # Never disable the old transport before its repositories have been inventoried.
+  # Legacy bare repositories remain separate from the fresh Gitea instance.
   fleet.gitServer.enable = true;
-  fleet.gitServer.authorizedKeys = [ ]; # Freeze legacy pushes during verified Forgejo migration.
+  fleet.gitServer.authorizedKeys = [ ]; # Legacy pushes remain disabled.
 
   fleet.vhosts.git = {
-    port = config.services.forgejo.settings.server.HTTP_PORT;
+    port = config.services.gitea.settings.server.HTTP_PORT;
     allowedCIDRs = [ "100.64.0.0/10" ];
   };
   # The runner and its containers need the same private endpoint as tailnet clients.
   networking.hosts.${devices.hydrogen.tailAddress} = [ "git.luckyobserver.com" ];
-  sops.secrets.forgejo-admin-password.sopsFile = ../secrets/forgejo.yaml;
-  fleet.forgejo.adminPasswordFile = config.sops.secrets.forgejo-admin-password.path;
-  sops.secrets.forgejo-runner-ci-checks = {
-    sopsFile = ../secrets/forgejo-runner.yaml;
-    restartUnits = [ "forgejo-runner-hydrogen.service" ];
-  };
-  fleet.forgejo.runnerConnections.ci-checks = {
-    uuid = "54f42cfb-63dc-4d01-b9d4-9a08c658aa2f";
-    tokenFile = config.sops.secrets.forgejo-runner-ci-checks.path;
-  };
-
-  sops.secrets.forgejo-runner-groundedgadgets = {
-    sopsFile = ../secrets/forgejo-runner.yaml;
-    restartUnits = [ "forgejo-runner-hydrogen.service" ];
-  };
-  fleet.forgejo.runnerConnections.groundedgadgets = {
-    uuid = "43f6cbb4-7961-402b-8069-a349e2092ba8";
-    tokenFile = config.sops.secrets.forgejo-runner-groundedgadgets.path;
-  };
+  sops.secrets.gitea-admin-password.sopsFile = ../secrets/gitea.yaml;
+  fleet.gitea.adminPasswordFile = config.sops.secrets.gitea-admin-password.path;
+  sops.secrets.gitea-actions-runner = { };
+  fleet.gitea.runnerTokenFile = config.sops.secrets.gitea-actions-runner.path;
 
   # Publish candidates centrally; each machine builds before activating.
   fleet.lockUpdate.enable = true;
@@ -111,6 +95,8 @@ in
     allowReboot = true;
     rebootWindow = { lower = "05:00"; upper = "06:00"; };
   };
+  # Resume after the Gitea configuration is published to main.
+  systemd.timers.nixos-upgrade.enable = lib.mkForce false;
   systemd.services.nixos-upgrade.serviceConfig.ExecCondition =
     pkgs.writeShellScript "upgrade-backups-idle" ''
       # Exit 1 from ExecCondition skips the run while a backup is active.
@@ -119,7 +105,7 @@ in
           fleet-borg-backup.service borgbackup-job-data.service borgbackup-job-ssd.service \
           borgbackup-job-remote.service \
           postgresqlBackup-nextcloud.service postgresqlBackup-immich.service \
-          forgejo-backup.service \
+          gitea-backup.service \
           | ${pkgs.gnugrep}/bin/grep -Eq '^(active|activating|deactivating)$'; then
         echo "Skipping automatic upgrade: a backup is running."
         exit 1

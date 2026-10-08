@@ -1,4 +1,4 @@
-# Private forge; deployment and migration instructions: docs/forgejo.md.
+# Private forge; deployment and migration instructions: docs/gitea.md.
 {
   config,
   lib,
@@ -6,15 +6,39 @@
   ...
 }:
 let
-  cfg = config.fleet.forgejo;
-  forge = config.services.forgejo;
+  cfg = config.fleet.gitea;
+  forge = config.services.gitea;
   devices = import ./family/devices.nix;
-  runnerEnabled = cfg.runnerConnections != { };
-  runnerUser = "forgejo-ci";
+  runnerEnabled = cfg.runnerTokenFile != null;
+  runnerUser = "gitea-ci";
   runnerUid = 1102; # 1100/1101 belong to Minecraft/Valheim.
-  runnerHome = "/var/lib/forgejo-runner/hydrogen";
+  runnerHome = "/var/lib/gitea-runner/hydrogen";
   runtime = "/run/user/${toString config.users.users.${runnerUser}.uid}";
   forgeCommand = "${lib.getExe forge.package} --work-path ${forge.stateDir} --config ${forge.customDir}/conf/app.ini";
+  logReader = pkgs.writeShellScript "gitea-read-log" ''
+    set -euo pipefail
+    if [[ $# != 1 || ! $1 =~ ^([A-Za-z0-9][A-Za-z0-9_.-]*/[A-Za-z0-9][A-Za-z0-9_.-]*)\ ([1-9][0-9]*)$ ]]; then
+      echo 'Usage: ssh ci-logs@hydrogen "owner/repo TASK_ID"' >&2
+      exit 2
+    fi
+    repo=''${BASH_REMATCH[1]}
+    task=''${BASH_REMATCH[2]}
+    shopt -s nullglob
+    logs=(${lib.escapeShellArg "${forge.stateDir}/data/actions_log"}/"$repo"/[0-9a-f][0-9a-f]/"$task".log.zst)
+    if [[ ''${#logs[@]} != 1 ]]; then
+      echo 'No completed log found for that repository and task ID.' >&2
+      exit 1
+    fi
+    log=''${logs[0]}
+    if [[ $(${pkgs.coreutils}/bin/realpath -e -- "$log") != "$log" ]]; then
+      echo 'Refusing a log path containing a symbolic link.' >&2
+      exit 1
+    fi
+    exec ${pkgs.zstd}/bin/zstd -dc -- "$log"
+  '';
+  logSsh = pkgs.writeShellScript "gitea-log-ssh" ''
+    exec /run/wrappers/bin/sudo -n -u ${forge.user} -- ${logReader} "$SSH_ORIGINAL_COMMAND"
+  '';
   runnerRuntime = pkgs.buildEnv {
     name = "hydrogen-actions-runtime";
     # Keep /var writable: fakeNss supplies a symlink into the read-only store.
@@ -57,32 +81,22 @@ let
   };
 in
 {
-  options.fleet.forgejo = {
+  options.fleet.gitea = {
     adminPasswordFile = lib.mkOption {
       type = lib.types.nullOr lib.types.str;
       default = null;
       description = "SOPS runtime file for initial sheath administrator creation; null defers bootstrap.";
     };
-    runnerConnections = lib.mkOption {
-      default = { };
-      description = "Repository or organization Forgejo registrations. Empty disables CI.";
-      type = lib.types.attrsOf (
-        lib.types.submodule {
-          options = {
-            uuid = lib.mkOption { type = lib.types.str; };
-            tokenFile = lib.mkOption {
-              type = lib.types.str;
-              description = "SOPS runtime path, never a Nix store file.";
-            };
-          };
-        }
-      );
+    runnerTokenFile = lib.mkOption {
+      type = lib.types.nullOr lib.types.str;
+      default = null;
+      description = "Runtime environment file containing TOKEN for Gitea runner registration; null disables CI.";
     };
   };
 
   config = lib.mkMerge [
     {
-      services.forgejo = {
+      services.gitea = {
         enable = true;
         database = {
           type = "postgres";
@@ -91,7 +105,6 @@ in
         lfs.enable = true;
         settings = {
           server = {
-            DOMAIN = "git.luckyobserver.com";
             ROOT_URL = "https://git.luckyobserver.com/";
             HTTP_ADDR = "127.0.0.1";
             HTTP_PORT = 3001;
@@ -124,25 +137,50 @@ in
       };
 
       environment.systemPackages = [
-        (pkgs.writeShellScriptBin "forgejo-admin" ''
+        (pkgs.writeShellScriptBin "gitea-admin" ''
           exec ${pkgs.util-linux}/bin/runuser -u ${forge.user} -- ${forgeCommand} "$@"
         '')
       ];
+
+      users.groups.ci-logs = { };
+      users.users.ci-logs = {
+        isSystemUser = true;
+        group = "ci-logs";
+        home = "/var/empty";
+        shell = pkgs.bashInteractive;
+        openssh.authorizedKeys.keys = map (
+          key: "from=\"100.64.0.0/10\" ${key}"
+        ) (import ../users/sheath.nix).openssh.authorizedKeys.keys;
+      };
+      services.openssh.extraConfig = ''
+        Match User ci-logs
+          ForceCommand ${logSsh}
+          AuthenticationMethods publickey
+          DisableForwarding yes
+          PermitTTY no
+          PermitUserRC no
+        Match all
+      '';
+      security.sudo.extraRules = [{
+        users = [ "ci-logs" ];
+        runAs = forge.user;
+        commands = [{ command = "${logReader} *"; options = [ "NOPASSWD" ]; }];
+      }];
 
       assertions = [
         {
           assertion = lib.all (p: !(lib.hasPrefix "/nix/store/" p)) (
             lib.optional (cfg.adminPasswordFile != null) cfg.adminPasswordFile
-            ++ map (c: c.tokenFile) (builtins.attrValues cfg.runnerConnections)
+            ++ lib.optional (cfg.runnerTokenFile != null) cfg.runnerTokenFile
           );
-          message = "Forgejo credentials must be runtime files supplied by SOPS, not Nix store paths.";
+          message = "Gitea credentials must be runtime files supplied by SOPS, not Nix store paths.";
         }
       ];
 
       # Keep a consistent copy of ALL state, including Actions artifacts and generated keys.
       # A SQL dump plus the complete stopped state avoids omissions in app-specific exports.
-      systemd.services.forgejo-backup = {
-        description = "Export a consistent Forgejo database and state for Borg";
+      systemd.services.gitea-backup = {
+        description = "Export a consistent Gitea database and state for Borg";
         requires = [ "postgresql.service" ];
         after = [ "postgresql.service" ];
         path = with pkgs; [
@@ -153,40 +191,40 @@ in
           config.services.postgresql.package
         ];
         environment = {
-          FORGEJO_STATE = forge.stateDir;
-          FORGEJO_BACKUP = "/var/backup/forgejo";
-          FORGEJO_VERSION = forge.package.version;
+          GITEA_STATE = forge.stateDir;
+          GITEA_BACKUP = "/var/backup/gitea";
+          GITEA_VERSION = forge.package.version;
         };
-        script = builtins.readFile ../packages/forgejo-backup.sh;
+        script = builtins.readFile ../packages/gitea-backup.sh;
         postStop = ''
           # ExecStopPost also runs after failure or termination, when a shell trap cannot.
           if [ -e "$RUNTIME_DIRECTORY/restart" ]; then
-            systemctl start forgejo.service
+            systemctl start gitea.service
           fi
         '';
         serviceConfig = {
           Type = "oneshot";
-          RuntimeDirectory = "forgejo-backup";
+          RuntimeDirectory = "gitea-backup";
           RuntimeDirectoryMode = "0700";
           UMask = "0077";
           TimeoutStartSec = "1h";
         };
       };
-      systemd.tmpfiles.rules = [ "d /var/backup/forgejo 0700 root root -" ];
+      systemd.tmpfiles.rules = [ "d /var/backup/gitea 0700 root root -" ];
     }
 
     (lib.mkIf (cfg.adminPasswordFile != null) {
-      systemd.services.forgejo-bootstrap = {
-        description = "Create the initial Forgejo administrator once";
-        requires = [ "forgejo.service" ];
-        after = [ "forgejo.service" ];
+      systemd.services.gitea-bootstrap = {
+        description = "Create the initial Gitea administrator once";
+        requires = [ "gitea.service" ];
+        after = [ "gitea.service" ];
         wantedBy = [ "multi-user.target" ];
         path = [
           config.services.postgresql.package
           pkgs.coreutils
         ];
         script = ''
-          existing=$(psql --dbname=forgejo --tuples-only --no-align \
+          existing=$(psql --dbname=gitea --tuples-only --no-align \
             --command="SELECT 1 FROM \"user\" WHERE lower_name = 'sheath';")
           if [ "$existing" != 1 ]; then
             ${forgeCommand} admin user create --username sheath --email se@nheath.com \
@@ -220,7 +258,7 @@ in
       };
 
       # A system unit under the dedicated uid, never the privileged system Podman socket.
-      systemd.services.forgejo-podman = {
+      systemd.services.gitea-podman = {
         path = [ "/run/wrappers" ]; # Rootless subordinate IDs require setuid newuidmap/newgidmap.
         requires = [ "user@${toString runnerUid}.service" ];
         after = [ "user@${toString runnerUid}.service" ];
@@ -232,26 +270,23 @@ in
         serviceConfig = {
           User = runnerUser;
           Group = runnerUser;
-          ExecStart = "${pkgs.podman}/bin/podman system service --time=0 unix://${runtime}/forgejo-podman.sock";
+          ExecStart = "${pkgs.podman}/bin/podman system service --time=0 unix://${runtime}/gitea-podman.sock";
           Restart = "on-failure";
           UMask = "0077";
           Delegate = true;
         };
       };
 
-      services.forgejo-runner.instances.hydrogen = {
+      services.gitea-actions-runner.instances.hydrogen = {
         enable = true;
-        # Override the module's rootful runtime wiring; DOCKER_HOST below selects ours.
-        runtimes = {
-          docker = false;
-          podman = false;
-          host = false;
-        };
+        name = "hydrogen";
+        url = forge.settings.server.ROOT_URL;
+        tokenFile = cfg.runnerTokenFile;
+        labels = [ "hydrogen-linux:docker://${image.imageName}:${image.imageTag}" ];
         settings = {
           runner = {
             capacity = 1;
             timeout = "3h";
-            labels = [ "hydrogen-linux:docker://${image.imageName}:${image.imageTag}" ];
           };
           cache.enabled = false;
           container = {
@@ -267,23 +302,16 @@ in
               "--volume=/nix/var/nix/daemon-socket:/nix/var/nix/daemon-socket:ro"
             ];
           };
-          server.connections = lib.mapAttrs (_: c: {
-            url = forge.settings.server.ROOT_URL;
-            inherit (c) uuid;
-          }) cfg.runnerConnections;
         };
-        secrets.server.connections = lib.mapAttrs (_: c: {
-          token_url = c.tokenFile;
-        }) cfg.runnerConnections;
       };
-      systemd.services.forgejo-runner-hydrogen = {
-        requires = [ "forgejo-podman.service" ];
+      systemd.services.gitea-runner-hydrogen = {
+        requires = [ "gitea-podman.service" ];
         after = [
-          "forgejo-podman.service"
-          "forgejo.service"
+          "gitea-podman.service"
+          "gitea.service"
         ];
         environment = {
-          DOCKER_HOST = "unix://${runtime}/forgejo-podman.sock";
+          DOCKER_HOST = lib.mkForce "unix://${runtime}/gitea-podman.sock";
           XDG_RUNTIME_DIR = runtime;
         };
         path = [ pkgs.podman ];
@@ -297,7 +325,7 @@ in
         '';
         serviceConfig = {
           DynamicUser = lib.mkForce false;
-          User = runnerUser;
+          User = lib.mkForce runnerUser;
           Group = runnerUser;
           SupplementaryGroups = lib.mkForce [ ];
           UMask = "0077";
