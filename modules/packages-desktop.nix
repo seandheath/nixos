@@ -61,7 +61,6 @@
     # 3D printing and CAD
     prusa-slicer
     openscad
-    freecad
     kicad
 
     # Note-taking and productivity
