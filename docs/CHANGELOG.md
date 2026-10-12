@@ -2,6 +2,12 @@
 
 Also the decision log. Rationale that would otherwise bloat a code comment lives here.
 
+## 2026-10-12 (Ponytail removal)
+
+- **Remove the Ponytail plugin** from claude, cclaude and codex/ccodex (client state, not
+  Nix); opencode/copencode never had it. Drop Node.js from the `ccodex` runtime since
+  it was only there for Ponytail hooks.
+
 ## 2026-10-07 (Gitea migration and developer containers)
 
 - Disable legacy Git SSH writes and copy `groundedgadgets` into private Gitea;
