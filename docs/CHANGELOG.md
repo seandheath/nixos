@@ -2,6 +2,13 @@
 
 Also the decision log. Rationale that would otherwise bloat a code comment lives here.
 
+## 2026-10-13 (consistent SQLite backups)
+
+- **Snapshot SQLite before each Borg run** (paperless, calibre-web app and library, marketplace
+  cache) with `sqlite3 .backup` into `/var/backup/sqlite`; the live files can be torn.
+  Restore from the snapshots.
+- Move hydrogen's upgrade-vs-backup guard into `modules/backup.nix`, beside the units it names.
+
 ## 2026-10-13 (bug fixes)
 
 - **Family laptops: sshd only on tailscale0.** It was open on every network these machines join.

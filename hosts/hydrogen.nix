@@ -91,20 +91,6 @@ in
     allowReboot = true;
     rebootWindow = { lower = "05:00"; upper = "06:00"; };
   };
-  systemd.services.nixos-upgrade.serviceConfig.ExecCondition =
-    pkgs.writeShellScript "upgrade-backups-idle" ''
-      # Exit 1 from ExecCondition skips the run while a backup is active.
-      if ! ${pkgs.util-linux}/bin/flock -n /run/lock/fleet-borg-backup.lock ${pkgs.coreutils}/bin/true \
-        || ${pkgs.systemd}/bin/systemctl show --property=ActiveState --value \
-          fleet-borg-backup.service borgbackup-job-data.service borgbackup-job-ssd.service \
-          borgbackup-job-remote.service \
-          postgresqlBackup-nextcloud.service postgresqlBackup-immich.service \
-          gitea-backup.service \
-          | ${pkgs.gnugrep}/bin/grep -Eq '^(active|activating|deactivating)$'; then
-        echo "Skipping automatic upgrade: a backup is running."
-        exit 1
-      fi
-    '';
 
   # On-demand worlds alongside the shared one. Each launcher has a dedicated SOPS-managed
   # key; the public halves below are restricted to the forced Minecraft control command.

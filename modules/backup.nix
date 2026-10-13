@@ -26,6 +26,7 @@ let
 
     # Include the database dumps without sweeping in unrelated backup storage.
     "/var/backup/postgresql"
+    "/var/backup/sqlite"
 
     # The whole Minecraft payload as a local binary cache. The flake can rebuild it only
     # while Mojang and Modrinth keep serving these exact versions; with this, `nix copy
@@ -84,6 +85,7 @@ let
     # writeShellScript does not enable errexit: a failed export must abort explicitly.
     ${pkgs.systemd}/bin/systemctl start --wait gitea-backup.service || exit 1
     ${pgRefresh}
+    ${sqliteRefresh}
     ${minecraftFlush}
     trap '${minecraftResume}' EXIT
 
@@ -113,6 +115,24 @@ let
     echo "Refreshing PostgreSQL dumps (nextcloud, immich)..."
     ${pkgs.systemd}/bin/systemctl start --wait \
       postgresqlBackup-nextcloud.service postgresqlBackup-immich.service
+  '';
+
+  # The live files are archived too, but a copy mid-transaction can be torn; restore from
+  # these. Mirrors each path under /var/backup/sqlite.
+  sqliteDbs = [
+    "/var/lib/paperless/db.sqlite3"
+    "/var/lib/calibre-web/app.db"
+    "/var/lib/calibre-web/library/metadata.db"
+    "/var/lib/ai-marketplace-monitor/cache.db"
+  ];
+  sqliteRefresh = ''
+    echo "Snapshotting SQLite databases..."
+    for db in ${lib.escapeShellArgs sqliteDbs}; do
+      dest="/var/backup/sqlite$db"
+      ${pkgs.coreutils}/bin/mkdir -p "$(${pkgs.coreutils}/bin/dirname "$dest")"
+      ${pkgs.sqlite}/bin/sqlite3 "$db" ".backup $dest.tmp" || exit 1
+      ${pkgs.coreutils}/bin/mv "$dest.tmp" "$dest"
+    done
   '';
 
   # One lock covers both the scheduled service and manually selected backups.  A second
@@ -241,6 +261,22 @@ in
     unitConfig.RequiresMountsFor = [ "/data" "/backup" ];
   };
 
+  # Lives here because it names this module's units.
+  systemd.services.nixos-upgrade.serviceConfig.ExecCondition =
+    pkgs.writeShellScript "upgrade-backups-idle" ''
+      # Exit 1 from ExecCondition skips the run while a backup is active.
+      if ! ${pkgs.util-linux}/bin/flock -n /run/lock/fleet-borg-backup.lock ${pkgs.coreutils}/bin/true \
+        || ${pkgs.systemd}/bin/systemctl show --property=ActiveState --value \
+          fleet-borg-backup.service borgbackup-job-data.service borgbackup-job-ssd.service \
+          borgbackup-job-remote.service \
+          postgresqlBackup-nextcloud.service postgresqlBackup-immich.service \
+          gitea-backup.service \
+          | ${pkgs.gnugrep}/bin/grep -Eq '^(active|activating|deactivating)$'; then
+        echo "Skipping automatic upgrade: a backup is running."
+        exit 1
+      fi
+    '';
+
   # The data job writes to /data — don't run it before the disk is mounted.
   systemd.services.borgbackup-job-data.unitConfig.RequiresMountsFor = "/data";
   systemd.services.borgbackup-job-ssd.unitConfig.RequiresMountsFor = "/backup";
@@ -254,5 +290,6 @@ in
     in
     [
       "d ${home}/.local/share/minecraft-couch 0755 ${config.fleet.adminUser} ${group} -"
+      "d /var/backup/sqlite 0700 root root -"
     ];
 }
