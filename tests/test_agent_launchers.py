@@ -86,8 +86,13 @@ print(json.dumps({{"args": sys.argv[1:], "env": {{k: os.environ.get(k) for k in
         return next(arg for arg in call["args"] if arg.startswith("--network="))
 
     assert "/run/secrets/development-token:/run/secrets/development-token:ro" in launch("copencode", "run", "hello")["args"]
-    assert launch("opencode", "--reva", "run", "hello")["env"]["OPENCODE_CONFIG"] == str(home / ".config/opencode/opencode-re.json")
-    assert launch("opencode", "run", "hello")["env"]["OPENCODE_CONFIG"] is None
+    reva = launch("opencode", "--reva", "run", "hello")
+    assert reva["env"]["OPENCODE_CONFIG"] == str(home / ".config/opencode/opencode-re.json")
+    # A shared background server would ignore OPENCODE_CONFIG.
+    assert reva["args"] == ["--standalone", "run", "hello"]
+    plain = launch("opencode", "run", "hello")
+    assert plain["env"]["OPENCODE_CONFIG"] is None
+    assert plain["args"] == ["run", "hello"]
     assert launch("opencode", "--", "--reva")["args"] == ["--", "--reva"]
 
     oc = launch("copencode", "run", "hello")
