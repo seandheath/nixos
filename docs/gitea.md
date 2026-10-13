@@ -36,8 +36,8 @@ as that OS user with `database.dump` on stdin. Start Gitea and verify clone/push
 
 ## Checks and deployment
 
-Run `python3 tests/test_gitea.py /path/to/pinned/nixpkgs`; the VM build command
-is at the top of `tests/gitea-vm.nix`. Build Hydrogen with
+Run `python3 tests/test_gitea.py /path/to/pinned/nixpkgs`; the VM test is
+`nix build path:.#checks.x86_64-linux.gitea-vm`, also run by `nix flake check`. Build Hydrogen with
 `nix build path:.#nixosConfigurations.hydrogen.config.system.build.toplevel`.
 Activate with `sudo nixos-rebuild switch --flake path:/home/sheath/nixos#hydrogen`.
 The `path:` prefix includes the ignored `provisioning/hydrogen/` hardware files.

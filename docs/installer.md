@@ -86,14 +86,10 @@ python3 tests/evaluate-installer.py
 nix build --no-link 'path:.#installer' 'path:.#installer.tests.unit'
 ```
 
-The disposable VM tests can be run individually (replace the test filename):
+The disposable VM tests run as part of `nix flake check`, or individually:
 
 ```sh
-nix build --no-link --impure --expr '
-  let f = builtins.getFlake ("path:" + toString ./.);
-  in import ./tests/installer-storage-vm.nix {
-    inherit (f.inputs) nixpkgs disko; system = "x86_64-linux";
-  }'
+nix build --no-link 'path:.#checks.x86_64-linux.installer-storage-vm'
 ```
 
 `installer-storage-vm.nix` checks the real guided layouts, swap, encryption,

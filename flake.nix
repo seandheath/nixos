@@ -137,7 +137,13 @@
       # a build regression in it goes unnoticed until someone needs to install a machine.
       checks.${system} =
         nixpkgs.lib.mapAttrs (_: h: h.config.system.build.toplevel) hosts
-        // { inherit (pkgs) installer; installer-unit = pkgs.installer.tests.unit; };
+        // { inherit (pkgs) installer; installer-unit = pkgs.installer.tests.unit; }
+        # NixOS VM tests; they need KVM and add minutes to a check.
+        // {
+          gitea-vm = import ./tests/gitea-vm.nix { inherit nixpkgs system; };
+          disko-vm = import ./tests/disko-vm.nix { inherit nixpkgs system; inherit (inputs) disko; };
+          installer-storage-vm = import ./tests/installer-storage-vm.nix { inherit nixpkgs system; inherit (inputs) disko; };
+        };
 
       packages.${system} = {
         inherit (pkgs)
