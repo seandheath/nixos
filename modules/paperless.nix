@@ -22,6 +22,6 @@
 
   systemd.services.paperless-task-queue.serviceConfig.RestartSec = 30;
 
-  fleet.vhosts.paper.port = 28981;
+  fleet.vhosts.paper.port = config.services.paperless.port;
 
 }

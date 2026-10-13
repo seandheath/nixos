@@ -186,6 +186,13 @@ let
   '';
 in
 {
+  # The monitor itself stays on loopback; nginx gives it the fleet wildcard certificate.
+  # Restrict the vhost to direct tailnet sources like the other private services.
+  fleet.vhosts.marketplace = {
+    port = 8467;
+    allowedCIDRs = [ "100.64.0.0/10" ];
+  };
+
   virtualisation.podman.enable = true;
   virtualisation.oci-containers = {
     backend = "podman";

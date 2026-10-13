@@ -1,4 +1,4 @@
-{ ... }:
+{ config, ... }:
 # calibre-web ebook library, reachable through the home tailnet at
 # https://calibre.luckyobserver.com.
 #
@@ -18,5 +18,5 @@
     };
   };
 
-  fleet.vhosts.calibre.port = 8083;
+  fleet.vhosts.calibre.port = config.services.calibre-web.listen.port;
 }

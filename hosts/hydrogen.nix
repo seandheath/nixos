@@ -11,7 +11,7 @@ in
     ../modules/gnome.nix
     ../modules/audio.nix
     ../modules/nix-ld.nix
-    ../modules/impermanence-server.nix
+    ../modules/persist-server.nix
     ../modules/reverse-proxy.nix
     ../modules/nextcloud.nix
     ../modules/immich.nix
@@ -71,6 +71,7 @@ in
   fleet.gitServer.enable = true;
   fleet.gitServer.authorizedKeys = [ ]; # Legacy pushes remain disabled.
 
+  # Here rather than in gitea.nix, which tests/gitea-vm.nix imports without the proxy.
   fleet.vhosts.git = {
     port = config.services.gitea.settings.server.HTTP_PORT;
     allowedCIDRs = [ "100.64.0.0/10" ];
@@ -145,13 +146,6 @@ in
     # Key-only because 22 also remains reachable from the home LAN as a recovery path.
     settings.PasswordAuthentication = false;
     settings.PermitRootLogin = "no";
-  };
-
-  # The monitor itself stays on loopback; nginx gives it the fleet wildcard certificate.
-  # Restrict the vhost to direct tailnet sources like the other private services.
-  fleet.vhosts.marketplace = {
-    port = 8467;
-    allowedCIDRs = [ "100.64.0.0/10" ];
   };
 
   # The console is the recovery path here, per the br0 note above.

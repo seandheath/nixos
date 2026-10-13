@@ -19,5 +19,5 @@
   systemd.services.immich-server.unitConfig.RequiresMountsFor = "/data";
   systemd.services.immich-machine-learning.unitConfig.RequiresMountsFor = "/data";
 
-  fleet.vhosts.immich = { port = 2283; maxBody = "50G"; readTimeout = "600s"; };
+  fleet.vhosts.immich = { port = config.services.immich.port; maxBody = "50G"; readTimeout = "600s"; };
 }
