@@ -96,17 +96,16 @@
           (builtins.pathExists (./provisioning + "/${hostName}/default.nix"))
           (./provisioning + "/${hostName}/default.nix");
 
-      mkHost = { hostName, extraModules ? [ ] }: nixpkgs.lib.nixosSystem {
+      mkHost = hostName: modules: nixpkgs.lib.nixosSystem {
         inherit system;
         specialArgs = { inherit inputs; };
-        modules = [ ./hosts/${hostName}.nix { fleet.profileName = hostName; } ]
-          ++ provisioningFor hostName ++ extraModules ++ commonModules;
+        modules = [ { networking.hostName = hostName; fleet.profileName = hostName; } ]
+          ++ modules ++ provisioningFor hostName ++ commonModules;
       };
 
       # The kids' laptops. modules/family/profile.nix derives the username, secret names,
       # and Minecraft handle from modules/family/devices.nix, so a host declares only its
-      # hostname and hardware.
-      # Value is the host's hardware-model modules, the seam mkHost has as extraModules.
+      # hostname and hardware. Value is the host's hardware-model modules.
       familyHosts = {
         gentlemenpupil = [ ./modules/oryp10.nix ]; # System76 Oryx Pro 10, ex-osmium
         vizualwanderer = [ ];
@@ -115,28 +114,20 @@
       };
 
       hosts = {
-        hydrogen = mkHost { hostName = "hydrogen"; };
+        hydrogen = mkHost "hydrogen" [ ./hosts/hydrogen.nix ];
 
-        sulfur = mkHost {
-          hostName = "sulfur";
-          extraModules = [
-            nixos-hardware.nixosModules.asus-zephyrus-gu605cw
-            {
-              # Sulfur supplies its panel setting; the shared module adds obsolete NVIDIA flags.
-              disabledModules = [ "${nixos-hardware}/asus/zephyrus/shared/backlight.nix" ];
-            }
-            impermanence.nixosModules.impermanence
-          ];
-        };
-      } // nixpkgs.lib.mapAttrs (hostName: extraModules: nixpkgs.lib.nixosSystem {
-        inherit system;
-        specialArgs = { inherit inputs; };
-        modules = [
-          ./modules/family/profile.nix
-          ./hardware/${hostName}.nix
-          { networking.hostName = hostName; fleet.profileName = hostName; }
-        ] ++ provisioningFor hostName ++ extraModules ++ commonModules;
-      }) familyHosts;
+        sulfur = mkHost "sulfur" [
+          ./hosts/sulfur.nix
+          nixos-hardware.nixosModules.asus-zephyrus-gu605cw
+          {
+            # Sulfur supplies its panel setting; the shared module adds obsolete NVIDIA flags.
+            disabledModules = [ "${nixos-hardware}/asus/zephyrus/shared/backlight.nix" ];
+          }
+          impermanence.nixosModules.impermanence
+        ];
+      } // nixpkgs.lib.mapAttrs (hostName: model:
+        mkHost hostName ([ ./modules/family/profile.nix ./hardware/${hostName}.nix ] ++ model)
+      ) familyHosts;
     in {
       nixosConfigurations = hosts;
 

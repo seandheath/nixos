@@ -29,7 +29,6 @@ in
     ../modules/valheim-server.nix
   ];
 
-  networking.hostName = "hydrogen";
   system.stateVersion = "25.11";
 
   fleet.bootGenerations = 20;

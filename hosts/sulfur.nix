@@ -73,7 +73,6 @@ in
     videoDrivers = [ "nvidia" ];
   };
 
-  networking.hostName = "sulfur";
   networking.networkmanager.enable = true;
   networking.networkmanager.wifi.powersave = false;
   # The Intel driver hit `Tx queue alloc failed` while roaming, leaving LAN traffic at
