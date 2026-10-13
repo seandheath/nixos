@@ -20,7 +20,6 @@ in
   imports = [
     ./gnome.nix
     ./nix-ld.nix
-    ./sops.nix
     ./dconf.nix
     ./audio.nix
     ./bluetooth.nix

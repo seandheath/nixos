@@ -23,7 +23,6 @@ in
     ../audio.nix
     ../bluetooth.nix
     ../printing.nix
-    ../sops.nix
     ../steam.nix
     ../minecraft-client.nix
     ../minecraft-launcher.nix

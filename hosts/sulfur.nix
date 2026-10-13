@@ -262,8 +262,8 @@ in
     startLimitBurst = 1;
   };
 
+  # Enabled by modules/steam.nix.
   programs.gamemode = {
-    enable = true;
     settings = {
       general = {
         renice = 10;
