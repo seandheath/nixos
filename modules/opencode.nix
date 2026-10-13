@@ -10,6 +10,8 @@ let
         echo 'opencode: ReVa configuration is missing; apply home-manager first' >&2
         exit 1
       fi
+      # A running background server ignores the client's OPENCODE_CONFIG.
+      set -- --standalone "$@"
     fi
     exec ${pkgs.opencode}/bin/opencode "$@"
   '';
@@ -46,8 +48,8 @@ in
           "$schema" = "https://opencode.ai/config.json";
 
           # The served model is not in models.dev, so the SDK and the capabilities have to be
-          # spelled out. @ai-sdk/openai-compatible is already in the nixpkgs opencode closure,
-          # so this resolves offline. The URL is Open WebUI's OpenAI-compatible root, which
+          # spelled out. The 2.x binary bundles @ai-sdk/openai-compatible, so this resolves
+          # offline. The URL is Open WebUI's OpenAI-compatible root, which
           # proxies to vLLM; tool calling through that proxy is verified working.
           provider.vllm = {
             npm = "@ai-sdk/openai-compatible";

@@ -2,6 +2,12 @@
 
 Also the decision log. Rationale that would otherwise bloat a code comment lives here.
 
+## 2026-10-13 (OpenCode 2.x)
+
+- **Package OpenCode 2.0.27 from its npm binary**; 2.x is not in nixpkgs. 2.x runs a shared
+  background server that ignores a client's `OPENCODE_CONFIG`, so `opencode --reva` now
+  runs `--standalone` to get the ReVa config.
+
 ## 2026-10-12 (Ponytail removal)
 
 - **Remove the Ponytail plugin** from claude, cclaude and codex/ccodex (client state, not

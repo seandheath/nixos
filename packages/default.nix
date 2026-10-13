@@ -18,13 +18,27 @@ final: prev: {
     exec ${final.mermaid-cli}/bin/mmdc -p ${final.writeText "puppeteer.json" (builtins.toJSON { args = [ "--no-sandbox" ]; })} "$@"
   '';
 
-  # Bun 1.4 breaks OpenCode's split executable; nixpkgs has the same fix after our pin.
-  opencode = if prev.opencode.version == "1.18.30" then prev.opencode.overrideAttrs (previousAttrs: {
-    postPatch = previousAttrs.postPatch + ''
-      substituteInPlace packages/opencode/script/build.ts \
-        --replace-fail 'splitting: true,' 'splitting: false,'
+  # OpenCode 2.x ships only as a prebuilt binary on npm (no GitHub releases, not in nixpkgs).
+  opencode = final.stdenvNoCC.mkDerivation rec {
+    pname = "opencode";
+    version = "2.0.27";
+    src = final.fetchurl {
+      url = "https://registry.npmjs.org/@opencode/cli-linux-x64/-/cli-linux-x64-${version}.tgz";
+      hash = "sha512-QPGrzBSSs5ATG3nM4XjS4tmWXUB22Di36H0vfMuhKwk6i3PR3Nb4sm+l00gvTdcyCRohYsKwqjvD67T0DPcQLQ==";
+    };
+    sourceRoot = "package";
+    dontBuild = true;
+    # Stripping destroys the Bun-compiled executable's embedded payload.
+    dontStrip = true;
+    nativeBuildInputs = [ final.autoPatchelfHook final.makeBinaryWrapper ];
+    installPhase = ''
+      install -Dm755 bin/opencode $out/bin/opencode
+      wrapProgram $out/bin/opencode \
+        --set OPENCODE_DISABLE_AUTOUPDATE true \
+        --prefix PATH : ${final.lib.makeBinPath [ final.ripgrep ]}
     '';
-  }) else prev.opencode;
+    meta.mainProgram = "opencode";
+  };
 
   # Hold the jar at the fleet-wide pin rather than whatever the channel ships.
   #
