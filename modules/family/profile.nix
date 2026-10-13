@@ -42,6 +42,7 @@ in
       enable = true;
       acceptRoutes = false;
       tags = [ "tag:family" ];
+      allowedTCPPorts = [ 22 ];
       authKeyFile = config.sops.secrets."tailscale-auth-${hostName}".path;
     };
     sops.secrets."tailscale-auth-${hostName}" = { };
@@ -49,7 +50,7 @@ in
 
     # These machines leave the house and are not disk-encrypted, so they carry the FAMILY
     # age key and can decrypt only family.yaml -- never the Nextcloud admin password, the
-    # Borg key or the fleet VPN key. install.sh places the right key per host.
+    # Borg key. The installer places the right key per host.
     sops.defaultSopsFile = lib.mkForce ../../secrets/family.yaml;
 
     # neededForUsers decrypts before accounts are created, which is the only way a
@@ -62,7 +63,7 @@ in
       description = username;
       # wheel: the kids administer their own machines, with a password prompt. It does not
       # weaken content filtering -- that is the router, per SSID -- but it does hand over
-      # the machine, including sheath's age key, which decrypts family.yaml. See the open
+      # the machine, including the family age key, which decrypts family.yaml. See the open
       # item in docs/CHANGELOG.md about no longer sharing that hash.
       extraGroups = [ "wheel" "networkmanager" "video" "audio" "input" ];
       hashedPasswordFile = config.sops.secrets."${hostName}-password-hash".path;
@@ -75,15 +76,16 @@ in
     fleet.accounts.sudoNoPassword = true;
 
     # Key-only, unlike hydrogen: these accounts have child-chosen passwords and the machines
-    # sit on untrusted networks. Headscale policy permits administrative access.
+    # sit on untrusted networks, so sshd is reachable only over tailscale0 (above).
+    # Headscale policy permits administrative access.
     services.openssh = {
       enable = true;
+      openFirewall = false;
       settings = {
         PasswordAuthentication = false;
         PermitRootLogin = "no";
       };
     };
-    networking.firewall.allowedTCPPorts = [ 22 ];
 
     programs.firefox.enable = true;
 

@@ -84,6 +84,8 @@ in
 
   home.packages = [
     pkgs.uv
+  ] ++ lib.optionals workstation [
+    # The launcher mounts /run/secrets/development-token, which only workstation.nix defines.
     cclaude
     cclaudePackages.cclaude-build
     cclaudePackages.cclaude-update

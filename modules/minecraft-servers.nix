@@ -85,7 +85,6 @@ in
         "command=\"${lib.getExe sshEntry}\",no-port-forwarding,no-agent-forwarding,no-X11-forwarding,no-pty ${key}"
       ) cfg.authorizedKeys;
     };
-    users.groups.mcctl = { };
 
     environment.systemPackages = [ ctl ];
 

@@ -1,6 +1,6 @@
 # Stand-in so `nixos-rebuild build` evaluates before a machine exists -- the module system
-# refuses a system with no root filesystem. install.sh overwrites the per-host file that
-# imports this with nixos-generate-config output. A build against this is meaningful; an
+# refuses a system with no root filesystem. The installer writes provisioning/<host>/,
+# whose hardware.nix and disk.nix supersede this. A build against this is meaningful; an
 # install from it is not.
 { config, lib, modulesPath, ... }:
 {

@@ -25,7 +25,8 @@ let
     context.fileName = "QWEN.md";
 
     # `httpUrl` selects StreamableHTTPClientTransport; ReVa does not serve SSE.
-    mcpServers.reva.httpUrl = "http://localhost:8080/mcp/message";
+    # 127.0.0.1, not localhost: see the matching ReVa URL in opencode.nix.
+    mcpServers.reva.httpUrl = "http://127.0.0.1:8080/mcp/message";
 
     permissions.allow = [ "run_shell_command(python3 -c *)" ];
   };

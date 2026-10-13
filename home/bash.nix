@@ -67,6 +67,11 @@
 
       _nix_rebuild() {
         local op="$1" target_host
+        # The family laptops carry this account but usually no checkout.
+        if [[ ! -d "$FLAKE" ]]; then
+          sudo fleet-rebuild "$op"
+          return
+        fi
         target_host=$(_nix_target_host) || return 1
         [[ -n "$target_host" ]] || return 1
         sudo nixos-rebuild "$op" --flake "path:$FLAKE#$target_host"

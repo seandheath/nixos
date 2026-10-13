@@ -240,8 +240,11 @@ in
   '';
 
   systemd.services.dock-monitors-hotplug = {
-    description = "Reapply monitor configuration on display hotplug";
-    after = [ "graphical.target" ];
+    description = "Reapply monitor configuration on display hotplug and resume";
+    # Resume too: GNOME drops the side monitors' rotation when resuming docked.
+    # Wanted by and ordered after suspend.target: the start runs once the system resumes.
+    wantedBy = [ "suspend.target" ];
+    after = [ "graphical.target" "suspend.target" ];
     serviceConfig = {
       Type = "oneshot";
       # No session bus, nothing to reconfigure. The udev rule fires on DRM events with no

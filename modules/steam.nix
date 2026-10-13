@@ -23,8 +23,9 @@
       proton-ge-bin
     ];
     package = pkgs.steam.override {
-      extraPkgs = pkgs: with pkgs; [
-        # 64-bit
+      # extraLibraries, not extraPkgs: multiPkgs get both 64- and 32-bit builds (Wine
+      # needs the 32-bit ones).
+      extraLibraries = pkgs: with pkgs; [
         freetype
         fontconfig
         # The Binding of Isaac: Rebirth (native, appid 250900) links
@@ -32,11 +33,6 @@
         # native binary dies at startup with "error while loading shared
         # libraries: libGLU.so.1". libGL/mesa GLU is separate from the driver.
         libGLU
-
-        # 32-bit (critical for Wine)
-        pkgsi686Linux.freetype
-        pkgsi686Linux.fontconfig
-        pkgsi686Linux.libGLU
       ];
     };
   };

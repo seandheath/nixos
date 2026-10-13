@@ -65,7 +65,7 @@ let
       # Move integration modules with nixpkgs. Each host builds before activating.
       nix flake update --flake "$repo"
       git -C "$repo" diff --quiet -- flake.lock && exit 0
-      git -C "$repo" -c user.name=hydrogen -c user.email=seanheath@gmail.com \
+      git -C "$repo" -c user.name=hydrogen -c user.email=seanheath87@gmail.com \
         commit -m "chore(flake): nightly input update" -- flake.lock
       git -C "$repo" push ${lib.escapeShellArg remote} HEAD:main
     '';

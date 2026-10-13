@@ -1,7 +1,7 @@
 # Installing a fleet machine
 
 Boot a NixOS live ISO in UEFI mode, connect to the network, clone this repository,
-and run `bash install.sh`. For the new hydrogen tower, use
+and run `bash install.sh`. For hydrogen, use
 `bash install.sh --host hydrogen`. A fresh installation does not require the old
 system SSD. Select the existing `/data` filesystem to keep it; the system disk and
 any separate `/home` disk are erased.

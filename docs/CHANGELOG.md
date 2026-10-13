@@ -2,6 +2,16 @@
 
 Also the decision log. Rationale that would otherwise bloat a code comment lives here.
 
+## 2026-10-13 (bug fixes)
+
+- **Family laptops: sshd only on tailscale0.** It was open on every network these machines join.
+- **Dock monitors re-apply on resume** via the system hotplug unit; the home-manager user
+  unit hooked `suspend.target`, which user managers never reach.
+- `nr`/`nb` fall back to `fleet-rebuild` where `~/nixos` does not exist (family laptops).
+- Steam's extra libraries move to `extraLibraries` so the 32-bit builds land in the FHS env.
+- cclaude installs only on the workstation; its launcher needs `development-token`.
+- qwen-code reaches ReVa at 127.0.0.1, like OpenCode.
+
 ## 2026-10-13 (obsolete overrides)
 
 - **Drop overrides nixpkgs now covers:** the qwen-code 0.21.1 pin (nixpkgs has 0.25.0), the
