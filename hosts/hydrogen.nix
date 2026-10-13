@@ -36,7 +36,8 @@ in
   fileSystems."/backup" = {
     device = "/dev/disk/by-id/nvme-Samsung_SSD_970_EVO_500GB_S5H7NJ0N419311D-part1";
     fsType = "btrfs";
-    options = [ "noatime" "compress=zstd" ];
+    # nofail: a dead backup SSD must not block boot; the ssd Borg job requires the mount.
+    options = [ "noatime" "compress=zstd" "nofail" ];
   };
 
   # Nightly fleet builds share the SSD with service data.
@@ -145,6 +146,8 @@ in
     enable = true;
     # Key-only because 22 also remains reachable from the home LAN as a recovery path.
     settings.PasswordAuthentication = false;
+    # Otherwise PAM still accepts passwords through keyboard-interactive.
+    settings.KbdInteractiveAuthentication = false;
     settings.PermitRootLogin = "no";
   };
 
@@ -155,6 +158,12 @@ in
   systemd.tmpfiles.rules = [
     "d /data/games 0755 ${config.fleet.adminUser} ${config.fleet.adminUser} -"
   ];
+
+  # /data is RAID0: scrub can only detect corruption there, which is still worth knowing.
+  services.btrfs.autoScrub.fileSystems = [ "/data" "/backup" ];
+  services.smartd.enable = true;
+  services.fwupd.enable = true;
+  zramSwap.enable = true;
 
   environment.systemPackages = with pkgs; [
     rustdesk-flutter

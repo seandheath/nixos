@@ -2,6 +2,14 @@
 
 Also the decision log. Rationale that would otherwise bloat a code comment lives here.
 
+## 2026-10-13 (host hardening)
+
+- **sshd on hydrogen and the family laptops disables keyboard-interactive.** With only
+  `PasswordAuthentication = false`, PAM still accepted passwords that way; hydrogen offered it.
+- hydrogen: `nofail` on `/backup`, monthly scrub of `/data` and `/backup`, smartd, fwupd, zram.
+- sulfur and family laptops: zram; family laptops also get fwupd.
+- Drop `iwlwifi.power_save=0` (sulfur, oryp10): the module default is already off.
+
 ## 2026-10-13 (consistent SQLite backups)
 
 - **Snapshot SQLite before each Borg run** (paperless, calibre-web app and library, marketplace

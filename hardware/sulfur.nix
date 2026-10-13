@@ -77,7 +77,7 @@
     options = [ "fmask=0077" "dmask=0077" ];
   };
 
-  # 32 GB, sized for hibernation.
+  # Backs up zram; hibernation is not configured (no resume offset).
   swapDevices = lib.mkIf (!config.fleet.disk.enable) [{
     device = "/swap/swapfile";
     size = 32768;

@@ -5,7 +5,6 @@
   boot.kernelParams = [
     "pcie_aspm=off"          # Xid 79: the dGPU falls off the bus under ASPM
     "nvme_core.default_ps_max_latency_us=0"
-    "iwlwifi.power_save=0"   # missed beacons
     "usbcore.autosuspend=-1" # xHCI resume
   ];
   boot.blacklistedKernelModules = [ "spd5118" "framebuffer_coreboot" ];

@@ -82,6 +82,8 @@ in
       openFirewall = false;
       settings = {
         PasswordAuthentication = false;
+        # Otherwise PAM still accepts passwords through keyboard-interactive.
+        KbdInteractiveAuthentication = false;
         PermitRootLogin = "no";
       };
     };
@@ -125,5 +127,7 @@ in
     '';
 
     networking.networkmanager.enable = true;
+    services.fwupd.enable = true;
+    zramSwap.enable = true;
   };
 }

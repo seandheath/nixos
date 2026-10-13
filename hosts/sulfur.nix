@@ -75,10 +75,6 @@ in
 
   networking.networkmanager.enable = true;
   networking.networkmanager.wifi.powersave = false;
-  # The Intel driver hit `Tx queue alloc failed` while roaming, leaving LAN traffic at
-  # triple-digit latency even after NetworkManager re-associated. Disable its independent
-  # power-save path too; NetworkManager's setting above does not set this module option.
-  boot.kernelParams = [ "iwlwifi.power_save=0" ];
 
   environment.systemPackages = with pkgs; [
     asusctl
@@ -221,9 +217,10 @@ in
   '';
 
   services.fwupd.enable = true;
+  zramSwap.enable = true;
 
-  # Prevent suspend when on AC power (docked)
   systemd.sleep.settings.Sleep.MemorySleepMode = "s2idle";
+  # No suspend on lid close while on AC power (docked).
   services.logind.settings.Login = {
     HandleLidSwitch = "suspend";
     HandleLidSwitchExternalPower = "ignore";
