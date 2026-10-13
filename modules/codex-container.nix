@@ -23,26 +23,7 @@ let
     # ${runtime}
 
     . ${../packages/container-devices.sh}
-
-    enable_ynab=false
-    forwarded_args=()
-    for arg in "$@"; do
-      if [[ "$arg" == --ynab ]]; then
-        enable_ynab=true
-      else
-        forwarded_args+=("$arg")
-      fi
-    done
-    set -- "''${forwarded_args[@]}"
-
-    ynab_args=()
-    if $enable_ynab; then
-      if [[ ! -s /run/secrets/ynab-api-token ]]; then
-        printf '%s\n' 'ccodex: --ynab requested, but /run/secrets/ynab-api-token is unavailable or empty' >&2
-        exit 1
-      fi
-      ynab_args=(-v /run/secrets/ynab-api-token:/run/secrets/ynab-api-token:ro)
-    fi
+    . ${../packages/container-ynab.sh}
 
     codex_home="$HOME/.codex"
     installed_codex="$codex_home/bin/codex"

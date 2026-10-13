@@ -16,26 +16,10 @@ pkgs.writeShellScriptBin "cclaude" ''
   image="${image}"
 
   . ${./container-devices.sh}
+  . ${./container-ynab.sh}
 
-  enable_ynab=false
-  forwarded_args=()
-  for arg in "$@"; do
-    if [[ "$arg" == --ynab ]]; then
-      enable_ynab=true
-    else
-      forwarded_args+=("$arg")
-    fi
-  done
-  set -- "''${forwarded_args[@]}"
-
-  ynab_args=()
   container_command=()
   if $enable_ynab; then
-    if [[ ! -s /run/secrets/ynab-api-token ]]; then
-      printf '%s\n' 'cclaude: --ynab requested, but /run/secrets/ynab-api-token is unavailable or empty' >&2
-      exit 1
-    fi
-    ynab_args=(-v /run/secrets/ynab-api-token:/run/secrets/ynab-api-token:ro)
     container_command=(claude --dangerously-skip-permissions --mcp-config ${ynabMcpConfig})
   fi
 
