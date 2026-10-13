@@ -1,6 +1,5 @@
 { config, pkgs, lib,... }: {
   config = lib.mkIf (builtins.elem config.fleet.desktop [ "inherit" "gnome" ]) {
-  #dconf.settings = {
   programs.dconf.profiles = {
     user.databases = [{
       settings = with lib.gvariant; {
@@ -17,9 +16,19 @@
             "firefox.desktop"
             "org.keepassxc.KeePassXC.desktop"
           ];
+          disable-user-extensions = false;
+          enabled-extensions = [
+            "appindicatorsupport@rgcjonas.gmail.com"
+            "gTile@vibou"
+            "bluetooth-quick-connect@bjarosze.gmail.com"
+            "Vitals@CoreCoding.com"
+            "display-configuration-switcher@knokelmaat.gitlab.com"
+            "caffeine@patapon.info"
+          ];
         };
         "org/gnome/mutter" = {
           attach-modal-dialogs = false;
+          experimental-features = [ "scale-monitor-framebuffer" "xwayland-native-scaling" ];
         };
         "org/gnome/desktop/background" = {
           picture-uri = "none";
@@ -37,17 +46,6 @@
         };
         "org/gnome/desktop/sound" = {
           allow-volume-above-100-percent = true;
-        };
-        "org/gnome/shell" = {
-          disable-user-extensions = false;
-          enabled-extensions = [
-            "appindicatorsupport@rgcjonas.gmail.com"
-            "gTile@vibou"
-            "bluetooth-quick-connect@bjarosze.gmail.com"
-	    "Vitals@CoreCoding.com"
-	    "display-configuration-switcher@knokelmaat.gitlab.com"
-	    "caffeine@patapon.info"
-          ];
         };
         "org/gnome/shell/extensions/gtile" = {
           grid-sizes = [ "2x3,3x2,4x4" ];
