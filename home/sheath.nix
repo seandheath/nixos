@@ -7,7 +7,7 @@ let
   # laptops carry this account purely for remote administration. Without this they each
   # built VSCodium, treesitter with every grammar, and a dock script hardcoded to three
   # specific monitor serials.
-  workstation = osConfig.fleet.profileName == "sulfur";
+  workstation = osConfig.fleet.workstation;
   # Pi coding agent (pi.dev) and its sops-templated Open WebUI config are
   # workstation-only. hydrogen (server) has no user-level age key at
   # ~/.config/sops/age/keys.txt, so the home sops activation for the openwebui

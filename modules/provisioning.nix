@@ -27,6 +27,9 @@
     description = "Installed desktop; inherit preserves the existing fleet configuration.";
   };
 
+  options.fleet.workstation = lib.mkEnableOption
+    "the admin's own desktop (set by modules/workstation.nix); gates the heavy home config";
+
   options.fleet.provisioning.enable = lib.mkEnableOption
     "machine-local hardware and disk provisioning state";
 

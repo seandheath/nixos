@@ -3,7 +3,7 @@
 # Full editor on sulfur; on the server and the kids' laptops sheath's account is for
 # administration, so it gets nix/bash/python tooling and the matching grammars only.
 let
-  workstation = osConfig.fleet.profileName == "sulfur";
+  workstation = osConfig.fleet.workstation;
 in
 {
   programs.neovim = {

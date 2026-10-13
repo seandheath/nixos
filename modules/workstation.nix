@@ -32,6 +32,8 @@ in
     ./mullvad.nix
   ];
 
+  fleet.workstation = true;
+
   # Programs
   programs.firefox.enable = true;
   programs.nautilus-open-any-terminal = {
