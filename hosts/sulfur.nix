@@ -139,7 +139,6 @@ in
     nvidia = {
       open = true;  # recommended for RTX 50 series
       nvidiaSettings = true;
-      modesetting.enable = true;
       powerManagement.enable = true;
       powerManagement.finegrained = false;
       moduleParams.nvidia = {
@@ -156,17 +155,11 @@ in
       prime = {
         offload.enable = true;
         offload.enableOffloadCmd = true;
-        # lspci
-        nvidiaBusId = "PCI:1:0:0";
-        intelBusId = "PCI:0:2:0";
       };
     };
     graphics = {
       enable = true;
       enable32Bit = true;
-      extraPackages = with pkgs; [
-        nvidia-vaapi-driver
-      ];
     };
   };
 
@@ -241,9 +234,8 @@ in
     IdleAction = "ignore";
   };
 
-  # Reconfigure monitors when the dock connects. mkAfter: hardware/sulfur.nix also sets
-  # this option.
-  services.udev.extraRules = lib.mkAfter ''
+  # Reconfigure monitors when the dock connects.
+  services.udev.extraRules = ''
     ACTION=="change", SUBSYSTEM=="drm", RUN+="${pkgs.systemd}/bin/systemctl start --no-block dock-monitors-hotplug.service"
   '';
 

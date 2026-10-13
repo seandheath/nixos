@@ -299,50 +299,5 @@ in
     requires = [ "ai-marketplace-monitor-talk-relay.service" ];
     after = [ "systemd-tmpfiles-setup.service" "ai-marketplace-monitor-talk-relay.service" ];
     unitConfig.RequiresMountsFor = stateDir;
-    # Migrate the first deployed seed without touching credentials entered directly by a
-    # user. Upstream's Web UI treated these exact placeholders literally instead of
-    # expanding them, which made the real Facebook credentials fail Web UI authentication.
-    preStart = ''
-      if ${pkgs.gnugrep}/bin/grep -Eq \
-        '^[[:space:]]*(username|password) = "\$\{FACEBOOK_(USERNAME|PASSWORD)\}"[[:space:]]*$' \
-        ${stateDir}/config.toml; then
-        ${pkgs.gnused}/bin/sed -i \
-          -e '/^[[:space:]]*username = "''${FACEBOOK_USERNAME}"[[:space:]]*$/d' \
-          -e '/^[[:space:]]*password = "''${FACEBOOK_PASSWORD}"[[:space:]]*$/d' \
-          ${stateDir}/config.toml
-      fi
-
-      # The live config is intentionally Web-UI-managed, so add the Talk notifier once
-      # for hosts seeded before this integration existed and leave later user edits alone.
-      if ! test -e ${stateDir}/.nextcloud-talk-alerts-v1; then
-        if ${pkgs.gnugrep}/bin/grep -Fxq '[user.me]' ${stateDir}/config.toml \
-          && ! ${pkgs.gnugrep}/bin/grep -Eq '^[[:space:]]*ntfy_server[[:space:]]*=' ${stateDir}/config.toml; then
-          ${pkgs.gnused}/bin/sed -i '/^\[user\.me\]$/a\
-ntfy_server = "http://host.containers.internal:${toString talkRelayPort}"\
-ntfy_topic = "marketplace"\
-message_format = "markdown"' ${stateDir}/config.toml
-        fi
-        touch ${stateDir}/.nextcloud-talk-alerts-v1
-      fi
-
-      # Earlier upstream DEBUG logs serialized scheduled-job arguments, including the
-      # Facebook credentials. Replace those exact secret values in retained rotated logs
-      # before the hardened process starts; the secret values never enter argv or the store.
-      for log_file in ${stateDir}/ai-marketplace-monitor.log*; do
-        if test -e "$log_file"; then
-          ${pkgs.perl}/bin/perl -0pi -e '
-            BEGIN {
-              local $/;
-              open my $uf, "<", "${config.sops.secrets."aimm-facebook-username".path}" or die $!;
-              $username = <$uf>;
-              open my $pf, "<", "${config.sops.secrets."aimm-facebook-password".path}" or die $!;
-              $password = <$pf>;
-            }
-            s/\Q$username\E/<redacted-facebook-username>/g if length $username;
-            s/\Q$password\E/<redacted-facebook-password>/g if length $password;
-          ' "$log_file"
-        fi
-      done
-    '';
   };
 }

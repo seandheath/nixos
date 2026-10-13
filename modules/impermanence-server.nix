@@ -8,8 +8,6 @@
 # redis, immich, /etc/ssh, /var/lib/nixos, /etc/machine-id.
 { config, lib, pkgs, ... }:
 {
-  boot.initrd.systemd.enable = true;
-
   # On /persist rather than under a home, so a fresh install does not leave ~/.config
   # root-owned. The installer decrypts secrets/age-key.enc to here.
   sops.age.keyFile = lib.mkForce "/persist/secrets/age-keys.txt";

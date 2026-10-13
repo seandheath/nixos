@@ -5,6 +5,9 @@
   ];
 
   # BASH
+  # fzf previews below.
+  programs.bat.enable = true;
+
   programs.bash = {
     enable = true;
     initExtra = ''

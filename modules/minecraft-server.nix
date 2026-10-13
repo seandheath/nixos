@@ -18,9 +18,6 @@ let
   fabricServer = import ../packages/fabric-server.nix { inherit pkgs; };
 in
 {
-  # The version pin moved to packages/default.nix, so it applies to the flake package set
-  # as well as to hosts. The assertion at the bottom of this file still enforces lockstep.
-
   services.minecraft-server = {
     enable = true;
     eula = true;
@@ -101,7 +98,7 @@ in
     {
       assertion = fabricServer.mcVersion == pkgs.minecraft-server.version;
       message = ''
-        Minecraft version drift: nixpkgs ships minecraft-server ${pkgs.minecraft-server.version}
+        Minecraft version drift: packages/minecraft-version.nix pins ${pkgs.minecraft-server.version}
         but packages/fabric-server.nix pins Fabric intermediary mappings for ${fabricServer.mcVersion}.
 
         Re-transcribe the launch profile for the new version:

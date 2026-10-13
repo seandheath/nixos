@@ -11,7 +11,6 @@ in
     ../modules/gnome.nix
     ../modules/audio.nix
     ../modules/nix-ld.nix
-    ../modules/core.nix
     ../modules/impermanence-server.nix
     ../modules/reverse-proxy.nix
     ../modules/nextcloud.nix
@@ -180,7 +179,8 @@ in
 
   environment.systemPackages = with pkgs; [
     rustdesk-flutter
-    rustup firefox git curl wget htop tree ripgrep srm
+    rustup firefox git curl wget htop btop tree ripgrep srm pciutils openssl nmap unzip
+    pv progress wormhole-william graphviz nixpkgs-fmt
     # /data is RAID0 with no redundancy and both devices carry btrfs corruption_errs;
     # btrfs can detect corruption there but never repair it.
     smartmontools

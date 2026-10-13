@@ -17,43 +17,6 @@ let
   ];
   mods = lib.concatStringsSep "\n" serverMods;
 
-  migrateVanillaClients = pkgs.writeShellScript "valheim-migrate-vanilla-clients-v1" ''
-    set -eu
-
-    migration_dir=${root}/.migrations
-    marker="$migration_dir/vanilla-clients-v1"
-    plugins=${root}/server/BepInEx/plugins
-
-    if [ ! -e "$marker" ]; then
-      # Thunderstore packages are normally unpacked into one top-level directory.
-      # Include the exact DLL names as well for older/manual flat installations.
-      ${pkgs.coreutils}/bin/rm -rf \
-        "$plugins/ValheimModding-Jotunn" \
-        "$plugins/Azumatt-AzuCraftyBoxes" \
-        "$plugins/Goldenrevolver-Quick_Stack_Store_Sort_Trash_Restock" \
-        "$plugins/MSchmoecker-MultiUserChest" \
-        "$plugins/Azumatt-AAA_Crafting" \
-        "$plugins/MainStreetGaming-MassFarming" \
-        "$plugins/Azumatt-AzuAreaRepair" \
-        "$plugins/ComfyMods-ComfyLadders" \
-        "$plugins/Jotunn.dll" \
-        "$plugins/AzuCraftyBoxes.dll" \
-        "$plugins/Quick_Stack_Store_Sort_Trash_Restock.dll" \
-        "$plugins/MultiUserChest.dll" \
-        "$plugins/AAA_Crafting.dll" \
-        "$plugins/MassFarming.dll" \
-        "$plugins/AzuAreaRepair.dll" \
-        "$plugins/ComfyLadders.dll"
-      ${pkgs.coreutils}/bin/mkdir -p "$migration_dir"
-      ${pkgs.coreutils}/bin/touch "$marker"
-    fi
-
-    # SkipSleep 1.0.5 breaks Game.UpdateSleeping on Valheim 1.0 (ZRoutedRpc.Everybody).
-    # Removing it from MODS does not remove its already-installed DLL.
-    ${pkgs.coreutils}/bin/rm -rf "$plugins/SkipSleep" "$plugins/R1NS3-SkipSleep" \
-      "$plugins/ModSkipSleepValheim.dll"
-  '';
-
   start = pkgs.writeShellScript "valheim-start" ''
     set -eu
 
@@ -184,10 +147,7 @@ in
         Group = "valheim";
         Environment = "XDG_RUNTIME_DIR=${runtimeDir}";
         LoadCredential = "password:${config.sops.secrets.valheim-server-password.path}";
-        ExecStartPre = [
-          migrateVanillaClients
-          "-${pkgs.podman}/bin/podman rm -f valheim"
-        ];
+        ExecStartPre = "-${pkgs.podman}/bin/podman rm -f valheim";
         ExecStart = start;
         ExecStartPost = installed;
         ExecStop = "${pkgs.podman}/bin/podman stop --time 180 valheim";

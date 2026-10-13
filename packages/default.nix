@@ -57,7 +57,6 @@ final: prev: {
   minecraft-menu = import ./minecraft-menu { pkgs = final; };
   minecraft-server-image = import ./minecraft-server-image.nix { pkgs = final; };
   minecraft-server-ctl = import ./minecraft-server-ctl.nix { pkgs = final; };
-  qwen-code = import ./qwen-code.nix { pkgs = final; };
   reference-download = import ./reference-download.nix { pkgs = final; };
   re-container = import ./re-container.nix { pkgs = final; };
   ynab-mcp-server = import ./ynab-mcp-server.nix { pkgs = final; };

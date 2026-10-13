@@ -2,6 +2,17 @@
 
 Also the decision log. Rationale that would otherwise bloat a code comment lives here.
 
+## 2026-10-13 (obsolete overrides)
+
+- **Drop overrides nixpkgs now covers:** the qwen-code 0.21.1 pin (nixpkgs has 0.25.0), the
+  calibre-web entry-point patch, `boot.initrd.systemd.enable`, NVIDIA modesetting/VA-API/
+  PreserveVideoMemory and sulfur's PRIME bus IDs, NVMe scheduler rules, oryp10 fstrim,
+  BlueZ 4's `Enable=` key and `fuse.userAllowOther`.
+- **Remove completed migrations:** Valheim vanilla-clients/SkipSleep and the marketplace
+  monitor's placeholder, Talk-notifier and log-redaction passes (all verified done on hydrogen).
+- **Remove dead code:** `diskConfigFor`, `modules/core.nix` (packages moved to hydrogen), the
+  tailscale `desiredUpFlags` alias. Install `bat` for the fzf previews that used it.
+
 ## 2026-10-13 (upgrades resumed, hydrogen hardware)
 
 - **Re-enable nixos-upgrade on hydrogen and sulfur.** Hydrogen's pause ended when the Gitea

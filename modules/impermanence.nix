@@ -1,9 +1,6 @@
 { config, lib, pkgs, ... }:
 
 {
-  # Enable systemd in initrd (required for LUKS unlock)
-  boot.initrd.systemd.enable = true;
-
   # Impermanence configuration
   environment.persistence."/persist" = {
     hideMounts = true;
@@ -52,9 +49,6 @@
     "d /persist/var/lib 0755 root root -"
     "d /persist/secrets 0700 root root -"
   ];
-
-  # Required for impermanence to work with users
-  programs.fuse.userAllowOther = true;
 
   # Btrfs maintenance
   services.btrfs.autoScrub = {

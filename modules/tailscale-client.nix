@@ -12,9 +12,6 @@ let
     # current Wi-Fi/Ethernet default route.
     "--exit-node="
   ] ++ lib.optional (cfg.operatorUser != null) "--operator=${cfg.operatorUser}";
-  # A tagged Headscale pre-auth key assigns the node's tags. Headscale rejects
-  # enrollment when that same request also advertises tags from the client.
-  desiredUpFlags = desiredSetFlags;
 in
 {
   options.fleet.tailscaleClient = {
@@ -98,7 +95,9 @@ in
       openFirewall = true;
       authKeyFile = cfg.authKeyFile;
       useRoutingFeatures = if cfg.acceptRoutes then "client" else "none";
-      extraUpFlags = [ "--login-server=${cfg.loginServer}" ] ++ desiredUpFlags;
+      # A tagged Headscale pre-auth key assigns the node's tags. Headscale rejects
+      # enrollment when that same request also advertises tags from the client.
+      extraUpFlags = [ "--login-server=${cfg.loginServer}" ] ++ desiredSetFlags;
     };
 
     networking.firewall.interfaces.tailscale0 = {

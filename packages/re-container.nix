@@ -7,14 +7,13 @@
 # Why dockerTools.buildLayeredImage rather than a Containerfile:
 #   cclaude (the reference this is modelled on) builds from debian:bookworm-slim and
 #   installs Claude Code with a curl-to-bash installer, because that is how Claude Code
-#   ships. The agents here already exist as Nix packages — including the version-pinned
-#   packages/qwen-code.nix — so building the image from those is reproducible, needs no
+#   ships. The agents here already exist as Nix packages, so building the image from those is reproducible, needs no
 #   network at image build time, and use the same tools as the host.
 #
 # Contents are deliberately minimal. At runtime the launcher mounts the host store and Nix
 # daemon so agents can use project dev shells; unrelated host files remain unmounted.
 let
-  qwen-code = import ./qwen-code.nix { inherit pkgs; };
+  inherit (pkgs) qwen-code;
 
   # HOME and the config tree live here. Deliberately not /home/sheath: nothing in the
   # container should be able to guess-path its way into a host-shaped home directory.

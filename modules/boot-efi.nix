@@ -11,6 +11,5 @@
     boot.loader.systemd-boot.enable = true;
     boot.loader.systemd-boot.configurationLimit = config.fleet.bootGenerations;
     boot.loader.efi.canTouchEfiVariables = true;
-    boot.initrd.systemd.enable = true;
   };
 }

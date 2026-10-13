@@ -9,9 +9,6 @@
     "usbcore.autosuspend=-1" # xHCI resume
   ];
   boot.blacklistedKernelModules = [ "spd5118" "framebuffer_coreboot" ];
-  boot.extraModprobeConfig = ''
-    options nvidia NVreg_PreserveVideoMemoryAllocations=1
-  '';
 
   services.xserver = {
     enable = true;
@@ -24,7 +21,6 @@
     nvidia = {
       open = false;
       nvidiaSettings = true;
-      modesetting.enable = true;
       powerManagement.enable = true;
       # Both guard the same failure: this card drops off the bus when it is allowed to
       # power down, so keep it initialised and keep RTD3 off.
@@ -37,14 +33,10 @@
         intelBusId = "PCI:0:2:0";
       };
     };
-    graphics.extraPackages = with pkgs; [ intel-media-driver nvidia-vaapi-driver ];
+    graphics.extraPackages = [ pkgs.intel-media-driver ];
   };
 
   services.system76-scheduler.enable = true;
-  services.fstrim.enable = true;
-  services.udev.extraRules = ''
-    ACTION=="add|change", KERNEL=="nvme[0-9]n[0-9]", ATTR{queue/scheduler}="none"
-  '';
 
   environment.systemPackages = with pkgs; [
     system76-firmware

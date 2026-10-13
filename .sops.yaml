@@ -1,9 +1,8 @@
 # sops creation rules. Which key can read which file is the whole point:
 # secrets/secrets.yaml holds credentials for hydrogen's services (Nextcloud admin, Borg
-# repo key, fleet VPN SSH key) and stays readable only by the main key. The family
-# laptops carry the FAMILY key instead, so a kid's machine -- which lives outside the
-# house and is not disk-encrypted -- can decrypt its own WireGuard key and password and
-# nothing else.
+# repo key) and stays readable only by the main key. The family laptops carry the FAMILY
+# key instead, so a kid's machine -- which lives outside the house and is not
+# disk-encrypted -- can decrypt only its own secrets.
 #
 # Rotate a recipient here and re-run `sops updatekeys <file>` on every file it matches.
 keys:

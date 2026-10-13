@@ -91,12 +91,6 @@
         })
       ];
 
-      # A host has a disk-config only once the installer has generated one; the hosts
-      # still carried by a hand-written hardware/<host>.nix simply have no file here.
-      diskConfigFor = hostName:
-        nixpkgs.lib.optional (builtins.pathExists (./disk-config + "/${hostName}.nix"))
-          (./disk-config + "/${hostName}.nix");
-
       provisioningFor = hostName:
         nixpkgs.lib.optional
           (builtins.pathExists (./provisioning + "/${hostName}/default.nix"))
@@ -106,7 +100,7 @@
         inherit system;
         specialArgs = { inherit inputs; };
         modules = [ ./hosts/${hostName}.nix { fleet.profileName = hostName; } ]
-          ++ diskConfigFor hostName ++ provisioningFor hostName ++ extraModules ++ commonModules;
+          ++ provisioningFor hostName ++ extraModules ++ commonModules;
       };
 
       # The kids' laptops. modules/family/profile.nix derives the username, secret names,
@@ -163,7 +157,6 @@
           jackify
           minecraft-server-ctl
           minecraft-server-image
-          qwen-code
           reference-download
           re-container
           ynab-mcp-server

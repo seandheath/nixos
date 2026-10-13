@@ -662,7 +662,7 @@
 
           # --wait blocks until the session exits, so this process's lifetime
           # matches the play session and GNOME's "app is running" state is honest.
-          # sheath has passwordless sudo (modules/core.nix), so no auth prompt
+          # sheath has passwordless sudo (modules/accounts.nix), so no auth prompt
           # appears on the projector.
           exec "$sudo" systemctl start --wait "$unit"
         '';
