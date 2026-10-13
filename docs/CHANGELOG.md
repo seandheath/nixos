@@ -2,6 +2,19 @@
 
 Also the decision log. Rationale that would otherwise bloat a code comment lives here.
 
+## 2026-10-13 (upgrades resumed, hydrogen hardware)
+
+- **Re-enable nixos-upgrade on hydrogen and sulfur.** Hydrogen's pause ended when the Gitea
+  config reached `main`. Sulfur froze again under `intel_idle.max_cstate=1`, so C-states are
+  not the cause; drop the trial and keep the lockup-panic and SysRq diagnostics.
+- **hydrogen is a System76 Oryx Pro (i7-12700H, RTX 3070 Ti Laptop), not a tower.** Switch
+  to open NVIDIA modules on the default branch; the Pascal `legacy_580` pin no longer
+  applies. Drop memtest (RAM replaced) and the redundant `networking.wireless` override.
+- **Remove Ollama** (nothing used it) and its Pascal-only CUDA source rebuild.
+  `/var/lib/ollama` remains on disk.
+- **Delete `bridge-slave-restore`.** Its last repair was 2026-09-18 on the old
+  `enp0s31f6`; none on `enp48s0`.
+
 ## 2026-10-13 (OpenCode 2.x)
 
 - **Package OpenCode 2.0.27 from its npm binary**; 2.x is not in nixpkgs. 2.x runs a shared
@@ -160,10 +173,6 @@ Also the decision log. Rationale that would otherwise bloat a code comment lives
 - **Stop sharing `sheath-password-hash` with the kids' laptops.** A child with wheel can read
   the family age key and offline-crack a hash that is also sheath's password on hydrogen and
   sulfur. Give the laptops their own admin hash.
-- **`modules/bridge-slave-restore.nix` retirement gate.** Delete once two consecutive
-  nightlies pass with no repair logged. A repair logged after 2026-08-13 is itself the
-  finding: scripted networking is detaching its own slave, and `br0-netdev`'s
-  `X-ReloadIfChanged` is the next suspect.
 
 ## 2026-09-18 (Sulfur diagnostic configuration rollback)
 

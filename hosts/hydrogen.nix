@@ -19,7 +19,6 @@ in
     ../modules/calibre.nix
     ../modules/paperless.nix
     ../modules/scanner.nix
-    ../modules/ollama.nix
     ../modules/ai-marketplace-monitor.nix
     ../modules/backup.nix
     ../modules/git-server.nix
@@ -59,8 +58,6 @@ in
     allowedUDPPorts = [ 2456 2457 2458 21116 ];
   };
   sops.secrets.tailscale-auth-hydrogen = { };
-  # For diagnosing the transient btrfs csum failures; RAM is the prime suspect.
-  boot.loader.systemd-boot.memtest86.enable = true;
 
   services.minecraftClient = {
     enable = true;
@@ -96,8 +93,6 @@ in
     allowReboot = true;
     rebootWindow = { lower = "05:00"; upper = "06:00"; };
   };
-  # Resume after the Gitea configuration is published to main.
-  systemd.timers.nixos-upgrade.enable = lib.mkForce false;
   systemd.services.nixos-upgrade.serviceConfig.ExecCondition =
     pkgs.writeShellScript "upgrade-backups-idle" ''
       # Exit 1 from ExecCondition skips the run while a backup is active.
@@ -141,10 +136,6 @@ in
   # Valheim publishes on the stable tail address. Permit the bind during the short boot
   # window before tailscaled restores that address to tailscale0.
   boot.kernel.sysctl."net.ipv4.ip_nonlocal_bind" = 1;
-
-  # mkForce because the NetworkManager module defines wireless.enable outright rather than
-  # as a default, and GNOME pulls NM in. No wifi on this host.
-  networking.wireless.enable = lib.mkForce false;
 
   # NM off: scripted networking.bridges already owns br0, and two owners for one interface
   # is the class of bug behind the 2026-08-13 outage. NM held no profiles here and is not
@@ -256,7 +247,7 @@ in
     SleepOperation = "";
   };
 
-  # Xeon E-2176M with HWP, mains-powered 24/7; the balanced EPP leaves frames on the table
+  # i7-12700H with HWP, mains-powered 24/7; the balanced EPP leaves frames on the table
   # under four Minecraft clients plus the server.
   powerManagement.cpuFreqGovernor = "performance";
 
@@ -268,10 +259,6 @@ in
   hardware.graphics.enable = true;
   hardware.graphics.enable32Bit = true;
   hardware.enableRedistributableFirmware = true;
-  # Closed modules: the safe choice for a pre-Turing GPU.
-  hardware.nvidia.open = false;
-  # legacy_580, NOT production: R580 is the last branch supporting Pascal. A pin to a
-  # moving branch name pins nothing -- production, stable and latest all crossed the 590
-  # boundary on the same day and this card lost its driver. See CHANGELOG 2026-08-13.
-  hardware.nvidia.package = config.boot.kernelPackages.nvidiaPackages.legacy_580;
+  # RTX 3070 Ti (Ampere): open modules, default driver branch.
+  hardware.nvidia.open = true;
 }

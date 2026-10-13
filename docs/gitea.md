@@ -43,7 +43,5 @@ Activate with `sudo nixos-rebuild switch --flake path:/home/sheath/nixos#hydroge
 The `path:` prefix includes the ignored `provisioning/hydrogen/` hardware files.
 Check Gitea, bootstrap, nginx, PostgreSQL, HTTPS, SSH, and backup export afterward.
 
-Hydrogen automatic upgrades are paused until this configuration is published to
-GitHub `main`; then remove the `systemd.timers.nixos-upgrade.enable` override in
-`hosts/hydrogen.nix`. The fresh SSH host key is pinned in
+The fresh SSH host key is pinned in
 `packages/gitea-known-hosts`; update any previously trusted client key too.

@@ -77,9 +77,6 @@
         ./modules/auto-update.nix
         # Inert until a host declares its tailnet role.
         ./modules/tailscale-client.nix
-        # Every host: hydrogen's br0 lost its slave during the 2026-08-13 nightly and
-        # stayed unreachable for six hours. Defines nothing on a host with no bridges.
-        ./modules/bridge-slave-restore.nix
         { nixpkgs = nixpkgsConfig; }
         ({ config, ... }: {
           home-manager.useGlobalPkgs = true;
