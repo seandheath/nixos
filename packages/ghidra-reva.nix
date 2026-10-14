@@ -58,6 +58,14 @@ pkgs.ghidra-bin.overrideAttrs (old: {
       --replace-fail \
         'VMARGS_LINUX=-Dsun.java2d.uiScale=1' \
         'VMARGS_LINUX=-Dsun.java2d.uiScale=2'
+
+    # Launch the GUI through PyGhidra so Python GhidraScripts (e.g. ReVa's run-script)
+    # work. Bypasses support/pyghidraRun: it pip-installs the bundled manylinux jpype
+    # wheels into a ~/.config venv, which do not run on NixOS.
+    rm "$out/bin/ghidra"
+    makeWrapper ${pkgs.python3.withPackages (ps: [ ps.pyghidra ])}/bin/python3 "$out/bin/ghidra" \
+      --set JAVA_HOME ${pkgs.openjdk21.home} \
+      --add-flags "-m pyghidra -g --install-dir $out/lib/ghidra"
   '';
 
   meta = old.meta // {
