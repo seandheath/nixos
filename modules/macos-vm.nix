@@ -13,6 +13,18 @@ let
     exec ${pkgs.util-linux}/bin/taskset -c 0-13 \
       ${pkgs.quickemu}/bin/quickemu --vm "$conf" --ssh-port 22220 "$@"
   '';
+  # setsid: QEMU must outlive the terminal that launched it.
+  macosVmHeadless = pkgs.writeShellScriptBin "macos-vm-headless" ''
+    exec ${pkgs.util-linux}/bin/setsid -w ${macosVm}/bin/macos-vm --display none "$@"
+  '';
+  # ACPI power-down so macOS shuts down cleanly; quickemu --kill is SIGKILL.
+  macosVmStop = pkgs.writeShellScriptBin "macos-vm-stop" ''
+    set -euo pipefail
+    cd "$HOME/vms/macos"
+    pid=$(< macos-tahoe/macos-tahoe.pid)
+    echo system_powerdown | ${pkgs.socat}/bin/socat - unix-connect:macos-tahoe/macos-tahoe-monitor.socket
+    ${pkgs.coreutils}/bin/tail --pid="$pid" -f /dev/null
+  '';
 in {
   users.groups.kvm.members = [ config.fleet.adminUser ];
   # macOS guests touch MSRs that KVM would otherwise reject.
@@ -21,5 +33,5 @@ in {
   services.udev.extraRules = ''
     SUBSYSTEM=="usb", ATTR{idVendor}=="05ac", MODE="0660", GROUP="kvm"
   '';
-  environment.systemPackages = [ macosVm ];
+  environment.systemPackages = [ macosVm macosVmHeadless macosVmStop ];
 }
