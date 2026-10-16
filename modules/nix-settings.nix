@@ -7,8 +7,6 @@
   nix.settings = {
     experimental-features = [ "nix-command" "flakes" ];
     download-buffer-size = 1073741824; # 1 GiB — avoids buffer-full stalls on big fetches
-    max-jobs = 6;
-    cores = 4;
 
     # Binary caches (consolidated here so all substituters live in one place).
     # pebble: personal cachix.

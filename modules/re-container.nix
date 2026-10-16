@@ -101,7 +101,7 @@ let
       -e HOME=/home/re \
       -e PATH=/bin:/run/current-system/sw/bin \
       -e NIX_REMOTE=daemon \
-      -e 'NIX_CONFIG=experimental-features = nix-command flakes' \
+      -e $'NIX_CONFIG=experimental-features = nix-command flakes\nmax-jobs = 6\ncores = 4' \
       -e TERM="''${TERM:-xterm-256color}" \
       -e COLORTERM="''${COLORTERM:-truecolor}" \
       "''${config_args[@]}" \
