@@ -21,6 +21,8 @@
   # /var/tmp sits on the tmpfs root; multi-GB image loads overflow it. Stage in the
   # on-disk container storage instead.
   virtualisation.containers.containersConf.settings.engine.image_copy_tmp_dir = "storage";
+  # Podman uses but never creates <graphroot>/tmp; root's already exists.
+  systemd.user.tmpfiles.rules = [ "d %h/.local/share/containers/storage/tmp 0700 - - -" ];
   environment.systemPackages = with pkgs; [
     dive 
     podman-tui 
