@@ -36,21 +36,14 @@ let
       exec ${pkgs.codex}/bin/codex "$@"
     fi
 
-    # Install the standalone CLI into the shared, writable Codex home. The Nix package remains
-    # the reproducible fallback, while this lets `ccodex update` track upstream releases without
-    # attempting to modify the immutable container image.
-    if [[ "''${1:-}" == update ]]; then
-      printf 'ccodex: installing the latest standalone Codex CLI...\n' >&2
-      ${pkgs.curl}/bin/curl -fsSL https://chatgpt.com/codex/install.sh \
-        | PATH="$codex_home/bin:$PATH" \
-          CODEX_HOME="$codex_home" \
-          CODEX_INSTALL_DIR="$codex_home/bin" \
-          CODEX_NON_INTERACTIVE=1 \
-          ${pkgs.bash}/bin/bash
-      printf 'ccodex: now using ' >&2
-      "$installed_codex" --version
-      exit 0
-    fi
+    # Install the latest standalone CLI into the shared, writable Codex home on every launch;
+    # the immutable image's copy only changes on a system rebuild.
+    ${pkgs.curl}/bin/curl -fsSL https://chatgpt.com/codex/install.sh \
+      | PATH="$codex_home/bin:$PATH" \
+        CODEX_HOME="$codex_home" \
+        CODEX_INSTALL_DIR="$codex_home/bin" \
+        CODEX_NON_INTERACTIVE=1 \
+        ${pkgs.bash}/bin/bash >/dev/null
 
     if ! ${podman} image exists ${imageName} 2>/dev/null; then
       printf 'ccodex: image not found, loading...\n' >&2
@@ -63,10 +56,6 @@ let
     fi
 
     project_dir="$(pwd)"
-    codex_command=/bin/codex
-    if [[ -x "$installed_codex" ]]; then
-      codex_command="$installed_codex"
-    fi
     resume=false
     for arg in "$@"; do
       [[ "$arg" == resume ]] && resume=true
@@ -131,7 +120,7 @@ let
       "''${sshagent_args[@]}" \
       -w "''${project_dir}" \
       ${imageName} \
-      "$codex_command" "''${codex_args[@]}" "$@")"
+      "$installed_codex" "''${codex_args[@]}" "$@")"
 
     set +e
     ${podman} start -a -i --detach-keys=ctrl-c --sig-proxy=false "$container_id"

@@ -18,6 +18,9 @@
     dockerCompat = true;
     defaultNetwork.settings.dns_enabled = true;
   };
+  # /var/tmp sits on the tmpfs root; multi-GB image loads overflow it. Stage in the
+  # on-disk container storage instead.
+  virtualisation.containers.containersConf.settings.engine.image_copy_tmp_dir = "storage";
   environment.systemPackages = with pkgs; [
     dive 
     podman-tui 

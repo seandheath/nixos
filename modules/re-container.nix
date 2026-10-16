@@ -16,10 +16,9 @@ let
     . ${../packages/reva-flag.sh}
     . ${../packages/container-devices.sh}
 
-    # Qwen's existing setup and its shell remain RE-only.
-    if [[ '${cmd}' == qwen || '${cmd}' == bash ]]; then reva=true; fi
+    # The shell remains RE-only.
+    if [[ '${cmd}' == bash ]]; then reva=true; fi
     config_args=()
-    env_args=()
     network=pasta:-T,none
     if $reva; then network=pasta:-T,8080; fi
     sshagent_args=()
@@ -41,8 +40,30 @@ let
       config_args+=(-v "$source:$2:ro")
     }
 
+    command='${cmd}'
     case '${cmd}' in
       opencode)
+        # Latest opencode from npm, patched for NixOS. The image's /nix/store copy only
+        # changes on a system rebuild.
+        oc_dir="$HOME/.local/share/copencode"
+        oc_version="$(${pkgs.curl}/bin/curl -fsSL https://registry.npmjs.org/@opencode/cli-linux-x64/latest | ${pkgs.jq}/bin/jq -er .version)"
+        if [[ "$(cat "$oc_dir/version" 2>/dev/null)" != "$oc_version" ]]; then
+          printf '%s: installing opencode %s...\n' '${name}' "$oc_version" >&2
+          oc_tmp="$(mktemp -d)"
+          ${pkgs.curl}/bin/curl -fsSL "https://registry.npmjs.org/@opencode/cli-linux-x64/-/cli-linux-x64-$oc_version.tgz" \
+            | tar -xz -C "$oc_tmp"
+          ${pkgs.patchelf}/bin/patchelf \
+            --set-interpreter ${pkgs.glibc}/lib/ld-linux-x86-64.so.2 \
+            --set-rpath ${pkgs.glibc}/lib \
+            "$oc_tmp/package/bin/opencode"
+          mkdir -p "$oc_dir"
+          mv -f "$oc_tmp/package/bin/opencode" "$oc_dir/opencode"
+          rm -rf "$oc_tmp"
+          printf '%s\n' "$oc_version" > "$oc_dir/version"
+        fi
+        config_args+=(-v "$oc_dir/opencode:/run/opencode:ro" -e OPENCODE_DISABLE_AUTOUPDATE=true)
+        command=/run/opencode
+
         oc_config=opencode-container.json
         if $reva; then oc_config=opencode-container-re.json; fi
         mount_file "$HOME/.config/opencode/$oc_config" /home/re/.config/opencode/opencode.json
@@ -51,16 +72,6 @@ let
           mount_file "$HOME/.config/opencode/re-instructions.md" "$HOME/.config/opencode/re-instructions.md"
           skill="$(resolve_file "$HOME/.config/opencode/skills/datasheet-reference/SKILL.md")"
           config_args+=(-v "$(dirname "$skill"):/home/re/.config/opencode/skills/datasheet-reference:ro")
-        fi
-        ;;
-      qwen|bash)
-        if [[ -f "$HOME/.qwen/re-settings.json" ]]; then
-          mount_file "$HOME/.qwen/re-settings.json" /run/config/qwen/settings.json
-          mount_file "$HOME/.qwen/QWEN.md" /run/config/qwen/QWEN.md
-        fi
-        if [[ -f "$HOME/.qwen/.env" ]]; then
-          set -a; . "$HOME/.qwen/.env"; set +a
-          env_args=(-e OPENWEBUI_URL -e OPENWEBUI_MODEL -e OPENWEBUI_API_KEY)
         fi
         ;;
     esac
@@ -94,17 +105,15 @@ let
       -e TERM="''${TERM:-xterm-256color}" \
       -e COLORTERM="''${COLORTERM:-truecolor}" \
       "''${config_args[@]}" \
-      "''${env_args[@]}" \
       "''${sshagent_args[@]}" \
       "''${device_args[@]}" \
       -w "''${project_dir}" \
       ${imageName} \
-      ${cmd} "$@"
+      "$command" "$@"
   '';
 
-  cqwen = mkLauncher "cqwen" "qwen";
   copencode = mkLauncher "copencode" "opencode";
   cqwen-shell = mkLauncher "cqwen-shell" "bash";
 in {
-  environment.systemPackages = [ cqwen copencode cqwen-shell cqwen-build image.runtime ];
+  environment.systemPackages = [ copencode cqwen-shell cqwen-build image.runtime ];
 }

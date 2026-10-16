@@ -29,7 +29,6 @@ let
   runtime = pkgs.buildEnv {
     name = "codex-container-runtime";
     paths = with pkgs; [
-      codex
       mmdc
       nix
       git
@@ -73,10 +72,6 @@ in
   enableFakechroot = true;
 
   config = {
-    Cmd = [
-      "/bin/codex"
-      "--yolo"
-    ];
     User = toString uid;
     WorkingDir = homeDir;
     Env = [

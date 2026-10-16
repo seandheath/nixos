@@ -27,10 +27,8 @@ pkgs.writeShellScriptBin "cclaude" ''
     ${upstream.cclaude-setup}/bin/cclaude-setup
   fi
 
-  if ! ${podman} image exists "$image" 2>/dev/null; then
-    printf 'cclaude: image not found, building...\n' >&2
-    ${upstream.cclaude-build}/bin/cclaude-build
-  fi
+  # Rebuild on the latest base image; layer caching makes this cheap when nothing changed.
+  ${upstream.cclaude-update}/bin/cclaude-update >/dev/null
 
   if [[ ! -S /nix/var/nix/daemon-socket/socket ]]; then
     cat >&2 <<EOF
@@ -59,6 +57,18 @@ pkgs.writeShellScriptBin "cclaude" ''
   fi
 
   ${import ./container-ssh.nix { inherit pkgs; }}
+
+  # Claude Code lives in the home volume, not the image, so update it there before starting.
+  ${podman} run --rm \
+    --userns=keep-id \
+    --cap-drop=ALL \
+    --security-opt no-new-privileges:true \
+    --security-opt label=disable \
+    --read-only \
+    --tmpfs /tmp:rw,nosuid,nodev,size=2g,mode=1777 \
+    -v cclaude-home:/home/claude:rw,U \
+    -e HOME=/home/claude \
+    "$image" claude update >/dev/null
 
   exec ${podman} run -it --rm \
     --name "cclaude-''${project_name}" \
