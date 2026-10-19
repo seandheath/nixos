@@ -17,12 +17,12 @@ let
   macosVmHeadless = pkgs.writeShellScriptBin "macos-vm-headless" ''
     exec ${pkgs.util-linux}/bin/setsid -w ${macosVm}/bin/macos-vm --display none "$@"
   '';
-  # ACPI power-down so macOS shuts down cleanly; quickemu --kill is SIGKILL.
+  # Shut down over SSH: macOS ignores the ACPI power button (system_powerdown) when headless,
+  # and quickemu --kill is SIGKILL.
   macosVmStop = pkgs.writeShellScriptBin "macos-vm-stop" ''
     set -euo pipefail
-    cd "$HOME/vms/macos"
-    pid=$(< macos-tahoe/macos-tahoe.pid)
-    echo system_powerdown | ${pkgs.socat}/bin/socat - unix-connect:macos-tahoe/macos-tahoe-monitor.socket
+    pid=$(< "$HOME/vms/macos/macos-tahoe/macos-tahoe.pid")
+    ssh -p 22220 dev@localhost sudo shutdown -h now
     ${pkgs.coreutils}/bin/tail --pid="$pid" -f /dev/null
   '';
 in {
