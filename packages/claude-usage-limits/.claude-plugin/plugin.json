@@ -1,0 +1,1 @@
+{ "name": "usage-limits", "version": "0.1.0", "description": "Shows subscription rate-limit usage as bars under the prompt", "types": "./types/index.d.ts" }

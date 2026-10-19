@@ -104,9 +104,9 @@ in
     home.file.".claude/CLAUDE.md".force = true;
     home.file.".codex/AGENTS.md".source = ../prompts/AGENTS.md;
 
-    # Claude Code permission rules, merged rather than declared: settings.json is NOT a
-    # home.file because Claude Code writes to it itself, and a read-only store symlink makes
-    # those writes fail. jq-merging keeps the file writable and our entries self-healing.
+    # Claude Code permission rules and plugin dirs, merged rather than declared: settings.json
+    # is NOT a home.file because Claude Code writes to it itself, and a read-only store symlink
+    # makes those writes fail. jq-merging keeps the file writable and our entries self-healing.
     # MCP rules match as mcp__<server> or mcp__<server>__<tool>; wildcards are not supported.
     imports = [ ({ lib, pkgs, ... }: {
       home.activation.claudeSettings = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
@@ -115,7 +115,8 @@ in
         settings="$HOME/.claude/settings.json"
         mkdir -p "$(dirname "$settings")"
         [ -s "$settings" ] || echo '{}' > "$settings"
-        ${pkgs.jq}/bin/jq '.permissions.allow = ((.permissions.allow // []) + ["mcp__ReVa"] | unique)' \
+        ${pkgs.jq}/bin/jq '.permissions.allow = ((.permissions.allow // []) + ["mcp__ReVa"] | unique)
+          | .env.CLAUDE_CODE_PLUGIN_DIRS = "${../packages/claude-usage-limits}"' \
           "$settings" > "$settings.tmp" && mv "$settings.tmp" "$settings"
       '';
     }) ];

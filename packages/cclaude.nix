@@ -89,6 +89,7 @@ pkgs.writeShellScriptBin "cclaude" ''
     -e CLAUDE_CODE_OAUTH_TOKEN="''${token}" \
     -e HOME=/home/claude \
     -e NIX_REMOTE=daemon \
+    -e CLAUDE_CODE_PLUGIN_DIRS=${./claude-usage-limits} \
     -e $'NIX_CONFIG=max-jobs = 6\ncores = 4' \
     -e TERM="''${TERM:-xterm-256color}" \
     -e COLORTERM="''${COLORTERM:-truecolor}" \
