@@ -18,7 +18,6 @@ in
     ../modules/calibre.nix
     ../modules/paperless.nix
     ../modules/scanner.nix
-    ../modules/ai-marketplace-monitor.nix
     ../modules/backup.nix
     ../modules/git-server.nix
     ../modules/gitea.nix
