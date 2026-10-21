@@ -1,11 +1,8 @@
-{ config, pkgs, lib, ... }:
+{ pkgs, lib, ... }:
 # Nextcloud on hydrogen, reachable through the home tailnet at https://nc.luckyobserver.com.
 # The nextcloud module generates its own nginx vhost on `hostName`; we attach the
 # wildcard *.luckyobserver.com cert (defined in reverse-proxy.nix) to it below.
 {
-  # Admin password sourced from sops (reuses the pre-existing secret).
-  sops.secrets.nextcloud-adminpass.owner = "nextcloud";
-
   services.nextcloud = {
     enable = true;
     package = pkgs.nextcloud35;
@@ -15,8 +12,6 @@
     database.createLocally = true;   # provisions local PostgreSQL (no dbpass needed)
     configureRedis = true;           # local Redis for file locking / caching
     config = {
-      adminuser = "admin";
-      adminpassFile = config.sops.secrets.nextcloud-adminpass.path;
       dbtype = "pgsql";
     };
     settings = {
