@@ -120,9 +120,5 @@
     # Web browser
     google-chrome
     mullvad-browser
-
-    # USB hardware tools (Great Scott Gadgets Cynthion)
-    cynthion   # CLI/Python utilities for the Cynthion USB test instrument
-    packetry   # USB 2.0 protocol analyzer GUI for Cynthion
   ];
 }
