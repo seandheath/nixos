@@ -104,6 +104,20 @@ in
         IdentityFile = personalIdentity;
       };
 
+      # In a podman container (cclaude --allow-ssh), localhost is the container, not sulfur.
+      macos-vm-container = lib.hm.dag.entryBefore [ "macos-vm" ] {
+        header = "Match host macos-vm exec \"test -e /run/.containerenv\"";
+        HostName = "host.containers.internal";
+      };
+
+      macos-vm = {
+        HostName = "localhost";
+        User = "dev";
+        Port = 22220;
+        IdentityFile = "~/.ssh/id_ed25519";
+        HostKeyAlias = "[localhost]:22220";
+      };
+
       "github.com" = {
         User = "git";
         IdentityFile = "~/.ssh/id_cclaude";
