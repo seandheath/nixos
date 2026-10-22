@@ -1,6 +1,6 @@
 { pkgs, upstream }:
 
-# cclaude launcher with opt-in access to USB/UART devices and the YNAB MCP server.
+# cclaude launcher with opt-in access to USB/UART devices, host SSH, and the YNAB MCP server.
 let
   podman = "${pkgs.podman}/bin/podman";
   image = "localhost/cclaude:latest";
@@ -17,6 +17,17 @@ pkgs.writeShellScriptBin "cclaude" ''
 
   . ${./container-devices.sh}
   . ${./container-ynab.sh}
+
+  allow_ssh=false
+  _kept=()
+  for _arg in "$@"; do
+    if [[ "$_arg" == --allow-ssh ]]; then
+      allow_ssh=true
+    else
+      _kept+=("$_arg")
+    fi
+  done
+  set -- "''${_kept[@]}"
 
   container_command=()
   if $enable_ynab; then
@@ -57,6 +68,19 @@ pkgs.writeShellScriptBin "cclaude" ''
   fi
 
   ${import ./container-ssh.nix { inherit pkgs; }}
+
+  # Host SSH config and known hosts; IdentityFile entries resolve to agent keys via their .pub files.
+  if $allow_ssh; then
+    if [[ ! -S "''${SSH_AUTH_SOCK:-}" ]]; then
+      echo "cclaude: --allow-ssh requested, but no ssh-agent socket is available" >&2
+      exit 1
+    fi
+    sshagent_args+=(-v "$(readlink -f "$HOME/.ssh/config"):/etc/ssh/ssh_config:ro"
+      -v "$HOME/.ssh/known_hosts:/etc/ssh/ssh_known_hosts:ro")
+    for pub in "$HOME"/.ssh/*.pub; do
+      sshagent_args+=(-v "$(readlink -f "$pub"):/home/claude/.ssh/''${pub##*/}:ro")
+    done
+  fi
 
   # Claude Code lives in the home volume, not the image, so update it there before starting.
   ${podman} run --rm \
