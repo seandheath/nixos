@@ -26,7 +26,8 @@ if $allow_usb; then
     exit 1
   fi
   # Bind the bus directory so devices that reconnect or re-enumerate remain visible.
-  device_args+=(-v /dev/bus/usb:/dev/bus/usb:rw)
+  # adb's libusb backend finds no devices in the container; its native backend scans /dev/bus/usb.
+  device_args+=(-v /dev/bus/usb:/dev/bus/usb:rw -e ADB_LIBUSB=0)
 fi
 if $allow_uart; then
   if [[ ! -d /dev/uart ]]; then
